@@ -303,8 +303,7 @@ async def main() -> None:
     # Main content area
     display_page_logo()
     st.title("Explore")
-    if "analyst_db" not in st.session_state:
-        st.warning("Could not identify user, please provide your API token")
+    if not hasattr(st.session_state, "analyst_db"):
         return
 
     analyst_db = cast(AnalystDB, st.session_state.analyst_db)
@@ -507,9 +506,9 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    if "datarobot_connect" not in st.session_state:
-        datarobot_connect = DataRobotTokenManager()
-        st.session_state.datarobot_connect = datarobot_connect
+    datarobot_connect = DataRobotTokenManager()
+    st.session_state.datarobot_connect = datarobot_connect
+
     asyncio.run(main())
 else:
     loop = asyncio.new_event_loop()

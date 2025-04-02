@@ -331,20 +331,12 @@ if "current_chat_id" not in st.session_state:
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 
-if "retries" not in st.session_state:
-    st.session_state.retries = 0
-
 
 async def main() -> None:
     await state_init()
     # Main page content (Chat Interface)
     display_page_logo()
     if "analyst_db" not in st.session_state:
-        st.session_state.retries += 1
-        if st.session_state.retries >= 5:
-            st.warning("Could not identify user, please provide your API token")
-            return
-        st.error("Failed to initialize the database connection.")
         time.sleep(1)
         st.rerun()
 
@@ -587,9 +579,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    if "datarobot_connect" not in st.session_state:
-        datarobot_connect = DataRobotTokenManager()
-        st.session_state.datarobot_connect = datarobot_connect
+    datarobot_connect = DataRobotTokenManager()
+    st.session_state.datarobot_connect = datarobot_connect
 
     asyncio.run(main())
 else:

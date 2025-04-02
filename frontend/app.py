@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 from typing import List
 
 import streamlit as st
@@ -31,17 +30,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 apply_custom_css()
-
-if "datarobot_connect" not in st.session_state:
-    datarobot_connect = DataRobotTokenManager()
-    st.session_state.datarobot_connect = datarobot_connect
+datarobot_connect = DataRobotTokenManager()
+st.session_state.datarobot_connect = datarobot_connect
 
 
-asyncio.run(
-    st.session_state.datarobot_connect.display_info(
-        st.sidebar.container(key="user_info")
-    )
-)
+datarobot_connect.display_info(st.sidebar.container(key="user_info"))
 
 pg = st.navigation(pages)
 pg.run()
