@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v0.1.7-release.11.0.1] - 2025-05-06
+
+### Fixed 
+
+- Fixed error when user doesn't have a last name
+
+### Changed
+
+- Pinned streamlit to version 1.44.1 to improve stability
+
 ## [v0.1.7-release.11.0] - 2025-04-02
 
 ### Added
