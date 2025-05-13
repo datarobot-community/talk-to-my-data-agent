@@ -31,6 +31,7 @@ from typing import (
     TypeVar,
     cast,
 )
+from urllib.parse import urljoin
 
 import datarobot as dr
 import instructor
@@ -116,8 +117,8 @@ def log_memory() -> None:
 try:
     dr_client = dr.Client()
     chat_agent_deployment_id = LLMDeployment().id
-    deployment_chat_base_url = (
-        dr_client.endpoint + f"/deployments/{chat_agent_deployment_id}/"
+    deployment_chat_base_url = urljoin(
+        dr_client.endpoint, f"/deployments/{chat_agent_deployment_id}/"
     )
 
     class AsyncLLMClient:
