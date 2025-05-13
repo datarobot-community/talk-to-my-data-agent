@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+
+## [v0.1.7-release.11.0.1b] - 2025-05-13
+
+### Fixed
+
+- Roll back the urljoin fix.
+
 ## [v0.1.7-release.11.0.1a] - 2025-05-13
 
 ### Fixed
