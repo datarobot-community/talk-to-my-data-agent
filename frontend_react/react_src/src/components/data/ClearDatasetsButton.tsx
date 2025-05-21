@@ -11,7 +11,7 @@ interface ClearDatasetsButtonProps {
 
 export const ClearDatasetsButton: React.FC<ClearDatasetsButtonProps> = ({ onClear }) => {
   const { mutate } = useDeleteAllDatasets();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   
   const handleClick = () => {
     mutate();
