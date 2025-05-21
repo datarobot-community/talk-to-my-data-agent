@@ -27,6 +27,7 @@ import { useAppState } from "@/state/hooks";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AxiosError } from "axios";
 import { TruncatedText } from "./ui-custom/truncated-text";
+import { useTranslation } from "react-i18next";
 
 export const AddDataModal = () => {
   const { data } = useFetchAllDatasets();
@@ -38,6 +39,7 @@ export const AddDataModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
@@ -75,12 +77,12 @@ export const AddDataModal = () => {
     >
       <DialogTrigger asChild>
         <Button variant="outline">
-          <FontAwesomeIcon icon={faPlus} /> Add Data
+          <FontAwesomeIcon icon={faPlus} /> {t("add_data")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>Add Data</DialogTitle>
+          <DialogTitle>{t("add_data")}</DialogTitle>
           <Separator className="border-t" />
           <DialogDescription></DialogDescription>
         </DialogHeader>

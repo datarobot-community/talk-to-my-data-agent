@@ -23,12 +23,12 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({
         DataRobot generates additional content based on your original question.
       </InfoText> */}
       {dataset && (
-        <CollapsiblePanel header="Dataset">
+        <CollapsiblePanel header="Dataset" defaultOpen={false}>
           <AnalystDatasetTable records={dataset?.data_records} />
         </CollapsiblePanel>
       )}
       {code && (
-        <CollapsiblePanel header="Code">
+        <CollapsiblePanel header="Code" defaultOpen={true}>
           <div className="markdown-content">
             <SyntaxHighlighter
               language="python"

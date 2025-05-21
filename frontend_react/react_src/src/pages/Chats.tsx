@@ -19,6 +19,7 @@ import { IChatMessage } from "@/api-state/chat-messages/types";
 import { useGeneratedDictionaries } from "@/api-state/dictionaries/hooks";
 import { useMultipleDatasetMetadata } from "@/api-state/cleansed-datasets/hooks";
 import { DATA_SOURCES } from "@/constants/dataSources";
+import { useTranslation } from "react-i18next";
 
 // Lazy load ResponseMessage for better performance
 const ResponseMessage = lazy(() =>
@@ -81,6 +82,7 @@ const ChatMessageItem = ({
 export const Chats: React.FC = () => {
   const { chatId } = useParams<{ chatId?: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // API data hooks
   const { data: messages = [], status: messagesStatus } = useFetchAllMessages({
@@ -199,7 +201,7 @@ export const Chats: React.FC = () => {
     return (
       <>
         <h2 className="text-xl flex-1">
-          <strong>{activeChat.name || "New Chat"}</strong>
+          <strong>{activeChat.name || t("new_chat")}</strong>
           <RenameChatModal
             chatId={activeChat.id}
             currentName={activeChat.name}
@@ -212,7 +214,7 @@ export const Chats: React.FC = () => {
         </div>
         <Button variant="ghost" onClick={handleDeleteChat}>
           <FontAwesomeIcon icon={faTrash} />
-          <span className="ml-2">Delete chat</span>
+          <span className="ml-2">{t("delete_chat")}</span>
         </Button>
       </>
     );

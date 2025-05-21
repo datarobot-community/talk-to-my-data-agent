@@ -17,6 +17,7 @@ import { useCreateChat } from "@/api-state/chat-messages/hooks";
 import { useNavigate } from "react-router-dom";
 import { generateChatRoute } from "@/pages/routes";
 import { useAppState } from "@/state/hooks";
+import { useTranslation } from "react-i18next";
 
 export const NewChatModal = () => {
   const [name, setName] = useState("");
@@ -24,6 +25,7 @@ export const NewChatModal = () => {
   const { mutate: createChat, isPending } = useCreateChat();
   const navigate = useNavigate();
   const { dataSource } = useAppState();
+  const { t } = useTranslation();
   return (
     <Dialog
       defaultOpen={false}
@@ -35,27 +37,27 @@ export const NewChatModal = () => {
     >
       <DialogTrigger asChild>
         <Button variant="outline">
-          <FontAwesomeIcon icon={faPlus} /> New chat
+          <FontAwesomeIcon icon={faPlus} /> {t("new_chat")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create new chat</DialogTitle>
+          <DialogTitle>{t("create_new_chat")}</DialogTitle>
           <DialogDescription>
-            Creating a new chat does not affect any of your existing questions.
+            {t("create_chat_description")}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              Chat name
+              {t("chat_name")}
             </Label>
             <Input
               id="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="col-span-3"
-              placeholder="Enter a name for your chat"
+              placeholder={t("enter_chat_name")}
               disabled={isPending}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && name.trim()) {
@@ -81,7 +83,7 @@ export const NewChatModal = () => {
               setOpen(false);
             }}
           >
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             onClick={() => {
@@ -99,7 +101,7 @@ export const NewChatModal = () => {
             }}
             disabled={isPending || !name.trim()}
           >
-            {isPending ? "Creating..." : "Create chat"}
+            {isPending ? t("creating_new_chat") : t("create_chat")}
           </Button>
         </DialogFooter>
       </DialogContent>
