@@ -89,7 +89,9 @@ class DataFrameWrapper:
             return cls(v)
         elif isinstance(v, list):
             try:
-                df = pl.DataFrame(v)
+                # Use up to 100,000 rows to infer the schema
+                infer_len = min(len(v), 100_000)
+                df = pl.DataFrame(v, infer_schema_length=infer_len)
                 return cls(df)
             except Exception as e:
                 raise ValueError(
@@ -143,7 +145,10 @@ class AnalystDataset(BaseModel):
         if "data" not in values and "data_records" in values:
             try:
                 records = values["data_records"]
-                df = pl.DataFrame(records)
+                # use full data to infer the schema
+                # Use up to 100,000 rows to infer the schema to balance accuracy and memory usage
+                infer_len = min(len(records), 100_000)
+                df = pl.DataFrame(records, infer_schema_length=infer_len)
                 # Wrap the DataFrame before storing it.
                 values["data"] = DataFrameWrapper(df)
             except Exception as e:
