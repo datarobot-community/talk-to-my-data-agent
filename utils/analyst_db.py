@@ -70,48 +70,53 @@ class DatasetHandler:
         name: str,
         dataset_type: DatasetType,
         data_source: DataSourceType,
-        original_name: str | None = None,
-        file_size: int = 0,
-    ) -> None:
-        """Register a Polars DataFrame with explicit dataset type tracking."""
-        logger.info(f"Registering dataframe {name} as {dataset_type.value}")
-
-        async for session in get_async_session():
-            try:
+        original_dataset_id: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        """Register a dataframe in the database."""
+        try:
+            async with get_async_session() as session:
                 # Check if dataset already exists
-                result = await session.execute(
+                existing = await session.execute(
                     select(DatasetMetadata).where(DatasetMetadata.table_name == name)
                 )
-                if result.scalar_one_or_none():
-                    raise ValueError(f"Table '{name}' already exists in the database")
+                if existing.scalar_one_or_none():
+                    raise ValueError(f"Dataset {name} already exists")
 
-                # For cleansed/dictionary datasets, verify original exists
-                if dataset_type.value in (DatasetType.CLEANSED.value, DatasetType.DICTIONARY.value):
-                    if not original_name:
+                # For cleansed or dictionary types, verify original dataset exists
+                if dataset_type in [DatasetType.CLEANSED, DatasetType.DICTIONARY]:
+                    if not original_dataset_id:
                         raise ValueError(
-                            f"original_name required for {dataset_type.value} datasets"
+                            f"Original dataset ID required for {dataset_type.value} type"
                         )
-                    result = await session.execute(
-                        select(DatasetMetadata).where(DatasetMetadata.table_name == original_name)
+                    original = await session.execute(
+                        select(DatasetMetadata).where(
+                            DatasetMetadata.id == original_dataset_id
+                        )
                     )
-                    if not result.scalar_one_or_none():
-                        raise ValueError(f"Original dataset '{original_name}' not found")
+                    if not original.scalar_one_or_none():
+                        raise ValueError(f"Original dataset {original_dataset_id} not found")
 
                 # Create metadata with timezone-naive datetime
+                current_time = datetime.now(timezone.utc).replace(tzinfo=None)
                 metadata = DatasetMetadata(
                     table_name=name,
-                    dataset_type=dataset_type.value,
-                    original_name=original_name or name,
-                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),  # Convert to naive datetime
-                    columns=list(df.columns),
-                    row_count=len(df),
-                    data_source=data_source.value,
-                    file_size=file_size,
+                    dataset_type=dataset_type,
+                    data_source=data_source,
+                    original_dataset_id=original_dataset_id,
+                    description=description,
+                    created_at=current_time,
+                    updated_at=current_time,
                 )
                 session.add(metadata)
+                await session.flush()  # Get the ID
 
-                # Convert Polars DataFrame to pandas for SQLAlchemy
+                # Convert to pandas for SQLAlchemy
                 pandas_df = df.to_pandas()
+
+                # Convert all datetime columns to timezone-naive
+                for col in pandas_df.select_dtypes(include=['datetime64[ns]']).columns:
+                    pandas_df[col] = pandas_df[col].dt.tz_localize(None)
 
                 # Get the engine from the session
                 engine = session.get_bind()
@@ -128,14 +133,12 @@ class DatasetHandler:
                     )
                 )
 
-                # Commit all changes at once
                 await session.commit()
+                return metadata.id
 
-            except Exception as e:
-                logger.error(f"Error registering dataframe {name}: {e}")
-                # Rollback all changes if anything fails
-                await session.rollback()
-                raise
+        except Exception as e:
+            logger.error(f"Error registering dataframe {name}: {e}")
+            raise
 
     async def list_datasets(
         self,
@@ -326,7 +329,7 @@ class ChatHandler:
         logger.info(f"Creating new chat '{chat_name}' for user {self.user_id}")
 
         chat_id = str(uuid.uuid4())
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
 
         async for session in get_async_session():
             chat = ChatHistory(
@@ -433,7 +436,7 @@ class ChatHandler:
                 return
 
             chat.chat_name = new_name
-            chat.updated_at = datetime.now(timezone.utc)
+            chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
             await session.commit()
 
     async def update_chat_data_source(self, chat_id: str, data_source: str) -> None:
@@ -450,7 +453,7 @@ class ChatHandler:
                 return
 
             chat.data_source = data_source
-            chat.updated_at = datetime.now(timezone.utc)
+            chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
             await session.commit()
 
     async def add_chat_message(
@@ -478,10 +481,14 @@ class ChatHandler:
                 logger.warning(f"Chat with ID {chat_id} does not exist")
                 return ""
 
+            # Ensure message created_at is timezone-naive
+            if message.created_at and message.created_at.tzinfo:
+                message.created_at = message.created_at.replace(tzinfo=None)
+
             chat_message = ChatMessage(
                 id=message.id,
                 chat_id=chat_id,
-                role=message.role,
+                role=message.role.value,  # Convert enum to string value
                 content=message.content,
                 components=[c.model_dump() for c in message.components],
                 in_progress=message.in_progress,
@@ -489,7 +496,7 @@ class ChatHandler:
             )
             session.add(chat_message)
 
-            chat.updated_at = datetime.now(timezone.utc)
+            chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
             await session.commit()
             return message.id
 
@@ -522,7 +529,7 @@ class ChatHandler:
             )
             chat = result.scalar_one_or_none()
             if chat:
-                chat.updated_at = datetime.now(timezone.utc)
+                chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
 
             await session.commit()
             return True
@@ -583,6 +590,10 @@ class ChatHandler:
             chat_id = existing_message.chat_id
             message.chat_id = chat_id
 
+            # Ensure message created_at is timezone-naive
+            if message.created_at and message.created_at.tzinfo:
+                message.created_at = message.created_at.replace(tzinfo=None)
+
             existing_message.content = message.content
             existing_message.components = [c.model_dump() for c in message.components]
             existing_message.in_progress = message.in_progress
@@ -594,7 +605,7 @@ class ChatHandler:
             )
             chat = result.scalar_one_or_none()
             if chat:
-                chat.updated_at = datetime.now(timezone.utc)
+                chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # Convert to naive datetime
 
             await session.commit()
             return True
@@ -710,8 +721,7 @@ class AnalystDB:
                     DatasetType.CLEANSED if is_cleansed else DatasetType.STANDARD
                 ),
                 data_source=data_source,
-                original_name=df.name,
-                file_size=file_size,
+                original_dataset_id=df.name,
             )
         except Exception as e:
             logger.warning(f"Error registering dataset: {e}")
@@ -753,7 +763,7 @@ class AnalystDB:
                 name=f"{data_dictionary.name}_dict",
                 dataset_type=DatasetType.DICTIONARY,
                 data_source=DataSourceType.GENERATED,
-                original_name=data_dictionary.name,
+                original_dataset_id=data_dictionary.name,
             )
         except Exception as e:
             logger.warning(

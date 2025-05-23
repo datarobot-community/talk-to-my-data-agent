@@ -24,6 +24,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Generator, List, Union, cast
+from datetime import datetime, timezone
 
 import datarobot as dr
 import polars as pl
@@ -914,7 +915,11 @@ async def create_chat_message(
     if not in_progress:
         # Create the user message
         user_message = AnalystChatMessage(
-            role="user", content=payload.message, components=[]
+            role="user",
+            content=payload.message,
+            components=[],
+            in_progress=True,
+            created_at=datetime.now(timezone.utc)
         )
 
         message_id = await analyst_db.add_chat_message(
@@ -923,9 +928,12 @@ async def create_chat_message(
         )
 
         # Create valid messages for the chat request
-        valid_messages: list[ChatCompletionMessageParam] = [
-            user_message.to_openai_message_param()
-        ]
+        valid_messages: list[ChatCompletionMessageParam] = []
+
+        # Add previous messages
+        for msg in messages:
+            if msg.content.strip():
+                valid_messages.append(msg.to_openai_message_param())
 
         # Add the current message
         valid_messages.append(

@@ -58,19 +58,44 @@ async_session_factory = async_sessionmaker(
 )
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """Get an async database session with proper connection management."""
-    async with async_session_factory() as session:
+    """Get an async session for database operations."""
+    try:
+        # Get the current event loop or create a new one if none exists
         try:
-            # Start a new transaction
-            async with session.begin():
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Create a new engine for each session to avoid connection issues
+        engine = create_async_engine(
+            DATABASE_URL,
+            echo=False,
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_recycle=1800,  # Recycle connections after 30 minutes
+        )
+
+        async_session = sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        async with async_session() as session:
+            try:
                 yield session
-        except Exception as e:
-            # Rollback on error
-            await session.rollback()
-            raise
-        finally:
-            # Ensure session is closed
-            await session.close()
+            finally:
+                await session.close()
+                await engine.dispose()
+
+    except Exception as e:
+        logger.error(f"Error in get_async_session: {e}")
+        raise
 
 # async def init_db():
 #     """Initialize the database."""
