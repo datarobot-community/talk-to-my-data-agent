@@ -35,9 +35,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Create enum types if they don't exist
 
-    op.execute("CREATE TYPE dataset_type AS ENUM ('standard', 'cleansed', 'dictionary')")
-    op.execute("CREATE TYPE data_source_type AS ENUM ('file', 'database', 'registry');")
-    op.execute("CREATE TYPE user_role_type AS ENUM ('user', 'assistant', 'system');")
+    # op.execute("CREATE TYPE dataset_type AS ENUM ('standard', 'cleansed', 'dictionary')")
+    # op.execute("CREATE TYPE data_source_type AS ENUM ('file', 'database', 'registry', 'generated');")
+    # op.execute("CREATE TYPE user_role_type AS ENUM ('user', 'assistant', 'system');")
 
     # Create dataset_metadata table
     op.create_table(
@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('columns', postgresql.JSON(astext_type=sa.Text()), nullable=False),
         sa.Column('row_count', sa.Integer(), nullable=False),
-        sa.Column('data_source', postgresql.ENUM('file', 'database', 'registry', name='data_source_type'), nullable=False),
+        sa.Column('data_source', postgresql.ENUM('file', 'database', 'registry', 'generated', name='data_source_type'), nullable=False),
         sa.Column('file_size', sa.Integer(), nullable=False, server_default='0'),
         sa.PrimaryKeyConstraint('table_name')
     )

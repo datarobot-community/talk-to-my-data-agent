@@ -84,7 +84,7 @@ class DatasetHandler:
                 raise ValueError(f"Table '{name}' already exists in the database")
 
             # For cleansed/dictionary datasets, verify original exists
-            if dataset_type in (DatasetType.CLEANSED, DatasetType.DICTIONARY):
+            if dataset_type.value in (DatasetType.CLEANSED.value, DatasetType.DICTIONARY.value):
                 if not original_name:
                     raise ValueError(
                         f"original_name required for {dataset_type.value} datasets"
@@ -95,12 +95,12 @@ class DatasetHandler:
                 if not result.scalar_one_or_none():
                     raise ValueError(f"Original dataset '{original_name}' not found")
 
-            # Create metadata
+            # Create metadata with timezone-naive datetime
             metadata = DatasetMetadata(
                 table_name=name,
                 dataset_type=dataset_type.value,
                 original_name=original_name or name,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),  # Convert to naive datetime
                 columns=list(df.columns),
                 row_count=len(df),
                 data_source=data_source.value,
@@ -114,28 +114,32 @@ class DatasetHandler:
         dataset_type: DatasetType | None = None,
         data_source: DataSourceType | None = None,
     ) -> list[DatasetMetadataInfo]:
-        """List all datasets, optionally filtered by dataset type and/or data source."""
+        """List all datasets in the database."""
         async for session in get_async_session():
-            query = select(DatasetMetadata)
-            if dataset_type:
-                query = query.where(DatasetMetadata.dataset_type == dataset_type.value)
-            if data_source:
-                query = query.where(DatasetMetadata.data_source == data_source.value)
-            result = await session.execute(query)
-            datasets = result.scalars().all()
-            return [
-                DatasetMetadataInfo(
-                    name=dataset.table_name,
-                    dataset_type=DatasetType(dataset.dataset_type),
-                    original_name=dataset.original_name,
-                    created_at=dataset.created_at,
-                    columns=dataset.columns,
-                    row_count=dataset.row_count,
-                    data_source=DataSourceType(dataset.data_source),
-                    file_size=dataset.file_size,
-                )
-                for dataset in datasets
-            ]
+            try:
+                query = select(DatasetMetadata)
+                if dataset_type:
+                    query = query.where(DatasetMetadata.dataset_type == dataset_type.value.lower())
+                if data_source:
+                    query = query.where(DatasetMetadata.data_source == data_source.value.lower())
+                result = await session.execute(query)
+                datasets = result.scalars().all()
+                return [
+                    DatasetMetadataInfo(
+                        name=ds.table_name,
+                        dataset_type=DatasetType(ds.dataset_type),
+                        original_name=ds.original_name,
+                        created_at=ds.created_at,
+                        columns=ds.columns,
+                        row_count=ds.row_count,
+                        data_source=DataSourceType(ds.data_source),
+                        file_size=ds.file_size,
+                    )
+                    for ds in datasets
+                ]
+            except Exception as e:
+                logger.error(f"Error listing datasets: {e}")
+                raise
 
     async def get_dataset_metadata(self, name: str) -> DatasetMetadataInfo:
         """Get metadata for a dataset by name."""
@@ -167,22 +171,28 @@ class DatasetHandler:
         logger.info(f"Retrieving dataframe {name}")
 
         async for session in get_async_session():
-            # First verify the dataset exists and check its type
-            stmt = select(DatasetMetadata).where(DatasetMetadata.table_name == name)
-            result = await session.execute(stmt)
-            metadata = result.scalar_one_or_none()
-            if not metadata:
-                raise ValueError(f"Dataset '{name}' not found")
+            try:
+                # First verify the dataset exists and check its type
+                stmt = select(DatasetMetadata).where(DatasetMetadata.table_name == name)
+                result = await session.execute(stmt)
+                metadata = result.scalar_one_or_none()
+                if not metadata:
+                    raise ValueError(f"Dataset '{name}' not found")
 
-            if expected_type and metadata.dataset_type != expected_type.value:
-                raise ValueError(
-                    f"Dataset '{name}' is of type {metadata.dataset_type}, "
-                    f"expected {expected_type.value}"
-                )
+                if expected_type and metadata.dataset_type != expected_type.value:
+                    raise ValueError(
+                        f"Dataset '{name}' is of type {metadata.dataset_type}, "
+                        f"expected {expected_type.value}"
+                    )
 
-            # For demonstration, just return an empty DataFrame with the right columns
-            # In a real implementation, you would store and retrieve the actual data
-            return pl.DataFrame({col: [] for col in metadata.columns})
+                # For demonstration, just return an empty DataFrame with the right columns
+                # In a real implementation, you would store and retrieve the actual data
+                return pl.DataFrame({col: [] for col in metadata.columns})
+            except Exception as e:
+                logger.error(f"Error retrieving dataframe {name}: {e}")
+                raise
+            finally:
+                await session.close()
 
     async def store_cleansing_report(
         self, dataset_name: str, reports: list[CleansedColumnReport]
@@ -656,6 +666,7 @@ class AnalystDB:
             )
         except Exception as e:
             logger.warning(f"Error registering dataset: {e}")
+            raise
 
     async def get_dataset(
         self, name: str, max_rows: int | None = 10000
