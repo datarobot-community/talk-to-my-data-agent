@@ -13,72 +13,45 @@
 # limitations under the License.
 
 import os
-from typing import Optional
+from typing import AsyncGenerator
 
-from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from utils.logging_helper import get_logger
+from utils.models import Base
 
-logger = get_logger("DatabaseConfig")
+# Get database configuration from environment variables
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "analyst_db")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_SCHEMA = os.getenv("POSTGRES_SCHEMA", "public")
 
-class DatabaseConfig(BaseModel):
-    """Database configuration model."""
-    host: str = Field(default="localhost")
-    port: int = Field(default=5432)
-    database: str = Field(default="analyst_db")
-    user: str = Field(default="postgres")
-    password: str = Field(default="postgres")
-    schema: str = Field(default="public")
+# Create async engine
+DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+engine = create_async_engine(DATABASE_URL, echo=True)
 
-    @property
-    def sync_url(self) -> str:
-        """Get the synchronous database URL."""
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-
-    @property
-    def async_url(self) -> str:
-        """Get the asynchronous database URL."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-
-def get_db_config() -> DatabaseConfig:
-    """Get database configuration from environment variables."""
-    return DatabaseConfig(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DB", "analyst_db"),
-        user=os.getenv("POSTGRES_USER", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-        schema=os.getenv("POSTGRES_SCHEMA", "public"),
-    )
-
-# Create database engines
-db_config = get_db_config()
-sync_engine = create_engine(db_config.sync_url)
-async_engine = create_async_engine(db_config.async_url)
-
-# Create session factories
-SyncSession = sessionmaker(bind=sync_engine)
-AsyncSession = sessionmaker(
-    bind=async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
+# Create async session factory
+async_session = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
 )
 
-def get_sync_session():
-    """Get a synchronous database session."""
-    session = SyncSession()
-    try:
-        yield session
-    finally:
-        session.close()
-
-async def get_async_session():
-    """Get an asynchronous database session."""
-    async with AsyncSession() as session:
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Get an async database session."""
+    async with async_session() as session:
         try:
             yield session
         finally:
             await session.close()
+
+# Create sync engine for Alembic
+SYNC_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+sync_engine = create_engine(SYNC_DATABASE_URL)
+
+# Create tables
+async def init_db():
+    """Initialize the database by creating all tables."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)

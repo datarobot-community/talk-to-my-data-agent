@@ -15,17 +15,29 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from utils.database_config import get_db_config
-from utils.models import Base
+from alembic import context
+
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Override sqlalchemy.url with environment variables
+section = config.config_ini_section
+config.set_section_option(section, "POSTGRES_USER", os.getenv("POSTGRES_USER", "postgres"))
+config.set_section_option(section, "POSTGRES_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres"))
+config.set_section_option(section, "POSTGRES_HOST", os.getenv("POSTGRES_HOST", "localhost"))
+config.set_section_option(section, "POSTGRES_PORT", os.getenv("POSTGRES_PORT", "5432"))
+config.set_section_option(section, "POSTGRES_DB", os.getenv("POSTGRES_DB", "analyst_db"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -34,6 +46,7 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
+from utils.models import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -53,8 +66,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    db_config = get_db_config()
-    url = db_config.sync_url
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -79,9 +91,7 @@ async def run_async_migrations() -> None:
 
     """
 
-    db_config = get_db_config()
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = db_config.async_url
     connectable = async_engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -103,3 +113,10 @@ def run_migrations_online() -> None:
     """
 
     asyncio.run(run_async_migrations())
+
+print(f"Database URL: {config.get_main_option('sqlalchemy.url')}")
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

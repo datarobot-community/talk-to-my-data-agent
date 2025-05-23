@@ -33,10 +33,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create enum types
+    # Create enum types if they don't exist
+
     op.execute("CREATE TYPE dataset_type AS ENUM ('standard', 'cleansed', 'dictionary')")
-    op.execute("CREATE TYPE data_source_type AS ENUM ('file', 'database', 'registry')")
-    op.execute("CREATE TYPE user_role_type AS ENUM ('user', 'assistant', 'system')")
+    op.execute("CREATE TYPE data_source_type AS ENUM ('file', 'database', 'registry');")
+    op.execute("CREATE TYPE user_role_type AS ENUM ('user', 'assistant', 'system');")
 
     # Create dataset_metadata table
     op.create_table(

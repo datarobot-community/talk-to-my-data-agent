@@ -18,6 +18,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Generator, Literal, Optional, Union
+from enum import Enum
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -508,7 +509,10 @@ class AppInfra(BaseModel):
     database: DatabaseConnectionType
 
 
-UserRoleType = Literal["assistant", "user", "system"]
+class UserRoleType(Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
 
 
 class Tool(BaseModel):
@@ -636,3 +640,16 @@ class ChatMessagePayload(BaseModel):
 class DownloadedRegistryDataset(BaseModel):
     name: str = ""
     error: Optional[str] = None
+
+
+class DatasetType(Enum):
+    STANDARD = "standard"
+    CLEANSED = "cleansed"
+    DICTIONARY = "dictionary"
+
+
+class DataSourceType(Enum):
+    FILE = "file"
+    DATABASE = "database"
+    REGISTRY = "catalog"
+    GENERATED = "generated"

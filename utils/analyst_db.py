@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import json
+from pathlib import Path
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ import polars as pl
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.orm import selectinload
 
 from utils.logging_helper import get_logger
 from utils.schema import (
@@ -32,6 +34,8 @@ from utils.schema import (
     CleansedColumnReport,
     CleansedDataset,
     DataDictionary,
+    DatasetType,
+    DataSourceType,
 )
 from utils.models import DatasetMetadata, CleansingReport, ChatHistory, ChatMessage
 from utils.database_config import get_async_session
@@ -43,21 +47,8 @@ logger = get_logger("ApplicationDB")
 ANALYST_DATABASE_VERSION = 5
 
 
-class DatasetType(Enum):
-    STANDARD = "standard"
-    CLEANSED = "cleansed"
-    DICTIONARY = "dictionary"
-
-
-class DataSourceType(Enum):
-    FILE = "file"
-    DATABASE = "database"
-    REGISTRY = "catalog"
-    GENERATED = "generated"
-
-
 @dataclass
-class DatasetMetadata:
+class DatasetMetadataInfo:
     name: str
     dataset_type: DatasetType
     original_name: str  # For cleansed/dictionary datasets, links to their original dataset
@@ -122,7 +113,7 @@ class DatasetHandler:
         self,
         dataset_type: DatasetType | None = None,
         data_source: DataSourceType | None = None,
-    ) -> list[DatasetMetadata]:
+    ) -> list[DatasetMetadataInfo]:
         """List all datasets, optionally filtered by dataset type and/or data source."""
         async for session in get_async_session():
             query = select(DatasetMetadata)
@@ -131,9 +122,22 @@ class DatasetHandler:
             if data_source:
                 query = query.where(DatasetMetadata.data_source == data_source.value)
             result = await session.execute(query)
-            return result.scalars().all()
+            datasets = result.scalars().all()
+            return [
+                DatasetMetadataInfo(
+                    name=dataset.table_name,
+                    dataset_type=DatasetType(dataset.dataset_type),
+                    original_name=dataset.original_name,
+                    created_at=dataset.created_at,
+                    columns=dataset.columns,
+                    row_count=dataset.row_count,
+                    data_source=DataSourceType(dataset.data_source),
+                    file_size=dataset.file_size,
+                )
+                for dataset in datasets
+            ]
 
-    async def get_dataset_metadata(self, name: str) -> DatasetMetadata:
+    async def get_dataset_metadata(self, name: str) -> DatasetMetadataInfo:
         """Get metadata for a dataset by name."""
         async for session in get_async_session():
             result = await session.execute(
@@ -142,7 +146,16 @@ class DatasetHandler:
             metadata = result.scalar_one_or_none()
             if not metadata:
                 raise ValueError(f"Dataset '{name}' not found")
-            return metadata
+            return DatasetMetadataInfo(
+                name=metadata.table_name,
+                dataset_type=DatasetType(metadata.dataset_type),
+                original_name=metadata.original_name,
+                created_at=metadata.created_at,
+                columns=metadata.columns,
+                row_count=metadata.row_count,
+                data_source=DataSourceType(metadata.data_source),
+                file_size=metadata.file_size,
+            )
 
     async def get_dataframe(
         self,
@@ -155,9 +168,8 @@ class DatasetHandler:
 
         async for session in get_async_session():
             # First verify the dataset exists and check its type
-            result = await session.execute(
-                select(DatasetMetadata).where(DatasetMetadata.table_name == name)
-            )
+            stmt = select(DatasetMetadata).where(DatasetMetadata.table_name == name)
+            result = await session.execute(stmt)
             metadata = result.scalar_one_or_none()
             if not metadata:
                 raise ValueError(f"Dataset '{name}' not found")
@@ -614,13 +626,8 @@ class AnalystDB:
         self.db_path = db_path
         self.dataset_db_name = dataset_db_name
         self.chat_db_name = chat_db_name
-        await self.initialize()
+        self.db_version = db_version
         return self
-
-    async def initialize(self) -> None:
-        """Initialize both database handlers."""
-        await self.dataset_handler._initialize_database()
-        await self.chat_handler._initialize_database()
 
     # Dataset operations
     async def register_dataset(
@@ -661,7 +668,7 @@ class AnalystDB:
         )
         return data
 
-    async def get_dataset_metadata(self, name: str) -> DatasetMetadata:
+    async def get_dataset_metadata(self, name: str) -> DatasetMetadataInfo:
         data = await self.dataset_handler.get_dataset_metadata(name)
         return data
 
@@ -891,3 +898,20 @@ class AnalystDB:
             data_source: The new data source setting
         """
         return await self.chat_handler.update_chat_data_source(chat_id, data_source)
+
+    async def get_dataframe(self, name: str) -> pl.DataFrame:
+        """Get a dataframe by name."""
+        logger.info(f"Getting dataframe {name} for user {self.user_id}")
+
+        async for session in get_async_session():
+            result = await session.execute(
+                select(DatasetMetadata).where(DatasetMetadata.table_name == name)
+            )
+            dataset = result.scalar_one_or_none()
+            if not dataset:
+                logger.warning(f"Dataset {name} not found")
+                return pl.DataFrame()
+
+            # For now, return an empty DataFrame with the correct columns
+            # TODO: Implement actual data retrieval from PostgreSQL
+            return pl.DataFrame(columns=dataset.columns)

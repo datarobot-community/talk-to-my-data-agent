@@ -14,7 +14,7 @@
 
 import json
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -30,12 +30,12 @@ class DatasetMetadata(Base):
     __tablename__ = "dataset_metadata"
 
     table_name: Mapped[str] = mapped_column(String, primary_key=True)
-    dataset_type: Mapped[str] = mapped_column(Enum(DatasetType))
+    dataset_type: Mapped[str] = mapped_column(Enum("standard", "cleansed", "dictionary", name="dataset_type"))
     original_name: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime)
     columns: Mapped[list[str]] = mapped_column(JSON)
     row_count: Mapped[int] = mapped_column(Integer)
-    data_source: Mapped[str] = mapped_column(Enum(DataSourceType))
+    data_source: Mapped[str] = mapped_column(Enum("file", "database", "catalog", "generated", name="data_source_type"))
     file_size: Mapped[int] = mapped_column(Integer, default=0)
 
 class CleansingReport(Base):
@@ -64,7 +64,7 @@ class ChatMessage(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     chat_id: Mapped[str] = mapped_column(String, ForeignKey("chat_history.id"), nullable=False)
-    role: Mapped[str] = mapped_column(Enum(UserRoleType))
+    role: Mapped[str] = mapped_column(Enum("user", "assistant", "system", name="user_role_type"))
     content: Mapped[str] = mapped_column(Text)
     components: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     in_progress: Mapped[bool] = mapped_column(default=True)
