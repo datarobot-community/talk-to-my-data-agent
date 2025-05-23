@@ -23,20 +23,11 @@ import pulumi_datarobot as datarobot
 import pydantic
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.llms import LLMConfig, LLMs
-
-from utils.credentials import (
-    AWSBedrockCredentials,
-    AzureOpenAICredentials,
-    DRCredentials,
-    GoogleCredentials,
-    NoDatabaseCredentials,
-    SAPDatasphereCredentials,
-    SnowflakeCredentials,
-)
-from utils.schema import (
-    DatabaseConnectionType,
-    RuntimeCredentialType,
-)
+from utils.credentials import (AWSBedrockCredentials, AzureOpenAICredentials,
+                               DRCredentials, GoogleCredentials,
+                               NoDatabaseCredentials, SAPDatasphereCredentials,
+                               SnowflakeCredentials)
+from utils.schema import DatabaseConnectionType, RuntimeCredentialType
 
 from ..settings_main import PROJECT_ROOT
 
@@ -316,7 +307,7 @@ def get_llm_credentials(
                             Unable to run a successful test completion against deployment '{credentials.azure_deployment or lookup[llm.name]}'
                             on '{credentials.azure_endpoint}' with API version '{credentials.api_version or "2023-05-15"}'
                             with provided Azure OpenAI credentials. Please validate your credentials.
-                            
+
                             Please validate your credentials or check {__file__} for details.
                             """
                         )
@@ -365,10 +356,10 @@ def get_llm_credentials(
                     raise ValueError(
                         textwrap.dedent(
                             f"""
-                            Unable to run a successful test completion against model '{lookup[llm.name]}' in region '{credentials.region_name or "us-west-1"}' 
+                            Unable to run a successful test completion against model '{lookup[llm.name]}' in region '{credentials.region_name or "us-west-1"}'
                             using request body '{request_body}' with provided AWS credentials.
-                            
-                            
+
+
                             Please validate your credentials or check {__file__} for details.
                             """
                         )
@@ -457,7 +448,7 @@ def get_database_credentials(
                     textwrap.dedent(
                         f"""
                         Your Snowflake credentials and environment variables were not configured properly.
-                        
+
                         Please validate your environment variables or check {__file__} for details.
                         """
                     )
