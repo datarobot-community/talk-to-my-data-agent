@@ -651,5 +651,5 @@ class DatasetType(Enum):
 class DataSourceType(Enum):
     FILE = "file"
     DATABASE = "database"
-    REGISTRY = "catalog"
+    REGISTRY = "registry"
     GENERATED = "generated"

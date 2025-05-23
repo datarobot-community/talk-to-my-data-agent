@@ -68,7 +68,7 @@ def upgrade() -> None:
         sa.Column('id', sa.String(), nullable=False),
         sa.Column('user_id', sa.String(), nullable=False),
         sa.Column('chat_name', sa.String(), nullable=False),
-        sa.Column('data_source', sa.String(), nullable=False, server_default='catalog'),
+        sa.Column('data_source', sa.String(), nullable=False, server_default='registry'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.PrimaryKeyConstraint('id')

@@ -35,7 +35,7 @@ class DatasetMetadata(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime)
     columns: Mapped[list[str]] = mapped_column(JSON)
     row_count: Mapped[int] = mapped_column(Integer)
-    data_source: Mapped[str] = mapped_column(Enum("file", "database", "catalog", "generated", name="data_source_type"))
+    data_source: Mapped[str] = mapped_column(Enum("file", "database", "registry", "generated", name="data_source_type"))
     file_size: Mapped[int] = mapped_column(Integer, default=0)
 
 class CleansingReport(Base):
@@ -52,7 +52,7 @@ class ChatHistory(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     chat_name: Mapped[str] = mapped_column(String, nullable=False)
-    data_source: Mapped[str] = mapped_column(String, default="catalog")
+    data_source: Mapped[str] = mapped_column(String, default="registry")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

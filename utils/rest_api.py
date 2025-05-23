@@ -739,7 +739,7 @@ async def get_chats(
         {
             "id": chat["id"],
             "name": chat["name"],
-            "data_source": chat.get("data_source", "catalog"),
+            "data_source": chat.get("data_source", "registry"),
             "created_at": chat["created_at"],
         }
         for chat in chat_list

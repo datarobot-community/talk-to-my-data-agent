@@ -21,7 +21,8 @@ from enum import Enum
 from typing import Any, List, Optional, cast
 
 import polars as pl
-from sqlalchemy import select, update, delete
+import pandas as pd
+from sqlalchemy import select, update, delete, text, quoted_name
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
@@ -76,54 +77,87 @@ class DatasetHandler:
         logger.info(f"Registering dataframe {name} as {dataset_type.value}")
 
         async for session in get_async_session():
-            # Check if dataset already exists
-            result = await session.execute(
-                select(DatasetMetadata).where(DatasetMetadata.table_name == name)
-            )
-            if result.scalar_one_or_none():
-                raise ValueError(f"Table '{name}' already exists in the database")
-
-            # For cleansed/dictionary datasets, verify original exists
-            if dataset_type.value in (DatasetType.CLEANSED.value, DatasetType.DICTIONARY.value):
-                if not original_name:
-                    raise ValueError(
-                        f"original_name required for {dataset_type.value} datasets"
-                    )
+            try:
+                # Check if dataset already exists
                 result = await session.execute(
-                    select(DatasetMetadata).where(DatasetMetadata.table_name == original_name)
+                    select(DatasetMetadata).where(DatasetMetadata.table_name == name)
                 )
-                if not result.scalar_one_or_none():
-                    raise ValueError(f"Original dataset '{original_name}' not found")
+                if result.scalar_one_or_none():
+                    raise ValueError(f"Table '{name}' already exists in the database")
 
-            # Create metadata with timezone-naive datetime
-            metadata = DatasetMetadata(
-                table_name=name,
-                dataset_type=dataset_type.value,
-                original_name=original_name or name,
-                created_at=datetime.now(timezone.utc).replace(tzinfo=None),  # Convert to naive datetime
-                columns=list(df.columns),
-                row_count=len(df),
-                data_source=data_source.value,
-                file_size=file_size,
-            )
-            session.add(metadata)
-            await session.commit()
+                # For cleansed/dictionary datasets, verify original exists
+                if dataset_type.value in (DatasetType.CLEANSED.value, DatasetType.DICTIONARY.value):
+                    if not original_name:
+                        raise ValueError(
+                            f"original_name required for {dataset_type.value} datasets"
+                        )
+                    result = await session.execute(
+                        select(DatasetMetadata).where(DatasetMetadata.table_name == original_name)
+                    )
+                    if not result.scalar_one_or_none():
+                        raise ValueError(f"Original dataset '{original_name}' not found")
+
+                # Create metadata with timezone-naive datetime
+                metadata = DatasetMetadata(
+                    table_name=name,
+                    dataset_type=dataset_type.value,
+                    original_name=original_name or name,
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),  # Convert to naive datetime
+                    columns=list(df.columns),
+                    row_count=len(df),
+                    data_source=data_source.value,
+                    file_size=file_size,
+                )
+                session.add(metadata)
+
+                # Convert Polars DataFrame to pandas for SQLAlchemy
+                pandas_df = df.to_pandas()
+
+                # Get the engine from the session
+                engine = session.get_bind()
+
+                # Use to_sql within async context
+                await session.run_sync(
+                    lambda sync_conn: pandas_df.to_sql(
+                        name,
+                        engine,  # Use the engine directly
+                        if_exists='replace',
+                        index=False,
+                        method='multi',
+                        chunksize=1000
+                    )
+                )
+
+                # Commit all changes at once
+                await session.commit()
+
+            except Exception as e:
+                logger.error(f"Error registering dataframe {name}: {e}")
+                # Rollback all changes if anything fails
+                await session.rollback()
+                raise
 
     async def list_datasets(
         self,
         dataset_type: DatasetType | None = None,
         data_source: DataSourceType | None = None,
     ) -> list[DatasetMetadataInfo]:
-        """List all datasets in the database."""
+        """List all registered datasets of a specific type."""
+        logger.info(f"Listing datasets with type={dataset_type.value if dataset_type else 'any'} and source={data_source.value if data_source else 'any'}")
+
         async for session in get_async_session():
             try:
-                query = select(DatasetMetadata)
+                # Query datasets with optional filters
+                stmt = select(DatasetMetadata)
                 if dataset_type:
-                    query = query.where(DatasetMetadata.dataset_type == dataset_type.value.lower())
+                    stmt = stmt.where(DatasetMetadata.dataset_type == dataset_type.value)
                 if data_source:
-                    query = query.where(DatasetMetadata.data_source == data_source.value.lower())
-                result = await session.execute(query)
+                    stmt = stmt.where(DatasetMetadata.data_source == data_source.value)
+
+                result = await session.execute(stmt)
                 datasets = result.scalars().all()
+
+                # Convert to DatasetMetadataInfo objects
                 return [
                     DatasetMetadataInfo(
                         name=ds.table_name,
@@ -137,6 +171,7 @@ class DatasetHandler:
                     )
                     for ds in datasets
                 ]
+
             except Exception as e:
                 logger.error(f"Error listing datasets: {e}")
                 raise
@@ -185,14 +220,28 @@ class DatasetHandler:
                         f"expected {expected_type.value}"
                     )
 
-                # For demonstration, just return an empty DataFrame with the right columns
-                # In a real implementation, you would store and retrieve the actual data
-                return pl.DataFrame({col: [] for col in metadata.columns})
+                # Get the data from the table using text() with proper table name quoting
+                query = text(f'SELECT * FROM "{name}"')
+                if max_rows is not None:
+                    query = text(f'SELECT * FROM "{name}" LIMIT :max_rows').bindparams(max_rows=max_rows)
+
+                # Execute the query and convert to Polars DataFrame
+                result = await session.execute(query)
+                rows = result.fetchall()
+
+                if not rows:
+                    # Create empty DataFrame with correct schema
+                    return pl.DataFrame(schema={col: pl.String for col in metadata.columns})
+
+                # Convert to Polars DataFrame
+                # First convert to pandas for easier handling
+                df = pd.DataFrame(rows, columns=metadata.columns)
+                # Then convert to Polars
+                return pl.from_pandas(df)
+
             except Exception as e:
                 logger.error(f"Error retrieving dataframe {name}: {e}")
                 raise
-            finally:
-                await session.close()
 
     async def store_cleansing_report(
         self, dataset_name: str, reports: list[CleansedColumnReport]
