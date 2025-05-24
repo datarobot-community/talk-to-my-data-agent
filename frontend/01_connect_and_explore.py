@@ -127,7 +127,7 @@ def clear_data_callback() -> None:
 
 
 # Add callback for Data Registry dataset selection
-async def registry_download_callback(token: str) -> None:
+async def registry_download_callback() -> None:
     """Callback function for Data Registry dataset download"""
     if (
         "selected_registry_datasets" in st.session_state
@@ -142,7 +142,7 @@ async def registry_download_callback(token: str) -> None:
                 ]
                 with st.session_state.datarobot_connect.use_user_token():
                     dataframes = await download_registry_datasets(
-                        selected_ids, st.session_state.analyst_db, token
+                        selected_ids, st.session_state.analyst_db
                     )
                 dataset_names = [
                     dataset.name for dataset in dataframes if not dataset.error
@@ -226,8 +226,8 @@ async def uploaded_file_callback(uploaded_files: list[UploadedFile]) -> None:
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def st_list_registry_datasets(token: str) -> list[DataRegistryDataset]:
-    return list_registry_datasets(token)
+def st_list_registry_datasets() -> list[DataRegistryDataset]:
+    return list_registry_datasets()
 
 
 @st.cache_data(ttl="60s", show_spinner=False)
@@ -265,60 +265,41 @@ async def main() -> None:
             if uploaded_files:
                 await uploaded_file_callback(uploaded_files)
 
-            # Data Registry section
-            st.subheader("☁️   DataRobot Data Registry")
+            if False:  # Disable Data Registry for now
+                # Data Registry section
+                st.subheader("☁️   DataRobot Data Registry")
 
-            # API Token input for Data Registry access
-            api_token = st.text_input(
-                "API Token",
-                type="password",
-                key="datarobot_api_token_for_registry",
-                help="Enter your DataRobot API token to access the Data Registry",
-                placeholder="Enter your API token here",
-            )
-            # Get datasets from registry
+                # Get datasets from registry
 
-            with st.spinner("Loading datasets from the Data Registry..."):
-                if api_token:
-                    datasets = [
-                        i.model_dump()
-                        for i in st_list_registry_datasets(
-                            st.session_state.get("datarobot_api_token_for_registry")
-                        )
-                    ]
-                else:
-                    datasets = []
-                    st.warning(
-                        "Please provide your DataRobot API token to access the Data Registry"
+                with st.spinner("Loading datasets from the Data Registry..."):
+                    with st.session_state.datarobot_connect.use_user_token():
+                        datasets = [i.model_dump() for i in st_list_registry_datasets()]
+
+                # Create form for dataset selection
+                with st.form("registry_selection_form", border=False):
+                    selected_registry_datasets = st.multiselect(
+                        "Select datasets from the Data Registry",
+                        options=datasets,
+                        format_func=lambda x: f"{x['name']} ({x['size']})",
+                        help="You can select multiple datasets",
+                        key="selected_registry_datasets",
+                        disabled=(
+                            "analyst_db" not in st.session_state
+                            or "datarobot_uid" not in st.session_state
+                        ),
                     )
 
-            # Create form for dataset selection
-            with st.form("registry_selection_form", border=False):
-                selected_registry_datasets = st.multiselect(
-                    "Select datasets from the Data Registry",
-                    options=datasets,
-                    format_func=lambda x: f"{x['name']} ({x['size']})",
-                    help="You can select multiple datasets",
-                    key="selected_registry_datasets",
-                    disabled=(
-                        "analyst_db" not in st.session_state
-                        or "datarobot_uid" not in st.session_state
-                    ),
-                )
-
-                # Form submit button
-                submit_button = st.form_submit_button(
-                    "Load Datasets",
-                    disabled="analyst_db" not in st.session_state,
-                )
-
-                # Process form submission
-                if submit_button and len(selected_registry_datasets) > 0:
-                    await registry_download_callback(
-                        st.session_state.get("datarobot_api_token_for_registry")
+                    # Form submit button
+                    submit_button = st.form_submit_button(
+                        "Load Datasets",
+                        disabled="analyst_db" not in st.session_state,
                     )
-                elif submit_button:
-                    st.warning("Please select at least one dataset")
+
+                    # Process form submission
+                    if submit_button and len(selected_registry_datasets) > 0:
+                        await registry_download_callback()
+                    elif submit_button:
+                        st.warning("Please select at least one dataset")
 
         # Database expander
         with st.expander("Database", expanded=False):

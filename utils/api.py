@@ -177,8 +177,12 @@ def cache(f: T) -> T:
         return cast(T, wrapper)
 
 
+def get_user_email() -> str:
+    return dr.client.get_client().get("account/info/").json()["email"]
+
+
 # This can be large as we are not storing the actual datasets in memory, just metadata
-def list_registry_datasets(token: str, limit: int = 100) -> list[DataRegistryDataset]:
+def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
     """
     Fetch datasets from Data Registry with specified limit
 
@@ -186,10 +190,10 @@ def list_registry_datasets(token: str, limit: int = 100) -> list[DataRegistryDat
         limit: int
         Datasets to retrieve. Max value: 100
     """
-
+    logger.info(f"Acting as user: {get_user_email()}")
     url = f"{dr.client.get_client().endpoint}/datasets?limit={limit}"
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {dr.client.get_client().token}",
         "Content-Type": "application/json",
     }
 
@@ -215,7 +219,7 @@ def list_registry_datasets(token: str, limit: int = 100) -> list[DataRegistryDat
     ]
 
 
-def get_registry_dataset_info(dataset_id: str, token: str) -> tuple[str, int]:
+def get_registry_dataset_info(dataset_id: str) -> tuple[str, int]:
     """
     Fetch a dataset's name and size from DataRobot API using requests.
 
@@ -230,7 +234,7 @@ def get_registry_dataset_info(dataset_id: str, token: str) -> tuple[str, int]:
     base_url = dr.client.get_client().endpoint
     url = f"{base_url}/datasets/{dataset_id}"
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {dr.client.get_client().token}",
         "Content-Type": "application/json",
     }
     response = requests.get(url, headers=headers)
@@ -241,7 +245,7 @@ def get_registry_dataset_info(dataset_id: str, token: str) -> tuple[str, int]:
     return name, size
 
 
-def download_registry_dataset_as_dataframe(token: str, dataset_id: str) -> pd.DataFrame:
+def download_registry_dataset_as_dataframe(dataset_id: str) -> pd.DataFrame:
     """
     Download a dataset from DataRobot as a pandas DataFrame using requests.
 
@@ -256,7 +260,7 @@ def download_registry_dataset_as_dataframe(token: str, dataset_id: str) -> pd.Da
     base_url = dr.client.get_client().endpoint
     url = f"{base_url}/datasets/{dataset_id}/file/"
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {dr.client.get_client().token}",
         "accept": "*/*",
     }
     response = requests.get(url, headers=headers, stream=True)
@@ -267,7 +271,7 @@ def download_registry_dataset_as_dataframe(token: str, dataset_id: str) -> pd.Da
 
 
 async def download_registry_datasets(
-    dataset_ids: list[str], analyst_db: AnalystDB, token: str
+    dataset_ids: list[str], analyst_db: AnalystDB
 ) -> list[DownloadedRegistryDataset]:
     """Load selected datasets as pandas DataFrames
 
@@ -277,6 +281,7 @@ async def download_registry_datasets(
     Returns:
         list[AnalystDataset]: Dictionary of dataset names and data
     """
+    logger.info(f"Acting as user: {get_user_email()}")
     downloaded_datasets = []
 
     # Use requests to get dataset info instead of dr.Dataset
@@ -284,7 +289,7 @@ async def download_registry_datasets(
     dataset_infos = []
     for id_ in dataset_ids:
         try:
-            name, size = get_registry_dataset_info(id_, token)
+            name, size = get_registry_dataset_info(id_)
             total_size += size if size is not None else 0
             dataset_infos.append((id_, name, size))
         except Exception as e:
@@ -301,7 +306,7 @@ async def download_registry_datasets(
     for id_, name, size in dataset_infos:
         try:
             # Use requests to download the dataset as DataFrame
-            df = download_registry_dataset_as_dataframe(token, id_)
+            df = download_registry_dataset_as_dataframe(id_)
             df_records = cast(
                 list[dict[str, Any]],
                 df.to_dict(orient="records"),
@@ -998,7 +1003,6 @@ async def rephrase_message(
         telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     else:
         telemetry_send = None
-
 
     # Convert messages to string format for prompt
     messages_str = "\n".join(
