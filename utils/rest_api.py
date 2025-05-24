@@ -671,9 +671,11 @@ async def download_dictionary(
     df = dictionary.to_application_df()
 
     # Convert to CSV
+    logger.info(f"Converting dictionary to CSV for {name}")
     csv_content = io.StringIO()
-    df.to_csv(csv_content)
-
+    df.to_csv(csv_content, index=False)
+    logger.info(f"CSV conversion complete for {name}")
+    
     # Create response with CSV attachment
     response = Response(content=csv_content.getvalue())
     response.headers["Content-Disposition"] = (

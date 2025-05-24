@@ -64,7 +64,7 @@ class DataFrameWrapper:
 
     def to_dict(self) -> list[dict[str, Any]]:
         # Convert pandas DataFrame to list of dictionaries
-        return self.df.to_dict("list")
+        return self.df.to_dict("records")
 
     @classmethod
     def __get_validators__(
