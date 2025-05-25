@@ -225,8 +225,8 @@ def try_datetime_conversion(
             candidate_2_success_rate,
         )
         warnings.append(f"Converted to datetime. Success rate: {success_rate:.1%}")
-        
-        if candidate_1_success_rate > candidate_2_success_rate:
+        # Japanse localization for date parsing
+        if candidate_1_success_rate >= candidate_2_success_rate:
             warnings.append("Used month-first date parsing")
             with suppress_datetime_warnings():
                 ts_series = pd.to_datetime(series, format=format_1, errors='coerce')
