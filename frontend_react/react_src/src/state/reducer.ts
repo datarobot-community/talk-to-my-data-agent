@@ -11,6 +11,7 @@ export const createInitialState = (): AppStateData => {
     enableChartGeneration: getStorageItem(STORAGE_KEYS.ENABLE_CHART_GENERATION) !== "false", // Enable by default
     enableBusinessInsights: getStorageItem(STORAGE_KEYS.ENABLE_BUSINESS_INSIGHTS) !== "false", // Enable by default
     dataSource: getStorageItem(STORAGE_KEYS.DATA_SOURCE) || DATA_SOURCES.FILE, // Default to FILE
+    expandGraphsInsightsDefaultOpen: getStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN) !== "false", // default to true
   };
 };
 
@@ -55,6 +56,15 @@ export const reducer = (state: AppStateData, action: Action): AppStateData => {
         ...state,
         dataSource: action.payload,
       };
+    case ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN:
+      setStorageItem(
+        STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN,
+        action.payload ? "true" : "false"
+      );
+      return {
+        ...state,
+        expandGraphsInsightsDefaultOpen: action.payload,
+      };
     default:
       return state;
   }
@@ -79,5 +89,9 @@ export const actions = {
   setDataSource: (source: string): Action => ({
     type: ACTION_TYPES.SET_DATA_SOURCE,
     payload: source
+  }),
+  setExpandGraphsInsightsDefaultOpen: (isOpen: boolean): Action => ({
+    type: ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN,
+    payload: isOpen
   }),
 };

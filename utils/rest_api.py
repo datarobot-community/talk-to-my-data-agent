@@ -361,7 +361,7 @@ async def get_registry_datasets(
     request: Request, limit: int = 100
 ) -> list[DataRegistryDataset]:
     with use_user_token(request):
-        return list_registry_datasets(request.state.session.datarobot_api_token, limit)
+        return list_registry_datasets(limit)
 
 
 @router.get("/database/tables")
@@ -482,9 +482,7 @@ async def upload_files(
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
             with use_user_token(request):
-                dataframes = await download_registry_datasets(
-                    id_list, analyst_db, request.state.session.datarobot_api_token
-                )
+                dataframes = await download_registry_datasets(id_list, analyst_db)
                 dataset_names = [
                     dataset.name for dataset in dataframes if not dataset.error
                 ]

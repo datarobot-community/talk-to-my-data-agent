@@ -30,8 +30,8 @@ import { TruncatedText } from "./ui-custom/truncated-text";
 import { useTranslation } from "react-i18next";
 
 export const AddDataModal = () => {
-  // TODO: Remove the showDataRegistry flag when Data Registry should be enabled again.
-  const showDataRegistry = false;
+  // TODO: Remove the showDataRegistry flag after making sure that the Data Registry is working.
+  const showDataRegistry = true;
   const { data } = showDataRegistry ? useFetchAllDatasets() : { data: null };
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const { data: dbTables } = useGetDatabaseTables();

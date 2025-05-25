@@ -33,3 +33,11 @@ export const isCollapsiblePanelDefaultOpen = (): boolean => {
 export const setCollapsiblePanelDefaultOpen = (isOpen: boolean): void => {
   setStorageItem(STORAGE_KEYS.COLLAPSIBLE_PANEL_DEFAULT_OPEN, isOpen ? 'true' : 'false');
 };
+
+export const isExpandGraphsInsightsDefaultOpen = (): boolean => {
+  return getStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN) !== 'false';
+};
+
+export const setExpandGraphsInsightsDefaultOpen = (isOpen: boolean): void => {
+  setStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN, isOpen ? 'true' : 'false');
+};
