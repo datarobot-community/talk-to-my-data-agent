@@ -86,7 +86,7 @@ async def process_uploaded_file(file: UploadedFile) -> list[str]:
                 f"Loaded CSV {dataset_name}: {len(df)} rows, {len(df.columns)} columns"
             )
 
-        elif file_extension in [".xlsx", ".xls"]:
+        elif file_extension in [".xlsx"]: # xls is out of scope [".xlsx", ".xls"]:
             # Read all sheets
             base_name = os.path.splitext(file.name)[0]
             excel_file = pd.ExcelFile(file)
@@ -256,7 +256,7 @@ async def main() -> None:
                 st.write("**Load Data Files**")
             uploaded_files = st.file_uploader(
                 "Select 1 or multiple files",
-                type=["csv", "xlsx", "xls"],
+                type=["csv", "xlsx"]# xls is out of scope , "xls"],
                 accept_multiple_files=True,
                 key=st.session_state.file_uploader_key,
             )
