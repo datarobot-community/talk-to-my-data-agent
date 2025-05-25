@@ -256,7 +256,7 @@ async def main() -> None:
                 st.write("**Load Data Files**")
             uploaded_files = st.file_uploader(
                 "Select 1 or multiple files",
-                type=["csv", "xlsx"]# xls is out of scope , "xls"],
+                type=["csv", "xlsx"], # xls is out of scope , "xls"],
                 accept_multiple_files=True,
                 key=st.session_state.file_uploader_key,
             )
