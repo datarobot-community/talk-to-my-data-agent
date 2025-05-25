@@ -11,10 +11,12 @@ import {
 import { useAppState } from "@/state";
 import { useState } from "react";
 import { Separator } from "./ui/separator";
+import { useTranslation } from "react-i18next";
 
 export const WelcomeModal = () => {
   const { showWelcome, hideWelcomeModal } = useAppState();
   const [open, setOpen] = useState(showWelcome);
+  const { t } = useTranslation();
 
   return (
     <Dialog
@@ -30,14 +32,13 @@ export const WelcomeModal = () => {
         </div>
         <DialogHeader>
           <DialogTitle className="text-center mb-4">
-            Talk to my data
+            {t("talk_to_my_data")}
           </DialogTitle>
           <DialogDescription className="text-center mb-10">
-            Use DataRobot’s intuitive chat-based analyst to ask questions about
-            your data.
+            {t("welcome_description")}
             <br />
             <br />
-            Get started by selecting the datasets you want to work with.
+            {t("welcome_get_started")}
           </DialogDescription>
         </DialogHeader>
         <Separator className="border-t mt-6" />
@@ -48,7 +49,7 @@ export const WelcomeModal = () => {
               hideWelcomeModal();
             }}
           >
-            Select data
+            {t("select_data")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { DictionaryTable as DT, DictionaryRow } from "@/api-state/dictionaries/types";
 import { Input } from "@/components/ui/input";
+import { useTranslation } from "react-i18next";
 
 interface DictionaryTableProps {
   data: DT;
@@ -30,6 +31,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
 }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialValue);
+  const { t } = useTranslation();
   
   // Update local state when props change (e.g., when data is refreshed after an error)
   React.useEffect(() => {
@@ -73,7 +75,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
     <div 
       onDoubleClick={handleDoubleClick}
       className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px]"
-      title="Double-click to edit"
+      title={t("double_click_edit")}
     >
       {value}
     </div>
@@ -84,6 +86,7 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
   data, 
   onUpdateCell 
 }) => {
+  const { t } = useTranslation();
   const handleCellUpdate = (rowIndex: number, field: keyof DictionaryRow, value: string) => {
     if (onUpdateCell) {
       onUpdateCell(rowIndex, field, value);
@@ -94,9 +97,9 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
     <Table>
       <TableHeader className="bg-background">
         <TableRow>
-          <TableHead className="w-[200px]">Column</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Description</TableHead>
+          <TableHead className="w-[200px]">{t("column")}</TableHead>
+          <TableHead>{t("type")}</TableHead>
+          <TableHead>{t("description_col")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

@@ -20,6 +20,7 @@ import { useFetchAllChats } from "@/api-state/chat-messages/hooks";
 import { Button } from "@/components/ui/button";
 import { faCog } from "@fortawesome/free-solid-svg-icons/faCog";
 import { SettingsModal } from "@/components/SettingsModal";
+import { useTranslation } from "react-i18next";
 
 export const Sidebar = () => {
   return (
@@ -32,12 +33,13 @@ export const Sidebar = () => {
 const DatasetList = () => {
   const { data } = useGeneratedDictionaries();
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const { t } = useTranslation();
   
   return (
     <div className="relative flex flex-col h-full min-h-[300px]">
       <div className="flex justify-between items-center">
         <div>
-          <strong>Datasets</strong>
+          <strong>{t("datasets")}</strong>
         </div>
         <AddDataModal />
       </div>
@@ -91,6 +93,7 @@ const ChatList = () => {
   const chatId = chatIdMatch ? chatIdMatch[1] : undefined;
   const [activeKey, setActiveKey] = useState<string | undefined>(chatId);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (chatId) {
@@ -118,7 +121,7 @@ const ChatList = () => {
     <div className="relative flex flex-col h-full min-h-[300px]">
       <div className="flex justify-between items-center pb-4">
         <div>
-          <strong>Chats</strong>
+          <strong>{t("chats")}</strong>
         </div>
         <NewChatModal />
       </div>
@@ -152,6 +155,7 @@ const SidebarHeader = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [activeKey, setActiveKey] = useState("");
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     if (pathname.includes(ROUTES.DATA)) {
@@ -166,7 +170,7 @@ const SidebarHeader = () => {
   const options: SidebarMenuOptionType[] = [
     {
       key: "data",
-      name: "Data",
+      name: t("data"),
       icon: <FontAwesomeIcon icon={faTable} />,
       active: activeKey === ROUTES.DATA,
       onClick: () => {
@@ -175,7 +179,7 @@ const SidebarHeader = () => {
     },
     {
       key: "chats",
-      name: "Chats",
+      name: t("chats"),
       icon: <FontAwesomeIcon icon={faComments} />,
       active: activeKey === ROUTES.CHATS,
       onClick: () => {
@@ -186,16 +190,29 @@ const SidebarHeader = () => {
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      <img
-        src={drLogo}
-        alt="DataRobot"
-        className="w-[130px] cursor-pointer"
-        onClick={() => navigate(ROUTES.DATA)}
-      />
-      <h1 className="text-xl">Talk to my data</h1>
+      <div className="flex items-center justify-between gap-2">
+        <img
+          src={drLogo}
+          alt="DataRobot"
+          className="w-[130px] cursor-pointer"
+          onClick={() => navigate(ROUTES.DATA)}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          style={{ minWidth: 44, padding: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+          onClick={() => i18n.changeLanguage(i18n.language === "en" ? "ja" : "en")}
+        >
+          {i18n.language === "en" ? (
+            <span role="img" aria-label="Japanese" style={{ fontSize: 20 }}>🇯🇵</span>
+          ) : (
+            <span role="img" aria-label="English" style={{ fontSize: 20 }}>🇺🇸</span>
+          )}
+        </Button>
+      </div>
+      <h1 className="text-xl">{t("talk_to_my_data")}</h1>
       <p className="text-sm">
-        Add the data you want to analyze, then ask DataRobot questions to
-        generate insights.
+        {t("sidebar_description")}
       </p>
       <div className="flex flex-col gap-2 flex-1 min-h-0">
         <SidebarMenu options={options} activeKey={activeKey} />

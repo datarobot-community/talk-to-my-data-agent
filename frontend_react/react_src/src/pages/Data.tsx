@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Separator } from "@radix-ui/react-separator";
 import { useGeneratedDictionaries } from "@/api-state/dictionaries/hooks";
+import { useTranslation } from "react-i18next";
 
 import {
   DatasetCardDescriptionPanel,
@@ -17,15 +18,16 @@ export const Data: React.FC = () => {
   const [viewMode, setViewMode] = useState<ValueOf<typeof DATA_TABS>>(
     DATA_TABS.DESCRIPTION
   );
+  const { t } = useTranslation();
 
   return (
     <div className="p-6">
       <h2 className="text-xl">
-        <strong>Data</strong>
+        <strong>{t("data")}</strong>
       </h2>
       <div className="flex justify-between gap-2">
         <div className="flex gap-2 items-center">
-          <div className="text-sm">View</div>
+          <div className="text-sm">{t("view")}</div>
           <DataViewTabs
             defaultValue={viewMode}
             onChange={(value) =>

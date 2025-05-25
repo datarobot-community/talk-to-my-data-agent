@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons/faTrash";
 import { useDeleteAllDatasets } from "@/api-state/datasets/hooks";
+import { useTranslation } from "react-i18next";
 
 interface ClearDatasetsButtonProps {
   onClear?: () => void;
@@ -10,6 +11,7 @@ interface ClearDatasetsButtonProps {
 
 export const ClearDatasetsButton: React.FC<ClearDatasetsButtonProps> = ({ onClear }) => {
   const { mutate } = useDeleteAllDatasets();
+  const { t } = useTranslation();
   
   const handleClick = () => {
     mutate();
@@ -21,7 +23,7 @@ export const ClearDatasetsButton: React.FC<ClearDatasetsButtonProps> = ({ onClea
   return (
     <Button variant="ghost" onClick={handleClick}>
       <FontAwesomeIcon icon={faTrash} />
-      Clear all datasets
+      {t("clear_all_datasets")}
     </Button>
   );
 };
