@@ -2,6 +2,8 @@ import React from "react";
 import { HeaderSection } from "./HeaderSection";
 import { SuggestedQuestionsSection } from "./SuggestedQuestionsSection";
 import { MarkdownContent } from "./MarkdownContent";
+import { CollapsiblePanel } from "./CollapsiblePanel";
+import { useAppState } from "@/state";
 
 interface InsightsTabContentProps {
   additionalInsights?: string | null;
@@ -14,8 +16,10 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
   followUpQuestions,
   chatId,
 }) => {
+  const { expandGraphsInsightsDefaultOpen } = useAppState();
+
   return (
-    <div>
+    <CollapsiblePanel header="Insights" defaultOpen={expandGraphsInsightsDefaultOpen}>
       {/* <InfoText>
         DataRobot generates additional content based on your original question.
       </InfoText> */}
@@ -25,6 +29,6 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
         </HeaderSection>
       )}
       <SuggestedQuestionsSection questions={followUpQuestions} chatId={chatId}/>
-    </div>
+    </CollapsiblePanel>
   );
 };

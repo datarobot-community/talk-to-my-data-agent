@@ -8,6 +8,7 @@ import {
   useUpdateChatDataSource,
 } from "@/api-state/chat-messages/hooks";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface IDataSourceToggleProps {
   multipleMetadata?: {
@@ -26,6 +27,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
   const { dataSource, setDataSource } = useAppState();
   const { data: chats } = useFetchAllChats();
   const { mutate: updateChatDataSource } = useUpdateChatDataSource();
+  const { t } = useTranslation();
 
   const handleValueChange = (value: string) => {
     if (value) {
@@ -65,7 +67,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
   const getTooltip = () => {
     return (
       <div className="absolute min-w-[270px] max-w-[600px] left-1/2 -translate-x-1/2 top-full mb-2 hidden bg-secondary text-secondary-foreground group-hover:block text-xs rounded px-2 py-1 shadow z-10">
-        Selected data sources:
+        {t("selected_data_sources", "Selected data sources:")}
         {dataByDataSource && dataByDataSource?.length > 0 ? (
           <ul className="list-disc pl-5">
             {dataByDataSource.map((item) => (
@@ -75,7 +77,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
             ))}
           </ul>
         ) : (
-          <div className="text-sm">No data sources selected.</div>
+          <div className="text-sm">{t("no_data_sources_selected", "No data sources selected.")}</div>
         )}
       </div>
     );
@@ -90,10 +92,10 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
     >
       {getTooltip()}
       <ToggleGroupItem value={DATA_SOURCES.DATABASE} className="text-sm">
-        <div className="m-2">Database</div>
+        <div className="m-2">{t("database")}</div>
       </ToggleGroupItem>
       <ToggleGroupItem value={DATA_SOURCES.FILE} className="text-sm">
-        <div className="m-2">Registry / File</div>
+        <div className="m-2">{t("registry_file")}</div>
       </ToggleGroupItem>
     </ToggleGroup>
   );

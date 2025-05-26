@@ -15,11 +15,8 @@ def get_today():
 def get_or_generate_data(_today):
     chat_path = Path("data/trace_chat.parquet")
     raw_path = Path("data/trace_raw.parquet")
-    if not chat_path.exists() or not raw_path.exists():
-        st.warning(
-            "Data parquet files not found. Running data pipeline to generate them..."
-        )
-        run_pipeline()
+
+    run_pipeline()
     try:
         df_chat = pd.read_parquet(chat_path)
     except Exception as e:

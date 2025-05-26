@@ -9,6 +9,7 @@ import {
 } from "@/api-state/chat-messages/hooks";
 import { useAppState } from "@/state/hooks";
 import { DATA_SOURCES } from "@/constants/dataSources";
+import { useTranslation } from "react-i18next";
 
 export const InitialPrompt = ({
   chatId,
@@ -26,6 +27,7 @@ export const InitialPrompt = ({
   const { mutate } = usePostMessage();
   const [message, setMessage] = useState("");
   const isDisabled = !allowedDataSources?.[0];
+  const { t } = useTranslation();
 
   // Find the active chat to get its data source setting
   const activeChat = chatId
@@ -59,13 +61,11 @@ export const InitialPrompt = ({
           <img src={chatMidnight} alt="" />
           <h4 className="mb-2 mt-4">
             <strong className=" text-center font-semibold">
-              Type a question about your dataset
+              {t("prompt_title")}
             </strong>
           </h4>
           <p className="text-center mb-10">
-            Ask specific questions about your datasets to get insights, generate
-            visualizations, and discover patterns. Include column names and the
-            kind of analysis you're looking for to get more accurate results.
+            {t("prompt_description")}
           </p>
           <PromptInput
             icon={FontAwesomeIcon}
@@ -85,8 +85,8 @@ export const InitialPrompt = ({
             value={message}
             placeholder={
               isDisabled
-                ? "Please upload and process data using the sidebar before starting the chat"
-                : "Ask another question about your datasets."
+                ? t("prompt_placeholder_disabled")
+                : t("prompt_placeholder_enabled")
             }
           />
         </div>

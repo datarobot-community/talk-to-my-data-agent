@@ -32,6 +32,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEnableChartGeneration,
     enableBusinessInsights,
     setEnableBusinessInsights,
+    expandGraphsInsightsDefaultOpen,
+    setExpandGraphsInsightsDefaultOpen,
   } = useAppState();
 
   const {
@@ -54,11 +56,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   );
   const [localEnableBusinessInsights, setLocalEnableBusinessInsights] =
     useState(enableBusinessInsights);
+  const [localExpandGraphsInsightsDefaultOpen, setLocalExpandGraphsInsightsDefaultOpen] = useState(expandGraphsInsightsDefaultOpen);
 
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
     setEnableChartGeneration(localEnableChartGeneration);
     setEnableBusinessInsights(localEnableBusinessInsights);
+    setExpandGraphsInsightsDefaultOpen(localExpandGraphsInsightsDefaultOpen);
     onOpenChange(false);
   };
 
@@ -87,6 +91,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) =>
                 setLocalCollapsiblePanelDefaultOpen(e.target.checked)
               }
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 py-2">
+            <Label
+              htmlFor="expand-graphs-insights-default-open"
+              className="cursor-pointer"
+            >
+              Expand graphs and insights by default
+            </Label>
+            <input
+              id="expand-graphs-insights-default-open"
+              type="checkbox"
+              className="h-4 w-4"
+              checked={localExpandGraphsInsightsDefaultOpen}
+              onChange={(e) => setLocalExpandGraphsInsightsDefaultOpen(e.target.checked)}
             />
           </div>
 

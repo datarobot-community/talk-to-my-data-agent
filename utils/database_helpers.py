@@ -350,14 +350,8 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         columns = [desc[0] for desc in cursor.description]
                         data = cursor.fetchall()
                         pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
-                        df = pl.DataFrame(
-                            data=pandas_df, schema={col: pl.String for col in columns}
-                        )
-
-                        logger.info(
-                            f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
-                        )
-                        dataframes.append(AnalystDataset(name=table, data=df))
+                        # If you want to use Polars later, do it after validation/registration
+                        dataframes.append(AnalystDataset(name=table, data=pandas_df))
 
                     except Exception as e:
                         logger.error(f"Error loading table {table}: {str(e)}")
@@ -733,7 +727,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                         logger.info(
                             f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
                         )
-                        dataframes.append(AnalystDataset(name=table, data=df))
+                        dataframes.append(AnalystDataset(name=table, data=pandas_df))
 
                     except Exception as e:
                         logger.error(f"Error loading table {table}: {str(e)}")

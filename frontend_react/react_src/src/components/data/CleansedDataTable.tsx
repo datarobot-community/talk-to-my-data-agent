@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import loader from "@/assets/loader.svg";
 import { Loading } from "@/components/ui-custom/loading";
+import { useTranslation } from "react-i18next";
 
 interface CleansedDataTableProps {
   datasetName: string;
@@ -22,6 +23,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   rowsPerPage = 50,
 }) => {
   const { ref, inView } = useInView();
+  const { t } = useTranslation();
 
   const {
     data,
@@ -62,7 +64,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   if (isError) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center h-96">
-        Error loading data: {String(error)}
+        {t("error_loading_data")} {String(error)}
       </div>
     );
   }
@@ -70,7 +72,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   if (allRows.length === 0) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center h-96">
-        No data available for this dataset.
+        {t("no_data_available")}
       </div>
     );
   }
@@ -106,16 +108,16 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
           <div className="flex justify-center items-center">
             <img
               src={loader}
-              alt="processing"
+              alt={t("processing")}
               className="mr-2 w-4 h-4 animate-spin"
             />
-            <span className="ml-2">Loading more...</span>
+            <span className="ml-2">{t("loading")}</span>
           </div>
         ) : hasNextPage ? (
           <div className="h-10" />
         ) : (
           <div className="text-muted-foreground">
-            {allRows.length > 0 ? "End of data" : "No data available"}
+            {allRows.length > 0 ? t("end_of_data") : t("no_data")}
           </div>
         )}
       </div>

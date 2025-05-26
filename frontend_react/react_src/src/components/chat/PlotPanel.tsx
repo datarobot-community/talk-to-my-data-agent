@@ -39,7 +39,7 @@ export const PlotPanel: React.FC<PlotPanelProps> = ({
   }
 
   return (
-    <CollapsiblePanel header={plotData.layout?.title?.text}>
+    <CollapsiblePanel header={plotData.layout?.title?.text} defaultOpen={true}>
       <Suspense fallback={<PlotLoading />}>
         <Plot
           data={plotData.data}
