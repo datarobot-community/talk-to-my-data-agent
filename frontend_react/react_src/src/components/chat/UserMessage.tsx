@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { MessageHeader } from "./MessageHeader";
 import { formatMessageDate } from "./utils";
 import { useDeleteMessage } from "@/api-state/chat-messages/hooks";
@@ -22,10 +22,6 @@ export const UserMessage: React.FC<UserMessageProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { mutate: deleteMessage } = useDeleteMessage();
-
-  useEffect(() => {
-    ref.current?.scrollIntoView(false);
-  });
 
   // Use the formatted timestamp if available, otherwise fallback to date prop or default
   const displayDate = timestamp ? formatMessageDate(timestamp) : date || "";

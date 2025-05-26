@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo } from "react";
+import React, { Suspense, lazy, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@radix-ui/react-separator";
@@ -157,6 +157,25 @@ export const Chats: React.FC = () => {
     }
   };
 
+  // scroll area viewport ref
+  // const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
+  const lastAIMessageRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the last AI message to the top of the scroll area (aligns the top of the message with the top of the viewport)
+  useEffect(() => {
+    // Use the actual Radix scroll area viewport for scrolling
+    const viewport = document.querySelector('[data-slot="scroll-area-viewport"]');
+    if (lastAIMessageRef.current && viewport) {
+      // Delay scroll to ensure charts/images inside the AI message are rendered before scrolling
+      setTimeout(() => {
+        if (lastAIMessageRef.current && viewport) {
+          // This ensures the top of the last AI message is exactly at the top of the scroll area
+          viewport.scrollTop = lastAIMessageRef.current.offsetTop;
+        }
+      }, 100);
+    }
+  }, [messages]);
+
   // Render chat messages
   const renderMessages = () => {
     if (!messages || messages.length === 0) {
@@ -170,18 +189,48 @@ export const Chats: React.FC = () => {
       );
     }
 
+    // find the index of the last AI reply
+    const lastAIIndex = (() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "assistant") return i;
+      }
+      return -1;
+    })();
+
     return (
       <>
         <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
-          {messages?.map((message, index, array) => (
-            <ChatMessageItem
-              key={index}
-              message={message}
-              messages={array}
-              chatId={activeChat?.id}
-              index={index}
-            />
-          ))}
+          <Separator className="my-4 border-t" />
+          {messages.map((message, index, array) => {
+            // render user message
+            if (message.role === "user") {
+              return (
+                <ChatMessageItem
+                  key={index}
+                  message={message}
+                  messages={array}
+                  chatId={activeChat?.id}
+                  index={index}
+                />
+              );
+            }
+            // render AI reply, add ref to the last one
+            if (message.role === "assistant") {
+              const isLastAI = index === lastAIIndex;
+              return (
+                <div key={index} ref={isLastAI ? lastAIMessageRef : undefined}>
+                  <Suspense fallback={<ComponentLoading />}>
+                    <ResponseMessage
+                      message={message}
+                      isLoading={!!message.in_progress}
+                      chatId={activeChat?.id}
+                    />
+                  </Suspense>
+                </div>
+              );
+            }
+            return null;
+          })}
         </ScrollArea>
         <Suspense fallback={<ComponentLoading />}>
           <UserPrompt
