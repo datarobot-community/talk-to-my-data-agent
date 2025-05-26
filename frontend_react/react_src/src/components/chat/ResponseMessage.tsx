@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   IChatMessage,
   IMessageComponent,
@@ -75,6 +75,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   isLoading = false,
 }) => {
   const [activeTab, setActiveTab] = useState(RESPONSE_TABS.SUMMARY);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   const {
     displayDate,
@@ -170,11 +171,13 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
 
   return (
     <MessageContainer>
-      <MessageHeader
-        avatar={DataRobotAvatar}
-        name="DataRobot"
-        date={displayDate}
-      />
+      <div ref={headerRef}>
+        <MessageHeader
+          avatar={DataRobotAvatar}
+          name="DataRobot"
+          date={displayDate}
+        />
+      </div>
 
       {isLoading ? (
         <Loading />

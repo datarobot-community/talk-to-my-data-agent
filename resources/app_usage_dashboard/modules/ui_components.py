@@ -46,13 +46,32 @@ def render_global_filters(user_emails):
         index=timeframe_keys.index(st.session_state["timeframe_key"]),
     )
     if st.session_state["timeframe_key"] == "custom":
-        st.session_state["date_range"] = st.sidebar.date_input(
+        # Ensure date_range is valid
+        if (
+            "date_range" not in st.session_state
+            or st.session_state["date_range"] is None
+            or st.session_state["date_range"][0] is None
+            or st.session_state["date_range"][1] is None
+        ):
+            st.session_state["date_range"] = (
+                st.session_state["input_date_range"][0],
+                st.session_state["input_date_range"][1],
+            )
+        st.session_state["date_range"] = st.sidebar.slider(
             _("filters.timeframe.custom"),
             key="custom_date_range",
-            value=st.session_state.get("date_range", None),
+            min_value=st.session_state["input_date_range"][0],
+            max_value=st.session_state["input_date_range"][1],
+            value=(
+                st.session_state["date_range"][0],
+                st.session_state["date_range"][1],
+            ),
         )
     else:
-        st.session_state["date_range"] = None
+        st.session_state["date_range"] = (
+            st.session_state["input_date_range"][0],
+            st.session_state["input_date_range"][1],
+        )
 
     user_email_options = ["ALL"] + user_emails
     st.session_state["user_email"] = st.sidebar.selectbox(

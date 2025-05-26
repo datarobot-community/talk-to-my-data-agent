@@ -1,4 +1,7 @@
+import traceback
+
 import streamlit as st
+from streamlit.logger import get_logger
 from wordcloud import WordCloud
 
 # For Japanese tokenization, use janome
@@ -17,6 +20,8 @@ try:
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
+
+logger = get_logger("streamlit")
 
 
 def generate_user_wordcloud(text_data, font_path, current_language, _):
@@ -64,6 +69,8 @@ def generate_error_wordcloud(text_list, font_path, current_language, _):
                 ]
             except Exception as e:
                 st.error(_("errors.janome_tokenize_error", error=str(e)))
+                logger.error(_("errors.janome_tokenize_error", error=str(e)))
+                logger.error(traceback.format_exc())
                 return
         else:
             st.error(_("errors.janome_init_error"))

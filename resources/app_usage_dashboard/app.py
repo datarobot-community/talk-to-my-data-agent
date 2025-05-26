@@ -3,6 +3,7 @@ import os
 import time
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from i18n_setup import _, setup_i18n
 from modules import (
@@ -53,6 +54,11 @@ user_emails = (
     if not trace_chat_df.empty
     else []
 )
+if "input_date_range" not in st.session_state:
+    st.session_state["input_date_range"] = (
+        trace_chat_df["date"].min(),
+        trace_chat_df["date"].max(),
+    )
 
 # Status indicators and refresh button in sidebar
 with st.sidebar:
@@ -69,9 +75,9 @@ with st.sidebar:
 
     st.write(file_status(chat_path))
     st.write(file_status(raw_path))
-    if st.button("🔄 Refresh Data from DataRobot"):
-        data_utils.refresh_data()
-        st.experimental_rerun()
+    # if st.button("🔄 Refresh Data from DataRobot"):
+    #     data_utils.refresh_data()
+    #     st.rerun()
 
 # Render global filters (sidebar includes language selector)
 filters = ui_components.render_global_filters(user_emails)
@@ -80,7 +86,6 @@ filters = ui_components.render_global_filters(user_emails)
 timeframe_key, date_range, user_email, granularity = filters
 
 # Helper: Convert timeframe_key/date_range to start/end datetime
-import pandas as pd
 
 now = pd.Timestamp.now()
 if timeframe_key == "last_7_days":
@@ -185,8 +190,8 @@ fig4 = chart_generators.plot_llm_call_count_trend(
 st.plotly_chart(fig4, use_container_width=True)
 
 # Display LLM Error Count Trend chart
-st.subheader(_("section_titles.llm_error_count_trend"))
-fig5 = chart_generators.plot_llm_error_count_trend(
+st.subheader(_("section_titles.llm_error_avg_trend"))
+fig5 = chart_generators.plot_llm_error_avg_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
 st.plotly_chart(fig5, use_container_width=True)
@@ -256,6 +261,7 @@ else:
         "chat_seq",
         "userMsg",
         "dataSource",
+        "datasetNames",
         "stopUnexpected",
         "startTimestamp",
         "errorCount",
