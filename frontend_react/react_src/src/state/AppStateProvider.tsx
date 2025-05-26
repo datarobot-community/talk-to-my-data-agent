@@ -28,6 +28,10 @@ export const AppStateProvider: React.FC<{
     dispatch(actions.setDataSource(source));
   };
 
+  const setExpandGraphsInsightsDefaultOpen = (isOpen: boolean) => {
+    dispatch(actions.setExpandGraphsInsightsDefaultOpen(isOpen));
+  };
+
   const contextValue: AppState = {
     ...state,
     hideWelcomeModal,
@@ -35,6 +39,8 @@ export const AppStateProvider: React.FC<{
     setEnableChartGeneration,
     setEnableBusinessInsights,
     setDataSource,
+    expandGraphsInsightsDefaultOpen: state.expandGraphsInsightsDefaultOpen,
+    setExpandGraphsInsightsDefaultOpen,
   };
 
   return (

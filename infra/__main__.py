@@ -313,11 +313,16 @@ class CustomJobPostActions(pulumi.ComponentResource):
             {"custom_job_id": custom_job_id},
             opts,
         )
-        # Run the custom job once
-        result = custom_job_id.apply(lambda id: settings_job_infra.run_job_once(id))
-        self.custom_run_id = result.apply(
-            lambda r: r["run_id"] if r["success"] else "NA"
-        )
+        import pulumi.runtime
+
+        # Only run the job if we're in the actual update phase, not preview
+        if not pulumi.runtime.is_dry_run():
+            result = custom_job_id.apply(lambda id: settings_job_infra.run_job_once(id))
+            self.custom_run_id = result.apply(
+                lambda r: r["run_id"] if r["success"] else "NA"
+            )
+        else:
+            self.custom_run_id = pulumi.Output.from_input("NA")
         self.schedule_id = custom_job_id.apply(
             lambda id: settings_job_infra.create_job_schedule(id)
         )

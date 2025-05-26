@@ -6,6 +6,7 @@ export interface AppStateData {
   enableChartGeneration: boolean;
   enableBusinessInsights: boolean;
   dataSource: string;
+  expandGraphsInsightsDefaultOpen: boolean;
 }
 
 export interface AppStateActions {
@@ -14,6 +15,7 @@ export interface AppStateActions {
   setEnableChartGeneration: (enabled: boolean) => void;
   setEnableBusinessInsights: (enabled: boolean) => void;
   setDataSource: (source: string) => void;
+  setExpandGraphsInsightsDefaultOpen: (isOpen: boolean) => void;
 }
 
 export type AppState = AppStateData & AppStateActions;
@@ -23,4 +25,5 @@ export type Action =
   | { type: "SET_COLLAPSIBLE_PANEL_DEFAULT_OPEN"; payload: boolean }
   | { type: "SET_ENABLE_CHART_GENERATION"; payload: boolean }
   | { type: "SET_ENABLE_BUSINESS_INSIGHTS"; payload: boolean }
-  | { type: "SET_DATA_SOURCE"; payload: string };
+  | { type: "SET_DATA_SOURCE"; payload: string }
+  | { type: "SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN"; payload: boolean };

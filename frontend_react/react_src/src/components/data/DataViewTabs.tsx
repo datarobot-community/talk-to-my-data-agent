@@ -5,6 +5,7 @@ import { faQuoteLeft } from "@fortawesome/free-solid-svg-icons/faQuoteLeft";
 import { faTable } from "@fortawesome/free-solid-svg-icons/faTable";
 import { DATA_TABS } from "@/state/constants";
 import { ValueOf } from "@/state/types";
+import { useTranslation } from "react-i18next";
 
 interface DataViewTabsProps {
   defaultValue?: ValueOf<typeof DATA_TABS>;
@@ -15,6 +16,7 @@ export const DataViewTabs: React.FC<DataViewTabsProps> = ({
   defaultValue = DATA_TABS.DESCRIPTION,
   onChange,
 }) => {
+  const { t } = useTranslation();
   return (
     <Tabs 
       defaultValue={defaultValue} 
@@ -24,11 +26,11 @@ export const DataViewTabs: React.FC<DataViewTabsProps> = ({
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value={DATA_TABS.DESCRIPTION}>
           <FontAwesomeIcon className="mr-2" icon={faQuoteLeft} />
-          Description
+          {t("description")}
         </TabsTrigger>
         <TabsTrigger value={DATA_TABS.RAW}>
           <FontAwesomeIcon className="mr-2" icon={faTable} />
-          Raw rows
+          {t("raw_rows")}
         </TabsTrigger>
       </TabsList>
     </Tabs>

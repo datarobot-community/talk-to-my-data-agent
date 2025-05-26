@@ -611,7 +611,9 @@ async def get_cleansed_dataset(
         # Apply skip if needed (max_rows in get_cleansed_dataset only handles the limit)
         if skip > 0 and cleansed_dataset.dataset.to_df().shape[0] > skip:
             # Create a new dataset with skipped rows
-            skipped_df = cleansed_dataset.dataset.to_df().iloc[skip:min(limit, max_rows)]
+            skipped_df = cleansed_dataset.dataset.to_df().iloc[
+                skip : min(limit, max_rows)
+            ]
             cleansed_dataset.dataset = AnalystDataset(name=name, data=skipped_df)
         elif skip > 0:
             # If skip is greater than the number of rows, return an empty dataset

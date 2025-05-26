@@ -24,6 +24,7 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+from io import StringIO
 from types import ModuleType, TracebackType
 from typing import Any, AsyncGenerator, Type, TypeVar, cast
 
@@ -33,6 +34,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import psutil
+import requests
 import scipy
 import sklearn
 import statsmodels as sm
@@ -175,6 +177,10 @@ def cache(f: T) -> T:
         return cast(T, wrapper)
 
 
+def get_user_email() -> str:
+    return dr.client.get_client().get("account/info/").json()["email"]
+
+
 # This can be large as we are not storing the actual datasets in memory, just metadata
 def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
     """
@@ -184,11 +190,17 @@ def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
         limit: int
         Datasets to retrieve. Max value: 100
     """
-
-    url = f"datasets?limit={limit}"
+    logger.info(f"Acting as user: {get_user_email()}")
+    url = f"{dr.client.get_client().endpoint}/datasets?limit={limit}"
+    headers = {
+        "Authorization": f"Bearer {dr.client.get_client().token}",
+        "Content-Type": "application/json",
+    }
 
     # Get all datasets and manually limit the results
-    datasets = dr.client.get_client().get(url).json()["data"]
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    datasets = response.json()["data"]
 
     return [
         DataRegistryDataset(
@@ -207,6 +219,57 @@ def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
     ]
 
 
+def get_registry_dataset_info(dataset_id: str) -> tuple[str, int]:
+    """
+    Fetch a dataset's name and size from DataRobot API using requests.
+
+    Args:
+        dataset_id: The ID of the dataset to fetch.
+        token: The DataRobot API token.
+    Returns:
+        Tuple of (name, size in bytes)
+    Raises:
+        Exception if the request fails or the response is invalid.
+    """
+    base_url = dr.client.get_client().endpoint
+    url = f"{base_url}/datasets/{dataset_id}"
+    headers = {
+        "Authorization": f"Bearer {dr.client.get_client().token}",
+        "Content-Type": "application/json",
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    name = data.get("name", "")
+    size = data.get("datasetSize", 0)
+    return name, size
+
+
+def download_registry_dataset_as_dataframe(dataset_id: str) -> pd.DataFrame:
+    """
+    Download a dataset from DataRobot as a pandas DataFrame using requests.
+
+    Args:
+        token: The DataRobot API token.
+        dataset_id: The ID of the dataset to download.
+    Returns:
+        DataFrame containing the dataset.
+    Raises:
+        Exception if the request fails or the response is invalid.
+    """
+    base_url = dr.client.get_client().endpoint
+    url = f"{base_url}/datasets/{dataset_id}/file/"
+    headers = {
+        "Authorization": f"Bearer {dr.client.get_client().token}",
+        "accept": "*/*",
+    }
+    response = requests.get(url, headers=headers, stream=True)
+    response.raise_for_status()
+    csv_content = response.content.decode("utf-8")
+    df = pd.read_csv(StringIO(csv_content))
+    return df
+
+
 async def download_registry_datasets(
     dataset_ids: list[str], analyst_db: AnalystDB
 ) -> list[DownloadedRegistryDataset]:
@@ -218,34 +281,47 @@ async def download_registry_datasets(
     Returns:
         list[AnalystDataset]: Dictionary of dataset names and data
     """
+    logger.info(f"Acting as user: {get_user_email()}")
     downloaded_datasets = []
-    datasets = [dr.Dataset.get(id_) for id_ in dataset_ids]
-    if (
-        sum([ds.size for ds in datasets if ds.size is not None])
-        > MAX_REGISTRY_DATASET_SIZE
-    ):
+
+    # Use requests to get dataset info instead of dr.Dataset
+    total_size = 0
+    dataset_infos = []
+    for id_ in dataset_ids:
+        try:
+            name, size = get_registry_dataset_info(id_)
+            total_size += size if size is not None else 0
+            dataset_infos.append((id_, name, size))
+        except Exception as e:
+            logger.error(f"Failed to fetch dataset info for {id_}: {str(e)}")
+            downloaded_datasets.append(
+                DownloadedRegistryDataset(name=id_, error=str(e))
+            )
+    if total_size > MAX_REGISTRY_DATASET_SIZE:
         raise ValueError(
             f"The requested Data Registry datasets must total <= {int(MAX_REGISTRY_DATASET_SIZE)} bytes"
         )
 
     result_datasets: list[AnalystDataset] = []
-    for dataset in datasets:
+    for id_, name, size in dataset_infos:
         try:
+            # Use requests to download the dataset as DataFrame
+            df = download_registry_dataset_as_dataframe(id_)
             df_records = cast(
                 list[dict[str, Any]],
-                dataset.get_as_dataframe().to_dict(orient="records"),
+                df.to_dict(orient="records"),
             )
-            result_datasets.append(AnalystDataset(name=dataset.name, data=df_records))
-            logger.info(f"Successfully downloaded {dataset.name}")
+            result_datasets.append(AnalystDataset(name=name, data=df_records))
+            logger.info(f"Successfully downloaded {name}")
         except Exception as e:
-            logger.error(f"Failed to read dataset {dataset.name}: {str(e)}")
+            logger.error(f"Failed to read dataset {name}: {str(e)}")
             downloaded_datasets.append(
-                DownloadedRegistryDataset(name=dataset.name, error=str(e))
+                DownloadedRegistryDataset(name=name, error=str(e))
             )
             continue
     for result_dataset in result_datasets:
         await analyst_db.register_dataset(
-            result_dataset, DataSourceType.REGISTRY, dataset.size or 0
+            result_dataset, DataSourceType.REGISTRY, size or 0
         )
         downloaded_datasets.append(DownloadedRegistryDataset(name=result_dataset.name))
     return downloaded_datasets
@@ -927,7 +1003,6 @@ async def rephrase_message(
         telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     else:
         telemetry_send = None
-
 
     # Convert messages to string format for prompt
     messages_str = "\n".join(

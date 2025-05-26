@@ -12,14 +12,18 @@ import { useAppState } from "@/state";
 interface CollapsiblePanelProps {
   header: React.ReactNode;
   children: React.ReactNode;
+  defaultOpen?: boolean;
 }
 
 export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
   header,
   children,
+  defaultOpen,
 }) => {
   const { collapsiblePanelDefaultOpen } = useAppState();
-  const [isOpen, setIsOpen] = React.useState(collapsiblePanelDefaultOpen);
+  const [isOpen, setIsOpen] = React.useState(
+    defaultOpen !== undefined ? defaultOpen : collapsiblePanelDefaultOpen
+  );
   const ref = useRef<HTMLDivElement>(null);
   
   useEffect(() => {

@@ -27,9 +27,12 @@ import { useAppState } from "@/state/hooks";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AxiosError } from "axios";
 import { TruncatedText } from "./ui-custom/truncated-text";
+import { useTranslation } from "react-i18next";
 
 export const AddDataModal = () => {
-  const { data } = useFetchAllDatasets();
+  // TODO: Remove the showDataRegistry flag after making sure that the Data Registry is working.
+  const showDataRegistry = true;
+  const { data } = showDataRegistry ? useFetchAllDatasets() : { data: null };
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const { data: dbTables } = useGetDatabaseTables();
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -38,6 +41,7 @@ export const AddDataModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
@@ -75,12 +79,12 @@ export const AddDataModal = () => {
     >
       <DialogTrigger asChild>
         <Button variant="outline">
-          <FontAwesomeIcon icon={faPlus} /> Add Data
+          <FontAwesomeIcon icon={faPlus} /> {t("add_data")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>Add Data</DialogTitle>
+          <DialogTitle>{t("add_data")}</DialogTitle>
           <Separator className="border-t" />
           <DialogDescription></DialogDescription>
         </DialogHeader>
@@ -97,32 +101,36 @@ export const AddDataModal = () => {
               </div>
             </div>
             <FileUploader onFilesChange={setFiles} progress={progress} />
-            <h4>Data Registry</h4>
-            <h6>Select one or more catalog items</h6>
-            <MultiSelect
-              options={
-                data
-                  ? data.map((i) => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder="Select one or more items."
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  <TruncatedText maxLength={100}>{error}</TruncatedText>
-                </AlertDescription>
-              </Alert>
+            {showDataRegistry && (
+              <>
+                <h4>Data Registry</h4>
+                <h6>Select one or more catalog items</h6>
+                <MultiSelect
+                  options={
+                    data
+                      ? data.map((i) => ({
+                          label: i.name,
+                          value: i.id,
+                          postfix: i.size,
+                        }))
+                      : []
+                  }
+                  onValueChange={setSelectedDatasets}
+                  defaultValue={selectedDatasets}
+                  placeholder="Select one or more items."
+                  variant="inverted"
+                  modalPopover
+                  animation={2}
+                  maxCount={3}
+                />
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      <TruncatedText maxLength={100}>{error}</TruncatedText>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
             )}
           </>
         )}
