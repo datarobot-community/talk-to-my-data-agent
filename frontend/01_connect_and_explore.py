@@ -47,6 +47,7 @@ from utils.schema import (
     DataDictionary,
     DataRegistryDataset,
 )
+from utils.i18n import gettext
 
 warnings.filterwarnings("ignore")
 
@@ -244,7 +245,7 @@ async def main() -> None:
     await state_init()
     logger.info("Starting App")
     with st.sidebar:
-        st.title("Connect")
+        st.title(gettext("Connect"))
 
         # Load Files expander containing file upload and the Data Registry
         with st.expander("Load Files", expanded=True):
@@ -339,7 +340,7 @@ async def main() -> None:
 
     # Main content area
     display_page_logo()
-    st.title("Explore")
+    st.title(gettext("Explore"))
     if "analyst_db" not in st.session_state:
         st.warning("Could not identify user, please provide your API token")
         return
