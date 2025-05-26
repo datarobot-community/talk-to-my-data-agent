@@ -113,3 +113,35 @@ msgstr "選択したテーブルを読み込み中..."
 msgid "Loading selected datasets..."
 msgstr "選択したデータセットを読み込み中..."
 
+msgid "Analysis Code"
+msgstr "分析コード"
+
+msgid "Analysis Results"
+msgstr "分析結果"
+
+msgid "Error running business analysis\n{result_metadata_exception_str}"
+msgstr "ビジネス分析時のエラー\n{result_metadata_exception_str}"
+
+msgid "Bottom Line"
+msgstr "要点"
+
+msgid "Additional Insights"
+msgstr "追加の洞察"
+
+msgid "Follow-up Questions"
+msgstr "追加質問"
+
+msgid "An error occurred during analysis. Please retry"
+msgstr "分析途中にエラーが起きました。再度実行してください"
+
+msgid "Last Executed Code"
+msgstr "最後に実行されたコード"
+
+msgid "Analysing question..."
+msgstr "質問を過去ログに基づいて分析中"
+
+msgid "Generating insights..."
+msgstr "インサイトを生成中"
+
+msgid "Failed to initialize the database connection."
+msgstr "データベースとの接続の初期化が失敗しました。"

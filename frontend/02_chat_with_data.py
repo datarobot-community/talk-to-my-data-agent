@@ -55,6 +55,8 @@ from utils.schema import (
     RunDatabaseAnalysisResult,
 )
 
+from utils.i18n import gettext
+
 warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")
 app_infra = load_app_infra()
@@ -225,11 +227,11 @@ class UnifiedRenderer:
                 self.render_exception(result.metadata.exception)
                 return
             if result.code:
-                with st.expander("Analysis Code", expanded=False):
+                with st.expander(gettext("Analysis Code"), expanded=False):
                     language = "sql" if is_database else "python"
                     st.code(result.code, language=language)
             if result.dataset:
-                with st.expander("Analysis Results", expanded=True):
+                with st.expander(gettext("Analysis Results"), expanded=True):
                     st.dataframe(result.dataset.to_df(), use_container_width=True)
 
     def render_charts(self, result: RunChartsResult) -> None:
@@ -258,22 +260,24 @@ class UnifiedRenderer:
             with self.containers.bottom_line:
                 if result.metadata is not None and result.metadata.exception_str:
                     st.error(
-                        f"Error running business analysis\n{result.metadata.exception_str}"
+                        gettext("Error running business analysis\n{result_metadata_exception_str}").format(
+                            result_metadata_exception_str=result.metadata.exception_str
+                        )
                     )
                 else:
                     st.error("Error running business analysis")
         with self.containers.bottom_line:
-            with st.expander("Bottom Line", expanded=True):
+            with st.expander(gettext("Bottom Line"), expanded=True):
                 st.markdown((result.bottom_line or "").replace("$", r"\$"))
 
         with self.containers.insights:
             if result.additional_insights:
-                with st.expander("Additional Insights", expanded=True):
+                with st.expander(gettext("Additional Insights"), expanded=True):
                     st.markdown(result.additional_insights.replace("$", r"\$"))
 
         with self.containers.followup:
             if result.follow_up_questions:
-                with st.expander("Follow-up Questions", expanded=True):
+                with st.expander(gettext("Follow-up Questions"), expanded=True):
                     for q in result.follow_up_questions:
                         st.markdown(f"- {q}".replace("$", r"\$"))
 
@@ -283,12 +287,12 @@ class UnifiedRenderer:
             or exception.exception_history is None
             or len(exception.exception_history) == 0
         ):
-            st.error("An error occurred during analysis. Please retry")
+            st.error(gettext("An error occurred during analysis. Please retry"))
             return
         last_exception = exception.exception_history[-1]
         st.error(f"Error: {last_exception.exception_str}")
         if last_exception.code is not None:
-            with st.expander("Last Executed Code"):
+            with st.expander(gettext("Last Executed Code")):
                 st.code(last_exception.code)
 
 
@@ -332,7 +336,7 @@ async def run_complete_analysis_st(
                 enable_business_insights=st.session_state.enable_business_insights,
                 telemetry_json=telemetry_json,
             )
-            with st.spinner("Analysing question..."):
+            with st.spinner(gettext("Analysing question...")):
                 enhanced_message = await anext(run_analysis_iterator)
 
             assistant_message = AnalystChatMessage(
@@ -344,7 +348,7 @@ async def run_complete_analysis_st(
             )
             await renderer.render_message(assistant_message, within_chat_context=True)
 
-            with st.spinner("Generating insights..."):
+            with st.spinner(gettext("Generating insights...")):
                 async for message in run_analysis_iterator:
                     if isinstance(message, AnalysisGenerationError):
                         st.error(message.message)
@@ -383,9 +387,9 @@ async def main() -> None:
     if "analyst_db" not in st.session_state:
         st.session_state.retries += 1
         if st.session_state.retries >= 5:
-            st.warning("Could not identify user, please provide your API token")
+            st.warning(gettext("Could not identify user, please provide your API token"))
             return
-        st.error("Failed to initialize the database connection.")
+        st.error(gettext("Failed to initialize the database connection."))
         time.sleep(1)
         st.rerun()
 

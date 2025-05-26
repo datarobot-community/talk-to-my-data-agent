@@ -182,6 +182,7 @@ async def load_from_database_callback() -> None:
                         gettext("Failed to load data from {app_infra_database}").format(
                             app_infra_database=app_infra.database
                         )
+                        )
                     return
                 telemetry_json = {
                     "user_email": st.session_state.user_email,
