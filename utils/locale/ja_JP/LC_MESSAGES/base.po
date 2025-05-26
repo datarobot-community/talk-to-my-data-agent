@@ -145,3 +145,36 @@ msgstr "インサイトを生成中"
 
 msgid "Failed to initialize the database connection."
 msgstr "データベースとの接続の初期化が失敗しました。"
+
+msgid "Chat Controls"
+msgstr "チャットの制御"
+
+msgid "Available Datasets"
+msgstr "利用可能なデータセット"
+
+msgid "Generate charts in conversation"
+msgstr "会話でのグラフ生成"
+
+msgid "Generate charts in conversation"
+msgstr "チャットでのグラフ生成の有効化"
+
+msgid "Enable business insights and follow up questions in conversation"
+msgstr "チャットでのデータへの洞察と追加質問の有効化"
+
+msgid "New Chat"
+msgstr "新しいチャット"
+
+msgid "Save Chat"
+msgstr "チャットの保存"
+
+msgid "No saved chats available."
+msgstr "保存されたチャットはありません"
+
+msgid "Saved Chats"
+msgstr "保存されたチャット"
+
+msgid "Please upload and process data using the sidebar before starting the chat"
+msgstr "チャットをする前に、サイドバーにデータをアップロードしてください。"
+
+msgid "Ask a question about your data"
+msgstr "あなたのデータについて聞いてみましょう。"
