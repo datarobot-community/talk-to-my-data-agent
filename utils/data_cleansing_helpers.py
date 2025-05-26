@@ -300,7 +300,9 @@ def process_column(
     if cleaned_column_name != column_name:
         column_report.original_column_name = column_name
         column_report.warnings.append(
-            f"Column renamed from '{column_name}' to '{cleaned_column_name}'"
+            gettext(
+                "Column renamed from '{old_name}' to '{new_name}'"
+                ).format(old_name=column_name, new_name=cleaned_column_name)
         )
 
     if pd.api.types.is_string_dtype(df[column_name]):
