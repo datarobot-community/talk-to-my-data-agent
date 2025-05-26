@@ -92,16 +92,22 @@ def plot_user_activity_heatmap(
     )
     if pivot.empty:
         return go.Figure()
-    fig = px.imshow(
-        pivot,
-        labels=dict(
-            x=_(f"filters.granularity.{granularity.lower()}"),
-            y=_("kpi_labels.user_email"),
-            color=_("charts.num_chats"),
-        ),
-        aspect="auto",
-        color_continuous_scale="Blues",
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=pivot.values,
+            x=pivot.columns,
+            y=pivot.index,
+            text=pivot.values,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            colorscale="Blues",
+        )
+    )
+    fig.update_layout(
         title=_("charts.user_activity_heatmap"),
+        xaxis_title=_(f"filters.granularity.{granularity.lower()}"),
+        yaxis_title=_("kpi_labels.user_email"),
+        coloraxis_colorbar_title=_("charts.num_chats"),
     )
     return fig
 
@@ -145,11 +151,11 @@ def plot_llm_call_count_trend(
 
 
 # LLM Error Count Trend (Grouped Line Chart)
-def plot_llm_error_count_trend(
+def plot_llm_error_avg_trend(
     df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
 ) -> go.Figure:
     """
-    Plot grouped line chart for LLM error counts by query_no type (02, 03, 04, 05).
+    Plot grouped line chart for LLM error average counts by query_no type (02, 03, 04, 05).
     """
     error_cols = [
         col
@@ -163,7 +169,7 @@ def plot_llm_error_count_trend(
     filtered["period"] = (
         pd.to_datetime(filtered["date"]).dt.to_period(granularity).dt.to_timestamp()
     )
-    data = filtered.groupby("period")[error_cols].sum().reset_index()
+    data = filtered.groupby("period")[error_cols].mean().reset_index()
     fig = go.Figure()
     for col in error_cols:
         fig.add_trace(
@@ -175,9 +181,9 @@ def plot_llm_error_count_trend(
             )
         )
     fig.update_layout(
-        title=_("charts.llm_error_count_trend"),
+        title=_("charts.llm_error_avg_trend"),
         xaxis_title=_(f"filters.granularity.{granularity.lower()}"),
-        yaxis_title=_("charts.llm_error_count"),
+        yaxis_title=_("charts.llm_error_avg"),
     )
     return fig
 
