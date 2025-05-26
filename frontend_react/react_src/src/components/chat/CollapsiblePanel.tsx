@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronUp } from "@fortawesome/free-solid-svg-icons/faChevronUp";
 import { faChevronDown } from "@fortawesome/free-solid-svg-icons/faChevronDown";
@@ -26,9 +26,9 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
   );
   const ref = useRef<HTMLDivElement>(null);
   
-  useEffect(() => {
-    ref.current?.scrollIntoView(false);
-  });
+  //   useEffect(() => {
+  //     ref.current?.scrollIntoView(false);
+  //   });
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="rounded border border-border">

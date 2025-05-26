@@ -983,6 +983,12 @@ async def run_complete_analysis_task(
             await analyst_db.list_analyst_datasets(DataSourceType.REGISTRY)
         ) + (await analyst_db.list_analyst_datasets(DataSourceType.FILE))
 
+    user_email = request.headers.get("x-user-email")
+    logger.info(f"Sending request on behalf of {user_email}")
+    telemetry_json = {
+        "user_email": user_email,
+        "user_msg": chat_request.messages[-1]["content"],
+    }
     run_analysis_iterator = run_complete_analysis(
         chat_request=chat_request,
         data_source=source,
@@ -992,6 +998,7 @@ async def run_complete_analysis_task(
         message_id=message_id,
         enable_chart_generation=enable_chart_generation,
         enable_business_insights=enable_business_insights,
+        telemetry_json=telemetry_json,
     )
 
     async for message in run_analysis_iterator:
