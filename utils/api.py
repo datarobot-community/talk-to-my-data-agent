@@ -1517,17 +1517,21 @@ async def process_data_and_update_state(
             logger.info("Cleansing datasets")
             yield "Cleansing datasets"
             for analysis_dataset_name in new_dataset_names:
-                analysis_dataset = await analyst_db.get_dataset(
-                    analysis_dataset_name, max_rows=None
-                )
-                cleansed_dataset = await cleanse_dataframe(analysis_dataset)
-                await analyst_db.register_dataset(
-                    cleansed_dataset, data_source=DataSourceType.GENERATED
-                )
-                yield f"Cleansed dataset: {analysis_dataset_name}"
-                del cleansed_dataset
-                del analysis_dataset
-                log_memory()
+                try:
+                    analysis_dataset = await analyst_db.get_dataset(
+                        analysis_dataset_name, max_rows=None
+                    )
+                    cleansed_dataset = await cleanse_dataframe(analysis_dataset)
+                    await analyst_db.register_dataset(
+                        cleansed_dataset, data_source=DataSourceType.GENERATED
+                    )
+                    yield f"Cleansed dataset: {analysis_dataset_name}"
+                    del cleansed_dataset
+                    del analysis_dataset
+                    log_memory()
+                except ValueError as e:
+                    logger.warning(f"Dataset {analysis_dataset_name} not found: {e}")
+                    continue
 
             logger.info("Cleansing datasets complete")
             yield "Cleansing datasets complete"
@@ -1558,15 +1562,18 @@ async def process_data_and_update_state(
             except Exception:
                 pass
             logger.info(f"Creating dictionary for dataset: {analysis_dataset_name}")
-            analysis_dataset = await analyst_db.get_dataset(analysis_dataset_name)
-            new_dictionary = await get_dictionary(analysis_dataset)
-            logger.info(new_dictionary.to_application_df())
-            del analysis_dataset
-            await analyst_db.register_data_dictionary(new_dictionary)
-            logger.info(f"Registered dictionary for dataset: {analysis_dataset_name}")
-            yield f"Registered data dictionary: {analysis_dataset_name}"
-            log_memory()
-            continue
+            try:
+                analysis_dataset = await analyst_db.get_dataset(analysis_dataset_name)
+                new_dictionary = await get_dictionary(analysis_dataset)
+                logger.info(new_dictionary.to_application_df())
+                del analysis_dataset
+                await analyst_db.register_data_dictionary(new_dictionary)
+                logger.info(f"Registered dictionary for dataset: {analysis_dataset_name}")
+                yield f"Registered data dictionary: {analysis_dataset_name}"
+                log_memory()
+            except ValueError as e:
+                logger.warning(f"Dataset {analysis_dataset_name} not found: {e}")
+                continue
     except Exception:
         logger.error("Failed to generate data dictionaries", exc_info=True)
         yield "Failed to generate data dictionaries"

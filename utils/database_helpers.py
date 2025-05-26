@@ -642,8 +642,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                     # Get all tables and views in the schema
                     cursor.execute(
                         f"""
-                        SELECT TABLE_NAME 
-                        FROM SYS.TABLES 
+                        SELECT TABLE_NAME
+                        FROM SYS.TABLES
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY TABLE_NAME
                         """
@@ -653,8 +653,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                     # Get all views
                     cursor.execute(
                         f"""
-                        SELECT VIEW_NAME 
-                        FROM SYS.VIEWS 
+                        SELECT VIEW_NAME
+                        FROM SYS.VIEWS
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY VIEW_NAME
                         """
