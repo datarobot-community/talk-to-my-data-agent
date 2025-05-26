@@ -23,8 +23,11 @@ msgstr "AIとのチャットによるデータ分析"
 msgid "Load Files"
 msgstr "ファイル"
 
-msgid "**Load Data Files"
-msgstr "読込ファイル"
+msgid "**Load Data Files**"
+msgstr "**読込ファイル**"
+
+msgid "Select 1 or multiple files"
+msgstr "複数のファイルがアップロード可能です。"
 
 msgid "Load Datasets"
 msgstr "データの読込"
@@ -178,3 +181,33 @@ msgstr "チャットをする前に、サイドバーにデータをアップロ
 
 msgid "Ask a question about your data"
 msgstr "あなたのデータについて聞いてみましょう。"
+
+msgid "app.pyはここから下"
+msgstr "______________________"
+
+msgid "Starting data processing"
+msgstr "データ処理の開始"
+
+msgid "Cleansing datasets"
+msgstr "データクレンジング"
+
+msgid "Cleansed dataset: {analysis_dataset_name}"
+msgstr "クレンジングデータセット: {analysis_dataset_name}"
+
+msgid "Cleansing datasets complete"
+msgstr "データセットのクレンジングが完了しました。"
+
+msgid "Data processing failed"
+msgstr "データの処理が失敗しました。"
+
+msgid "Data processing successful, generating dictionaries"
+msgstr "データの処理が成功し、データの各列の説明が生成されました。"
+
+msgid "Registered data dictionary: {analysis_dataset_name}"
+msgstr "データの各列の説明の設定が完了: {analysis_dataset_name}"
+
+msgid "Failed to generate data dictionaries"
+msgstr "データの各列の説明の生成が失敗しました。"
+
+msgid "Processing complete"
+msgstr "データ処理の完了"

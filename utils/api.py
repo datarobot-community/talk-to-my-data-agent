@@ -1738,7 +1738,7 @@ async def process_data_and_update_state(
     # Start processing and yield initial message
     logger.info("Starting data processing")
     log_memory()
-    yield "Starting data processing"
+    yield gettext("Starting data processing")
 
     # Handle data cleansing based on the source
     # Convert string data_source to DataSourceType if needed
@@ -1750,7 +1750,7 @@ async def process_data_and_update_state(
     if data_source_type != DataSourceType.DATABASE:
         try:
             logger.info("Cleansing datasets")
-            yield "Cleansing datasets"
+            yield gettext("Cleansing datasets")
             for analysis_dataset_name in new_dataset_names:
                 analysis_dataset = await analyst_db.get_dataset(
                     analysis_dataset_name, max_rows=None
@@ -1759,24 +1759,26 @@ async def process_data_and_update_state(
                 await analyst_db.register_dataset(
                     cleansed_dataset, data_source=DataSourceType.GENERATED
                 )
-                yield f"Cleansed dataset: {analysis_dataset_name}"
+                yield gettext("Cleansed dataset: {analysis_dataset_name}").format(
+                    analysis_dataset_name=analysis_dataset_name
+                )
                 del cleansed_dataset
                 del analysis_dataset
                 log_memory()
 
             logger.info("Cleansing datasets complete")
-            yield "Cleansing datasets complete"
+            yield gettext("Cleansing datasets complete")
             log_memory()
         except Exception:
             logger.error("Data processing failed", exc_info=True)
-            yield "Data processing failed"
+            yield gettext("Data processing failed")
             raise
     else:
         pass
 
     # Generate data dictionaries
     logger.info("Data processing successful, generating dictionaries")
-    yield "Data processing successful, generating dictionaries"
+    yield gettext("Data processing successful, generating dictionaries")
     log_memory()
     try:
         for analysis_dataset_name in new_dataset_names:
@@ -1799,13 +1801,15 @@ async def process_data_and_update_state(
             del analysis_dataset
             await analyst_db.register_data_dictionary(new_dictionary)
             logger.info(f"Registered dictionary for dataset: {analysis_dataset_name}")
-            yield f"Registered data dictionary: {analysis_dataset_name}"
+            yield gettext("Registered data dictionary: {analysis_dataset_name}").format(
+                analysis_dataset_name=analysis_dataset_name
+            )
             log_memory()
             continue
     except Exception:
         logger.error("Failed to generate data dictionaries", exc_info=True)
-        yield "Failed to generate data dictionaries"
+        yield gettext("Failed to generate data dictionaries")
         raise
     log_memory()
     # Final completion message
-    yield "Processing complete"
+    yield gettext("Processing complete")
