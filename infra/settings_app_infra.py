@@ -24,6 +24,7 @@ from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 from settings_database import DATABASE_CONNECTION_TYPE
 
 from utils.credentials import SnowflakeCredentials
+from utils.i18n import LanguageCode, LocaleSettings
 
 from .settings_main import PROJECT_ROOT
 
@@ -120,5 +121,16 @@ def get_app_files(
             exclude_pattern.match(file_name) for exclude_pattern in EXCLUDE_PATTERNS
         )
     ]
+
+    application_locale = LocaleSettings().app_locale
+
+    if application_locale != LanguageCode.EN:
+        source_files.append(
+            (
+                str( PROJECT_ROOT / "utils" / "locale" / application_locale / "LC_MESSAGES" / "base.mo"),
+                f"utils/locale/{application_locale}/LC_MESSAGES/base.mo",
+            )
+        )
+
 
     return source_files

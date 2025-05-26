@@ -1,0 +1,213 @@
+msgid ""
+msgstr ""
+"PO-Revision-Date: 2025-05-26 17:30+0000\n"
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Repo: recipe-talk-to-my-data\n"
+
+msgid "Connect"
+msgstr "データアップロード"
+
+msgid "Explore"
+msgstr "データの詳細"
+
+msgid "Connect & Explore"
+msgstr "データのアップロードと詳細の確認"
+
+msgid "AI Data Analyst"
+msgstr "AIとのチャットによるデータ分析"
+
+msgid "Load Files"
+msgstr "ファイル"
+
+msgid "**Load Data Files**"
+msgstr "**読込ファイル**"
+
+msgid "Select 1 or multiple files"
+msgstr "複数のファイルがアップロード可能です。"
+
+msgid "Load Datasets"
+msgstr "データの読込"
+
+msgid "Please select at least one dataset"
+msgstr "データセットを一つは選んでください"
+
+msgid "Database"
+msgstr "データベース"
+
+msgid "Clear Data"
+msgstr "全てのデータをクリア"
+
+msgid "Upload and process your data using the sidebar to get started"
+msgstr "サイドバーからデータをアップロードして、分析を始めましょう"
+
+msgid "Raw Data"
+msgstr "データ"
+
+msgid "Data Dictionary"
+msgstr "データの各列の説明"
+
+msgid "View Cleaning Report"
+msgstr "データクレンジング（前処理）レポートを見る"
+
+msgid "### Summary of Changes"
+msgstr ""### 変更点まとめ"
+
+msgid "Original name: `{report.original_column_name}`"
+msgstr "元の名前: `{report.original_column_name}`"
+
+msgid "Type conversion: `{report.original_dtype}` → `{report.new_dtype}`"
+msgstr "型の変更: `{report.original_dtype}` → `{report.new_dtype}`"
+
+msgid "**Warnings:**"
+msgstr "**注意:**"
+
+msgid "**Errors:**"
+msgstr "**エラー:**"
+
+msgid "No columns were modified during cleaning"
+msgstr "データの変更があった列はありません"
+
+msgid "### Unchanged Columns"
+msgstr "### 変更がなかった列名"
+
+msgid "No cleaning report available for this dataset"
+msgstr "このデータセットでクレンジング（実行のために型などの変更）はありませんでした。"
+
+msgid "Search columns"
+msgstr "列を検索"
+
+msgid "Filter columns by name"
+msgstr "名前で列名をフィルターする"
+
+msgid "search_{ds_display_name}"
+msgstr "{ds_display_name}で検索"
+
+msgid "Rows to display"
+msgstr "表示する行数"
+
+msgid "Download Data"
+msgstr "データダウンロード"
+
+msgid "Delete Dataset"
+msgstr "データ削除"
+
+msgid "No data dictionary found for this dataset."
+msgstr "データ各列の説明はこのデータでは生成されませんでした。"
+
+msgid "Save changes"
+msgstr "変更を保存"
+
+msgid "Download Data Dictionary"
+msgstr "データ各列の説明をダウンロード"
+
+msgid "Could not identify user, please provide your API token"
+msgstr "ユーザーが特定できませんでした。APIトークンを入力してください。"
+
+msgid "Load Selected Tables"
+msgstr "選択したテーブルを読み込む"
+
+msgid "Loading selected tables..."
+msgstr "選択したテーブルを読み込み中..."
+
+msgid "Loading selected datasets..."
+msgstr "選択したデータセットを読み込み中..."
+
+msgid "Analysis Code"
+msgstr "分析コード"
+
+msgid "Analysis Results"
+msgstr "分析結果"
+
+msgid "Error running business analysis\n{result_metadata_exception_str}"
+msgstr "ビジネス分析時のエラー\n{result_metadata_exception_str}"
+
+msgid "Bottom Line"
+msgstr "要点"
+
+msgid "Additional Insights"
+msgstr "追加の洞察"
+
+msgid "Follow-up Questions"
+msgstr "追加質問"
+
+msgid "An error occurred during analysis. Please retry"
+msgstr "分析途中にエラーが起きました。再度実行してください"
+
+msgid "Last Executed Code"
+msgstr "最後に実行されたコード"
+
+msgid "Analysing question..."
+msgstr "質問を過去ログに基づいて分析中"
+
+msgid "Generating insights..."
+msgstr "インサイトを生成中"
+
+msgid "Failed to initialize the database connection."
+msgstr "データベースとの接続の初期化が失敗しました。"
+
+msgid "Chat Controls"
+msgstr "チャットの制御"
+
+msgid "Available Datasets"
+msgstr "利用可能なデータセット"
+
+msgid "Generate charts in conversation"
+msgstr "会話でのグラフ生成"
+
+msgid "Generate charts in conversation"
+msgstr "チャットでのグラフ生成の有効化"
+
+msgid "Enable business insights and follow up questions in conversation"
+msgstr "チャットでのデータへの洞察と追加質問の有効化"
+
+msgid "New Chat"
+msgstr "新しいチャット"
+
+msgid "Save Chat"
+msgstr "チャットの保存"
+
+msgid "No saved chats available."
+msgstr "保存されたチャットはありません"
+
+msgid "Saved Chats"
+msgstr "保存されたチャット"
+
+msgid "Please upload and process data using the sidebar before starting the chat"
+msgstr "チャットをする前に、サイドバーにデータをアップロードしてください。"
+
+msgid "Ask a question about your data"
+msgstr "あなたのデータについて聞いてみましょう。"
+
+msgid "app.pyはここから下"
+msgstr "______________________"
+
+msgid "Starting data processing"
+msgstr "データ処理の開始"
+
+msgid "Cleansing datasets"
+msgstr "データクレンジング"
+
+msgid "Cleansed dataset: {analysis_dataset_name}"
+msgstr "クレンジングデータセット: {analysis_dataset_name}"
+
+msgid "Cleansing datasets complete"
+msgstr "データセットのクレンジングが完了しました。"
+
+msgid "Data processing failed"
+msgstr "データの処理が失敗しました。"
+
+msgid "Data processing successful, generating dictionaries"
+msgstr "データの処理が成功し、データの各列の説明が生成されました。"
+
+msgid "Registered data dictionary: {analysis_dataset_name}"
+msgstr "データの各列の説明の設定が完了: {analysis_dataset_name}"
+
+msgid "Failed to generate data dictionaries"
+msgstr "データの各列の説明の生成が失敗しました。"
+
+msgid "Processing complete"
+msgstr "データ処理の完了"

@@ -20,9 +20,11 @@ from app_settings import PAGE_ICON, apply_custom_css
 from datarobot_connect import DataRobotTokenManager
 from streamlit.navigation.page import StreamlitPage
 
+from utils.i18n import gettext
+
 pages: List[StreamlitPage] = [
-    st.Page("01_connect_and_explore.py", title="Connect & Explore"),
-    st.Page("02_chat_with_data.py", title="AI Data Analyst"),
+    st.Page("01_connect_and_explore.py", title=gettext("Connect & Explore")),
+    st.Page("02_chat_with_data.py", title=gettext("AI Data Analyst")),
 ]
 
 st.set_page_config(

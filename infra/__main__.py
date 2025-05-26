@@ -48,6 +48,8 @@ from utils.custom_job_helper import (
 )
 from utils.resources import app_env_name, dashboard_env_name, llm_deployment_env_name
 from utils.schema import AppInfra
+from utils.i18n import LocaleSettings
+
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
@@ -60,6 +62,8 @@ if settings_generative.LLM == LLMs.DEPLOYED_LLM:
         raise ValueError(
             "Either TEXTGEN_DEPLOYMENT_ID or TEXTGEN_REGISTERED_MODEL_ID must be set when using a deployed LLM. Plese check your .env file"
         )
+
+LocaleSettings().setup_locale()
 
 check_feature_flags(PROJECT_ROOT / "infra" / "feature_flag_requirements.yaml")
 
@@ -170,6 +174,10 @@ app_runtime_parameters = [
         type="deployment",
         value=llm_deployment.id,
     ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
+    ),
+
 ]
 
 

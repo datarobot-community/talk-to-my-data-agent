@@ -47,6 +47,7 @@ from utils.schema import (
     DataDictionary,
     DataRegistryDataset,
 )
+from utils.i18n import gettext
 
 warnings.filterwarnings("ignore")
 
@@ -136,7 +137,7 @@ async def registry_download_callback() -> None:
         st.session_state.data_source = DataSourceType.REGISTRY
 
         with st.sidebar:  # Use sidebar context
-            with st.spinner("Loading selected datasets..."):
+            with st.spinner(gettext("Loading selected datasets...")):
                 selected_ids = [
                     ds["id"] for ds in st.session_state.selected_registry_datasets
                 ]
@@ -170,14 +171,18 @@ async def load_from_database_callback() -> None:
         and st.session_state.selected_schema_tables
     ):
         with st.sidebar:
-            with st.spinner("Loading selected tables..."):
+            with st.spinner(gettext("Loading selected tables...")):
                 dataframes = await Database.get_data(
                     *st.session_state.selected_schema_tables,
                     analyst_db=st.session_state.analyst_db,
                 )
 
                 if not dataframes:
-                    st.error(f"Failed to load data from {app_infra.database}")
+                    st.error(
+                        gettext("Failed to load data from {app_infra_database}").format(
+                            app_infra_database=app_infra.database
+                        )
+                        )
                     return
                 telemetry_json = {
                     "user_email": st.session_state.user_email,
@@ -246,16 +251,16 @@ async def main() -> None:
     await state_init()
     logger.info("Starting App")
     with st.sidebar:
-        st.title("Connect")
+        st.title(gettext("Connect"))
 
         # Load Files expander containing file upload and the Data Registry
-        with st.expander("Load Files", expanded=True):
+        with st.expander(gettext("Load Files"), expanded=True):
             # File upload section
             col1, col2, col3 = st.columns([1, 4, 2])
             with col1:
                 st.image("csv_File_Logo.svg", width=25)
             with col2:
-                st.write("**Load Data Files**")
+                st.write(gettext("**Load Data Files**"))
             uploaded_files = st.file_uploader(
                 "Select 1 or multiple files",
                 type=["csv", "xlsx"], # xls is out of scope , "xls"],
@@ -291,7 +296,7 @@ async def main() -> None:
 
                     # Form submit button
                     submit_button = st.form_submit_button(
-                        "Load Datasets",
+                        gettext("Load Datasets"),
                         disabled="analyst_db" not in st.session_state,
                     )
 
@@ -299,10 +304,10 @@ async def main() -> None:
                     if submit_button and len(selected_registry_datasets) > 0:
                         await registry_download_callback()
                     elif submit_button:
-                        st.warning("Please select at least one dataset")
+                        st.warning(gettext("Please select at least one dataset"))
 
         # Database expander
-        with st.expander("Database", expanded=False):
+        with st.expander(gettext("Database"), expanded=False):
             get_database_logo(app_infra)
 
             schema_tables = st_list_database_tables()
@@ -319,20 +324,20 @@ async def main() -> None:
 
                 # Form submit button
                 submit_button = st.form_submit_button(
-                    "Load Selected Tables",
+                    gettext("Load Selected Tables"),
                     use_container_width=False,
                     disabled="analyst_db" not in st.session_state,
                 )
 
                 if submit_button:
                     if len(selected_schema_tables) == 0:
-                        st.warning("Please select at least one table")
+                        st.warning(gettext("Please select at least one table"))
                     else:
                         await load_from_database_callback()
 
         # Add Clear Data button after the Database expander
         if st.sidebar.button(
-            "Clear Data",
+            gettext("Clear Data"),
             on_click=clear_data_callback,
             type="secondary",
             use_container_width=False,
@@ -342,19 +347,19 @@ async def main() -> None:
 
     # Main content area
     display_page_logo()
-    st.title("Explore")
+    st.title(gettext("Explore"))
     if "analyst_db" not in st.session_state:
-        st.warning("Could not identify user, please provide your API token")
+        st.warning(gettext("Could not identify user, please provide your API token"))
         return
 
     analyst_db = cast(AnalystDB, st.session_state.analyst_db)
     dataset_names = await analyst_db.list_analyst_datasets()
     # Main content area - conditional rendering based on cleansed data
     if not dataset_names:
-        st.info("Upload and process your data using the sidebar to get started")
+        st.info(gettext("Upload and process your data using the sidebar to get started"))
     else:
         for ds_display_name in dataset_names:
-            tab1, tab2 = st.tabs(["Raw Data", "Data Dictionary"])
+            tab1, tab2 = st.tabs([gettext("Raw Data"), gettext("Data Dictionary")])
             with tab1:
                 ds_display = await analyst_db.get_dataset(ds_display_name)
                 st.subheader(f"{ds_display.name}")
@@ -366,7 +371,7 @@ async def main() -> None:
                     cleaning_report = ds_display_cleansed.cleaning_report
 
                     # Display cleaning report in expander
-                    with st.expander("View Cleaning Report"):
+                    with st.expander(gettext("View Cleaning Report")):
                         # Group reports by conversion type
                         conversions: defaultdict[str, list[CleansedColumnReport]] = (
                             defaultdict(list)
@@ -380,7 +385,7 @@ async def main() -> None:
 
                         # Display summary of changes
                         if conversions:
-                            st.write("### Summary of Changes")
+                            st.write(gettext("### Summary of Changes"))
                             for conv_type, reports in conversions.items():
                                 columns_count = len(reports)
                                 st.write(
@@ -391,39 +396,47 @@ async def main() -> None:
                                         st.markdown(f"### {report.new_column_name}")
                                         if report.original_column_name:
                                             st.write(
-                                                f"Original name: `{report.original_column_name}`"
+                                                gettext(
+                                                    "Original name: `{report_original_column_name}`"
+                                                    ).format(
+                                                        report_original_column_name=report.original_column_name
+                                                        )
                                             )
                                         if report.original_dtype:
                                             st.write(
-                                                f"Type conversion: `{report.original_dtype}` → `{report.new_dtype}`"
+                                                gettext(
+                                                    "Type conversion: `{report_original_dtype}` → `{report_new_dtype}`"
+                                                        ).format(
+                                                    report_original_dtype=report.original_dtype,
+                                                    report_new_dtype=report.new_dtype)
                                             )
 
                                         # Show warnings if any
                                         if report.warnings:
-                                            st.write("**Warnings:**")
+                                            st.write(gettext("**Warnings:**"))
                                             for warning in report.warnings:
                                                 st.markdown(f"- {warning}")
 
                                         # Show errors if any
                                         if report.errors:
-                                            st.error("**Errors:**")
+                                            st.error(gettext("**Errors:**"))
                                             for error in report.errors:
                                                 st.markdown(f"- {error}")
                         else:
-                            st.info("No columns were modified during cleaning")
+                            st.info(gettext("No columns were modified during cleaning"))
 
                         # Show unchanged columns
                         unchanged = [
                             r for r in cleaning_report if not r.conversion_type
                         ]
                         if unchanged:
-                            st.write("### Unchanged Columns")
+                            st.write(gettext("### Unchanged Columns"))
                             st.write(
                                 ", ".join(f"`{r.new_column_name}`" for r in unchanged)
                             )
 
                 except ValueError:
-                    st.warning("No cleaning report available for this dataset")
+                    st.warning(gettext("No cleaning report available for this dataset"))
 
                 df_lock = asyncio.Lock()
                 # Display dataframe with column filters
@@ -434,14 +447,14 @@ async def main() -> None:
                     col1, col2 = st.columns([3, 1])
                     with col1:
                         search = st.text_input(
-                            "Search columns",
+                            gettext("Search columns"),
                             key=f"search_{ds_display.name}",
-                            help="Filter columns by name",
+                            help=gettext("Filter columns by name"),
                         )
                     with col2:
                         n_rows = int(
                             st.number_input(
-                                "Rows to display",
+                                gettext("Rows to display"),
                                 min_value=1,
                                 max_value=len(df_display),
                                 value=min(10, len(df_display)),
@@ -470,7 +483,7 @@ async def main() -> None:
                     with col1:
                         csv = convert_df_to_csv(df_display)
                         st.download_button(
-                            label="Download Data",
+                            label=gettext("Download Data"),
                             data=csv,
                             file_name=f"{ds_display.name}_cleansed.csv",
                             mime="text/csv",
@@ -478,7 +491,7 @@ async def main() -> None:
                         )
                     with col3:
                         if st.button(
-                            "Delete Dataset",
+                            gettext("Delete Dataset"),
                             key=f"delete_{ds_display.name}",
                             use_container_width=True,
                         ):
@@ -489,7 +502,7 @@ async def main() -> None:
                 try:
                     dictionary = await analyst_db.get_data_dictionary(ds_display.name)
                     if dictionary is None:
-                        st.error("No data dictionary found for this dataset.")
+                        st.error(gettext("No data dictionary found for this dataset."))
                         return
 
                     # Convert dictionary to DataFrame
@@ -513,7 +526,7 @@ async def main() -> None:
 
                     with col3:
                         if st.button(
-                            label="Save changes",
+                            label=gettext("Save changes"),
                             key=f"dict_save_{dictionary.name}",
                             use_container_width=True,
                         ):
@@ -528,7 +541,7 @@ async def main() -> None:
                         # Download button for dictionary
                         csv = convert_df_to_csv(edited_df)
                         st.download_button(
-                            label="Download Data Dictionary",
+                            label=gettext("Download Data Dictionary"),
                             data=csv,
                             file_name=f"{dictionary.name}_dictionary.csv",
                             mime="text/csv",
