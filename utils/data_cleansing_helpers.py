@@ -21,6 +21,7 @@ from typing import Generator, cast
 import pandas as pd
 from utils.logging_helper import get_logger
 from utils.schema import CleansedColumnReport
+from utils.i18n import gettext
 
 logger = get_logger("DataCleansingHelper")
 
@@ -65,7 +66,9 @@ def try_simple_numeric_conversion(
 
     if simple_success_rate > 0.8:
         warnings.append(
-            f"Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
+            gettext(
+                "Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
+                    ).format(simple_success_rate=simple_success_rate)
         )
         # 実際のシリーズにも同じ処理を適用
         clean_series = series.astype(str).str.strip().str.replace(r"['\s]+", "", regex=True)
@@ -75,7 +78,9 @@ def try_simple_numeric_conversion(
         # 変換が部分的に成功した場合は警告
         if simple_success_rate > 0.2:
             warnings.append(
-                f"Simple numeric conversion partially successful ({simple_success_rate:.1%}) but below threshold"
+                gettext(
+                    "Simple numeric conversion partially successful ({simple_success_rate:.1%}) but below threshold"
+                    ).format(simple_success_rate=simple_success_rate)
             )
     return False, series, warnings
 
@@ -163,15 +168,19 @@ def try_unit_conversion(
 
     # 検出されたパターンに基づいて警告メッセージを生成
     pattern_names = {
-        "has_currency": "currency symbols",
-        "has_commas": "thousand separators",
-        "has_magnitude": "magnitude suffixes (K/M/B)",
-        "has_percent": "percentages",
+        "has_currency": gettext("currency symbols"),
+        "has_commas": gettext("thousand separators"),
+        "has_magnitude": gettext("magnitude suffixes (K/M/B)"),
+        "has_percent": gettext("percentages"),
     }
 
     detected = [pattern_names[k] for k, v in patterns.items() if v]
     if detected:
-        warnings.append(f"Detected patterns in data: {', '.join(detected)}")
+        warnings.append(
+            gettext(
+                "Detected patterns in data: {}"
+                    ).format(', '.join(detected))
+            )
 
     # 変換成功率の計算
     new_nulls = sample_result.isna()
@@ -180,14 +189,18 @@ def try_unit_conversion(
     if conversion_success_rate > 0.8:
         # サンプル変換が成功した場合、検出されたパターンを使用して完全なデータセットを変換
         warnings.append(
-            f"Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
+            gettext(
+                "Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
+                ).format(conversion_success_rate=conversion_success_rate)
         )
         result, _ = _convert_units(series, patterns)  # サンプルから得たパターンを再利用
         return True, result, warnings
 
     elif conversion_success_rate > 0.2:
         warnings.append(
-            f"Complex numeric conversion partially successful ({conversion_success_rate:.1%}) but below threshold"
+            gettext(
+                "Complex numeric conversion partially successful ({conversion_success_rate:.1%}) but below threshold"
+            ).format(conversion_success_rate=conversion_success_rate)
         )
 
     return False, series, warnings
@@ -224,14 +237,18 @@ def try_datetime_conversion(
             candidate_1_success_rate,
             candidate_2_success_rate,
         )
-        warnings.append(f"Converted to datetime. Success rate: {success_rate:.1%}")
+        warnings.append(
+            gettext(
+                "Converted to datetime. Success rate: {success_rate:.1%}"
+                ).format(success_rate=success_rate)
+            )
         # Japanse localization for date parsing
         if candidate_1_success_rate >= candidate_2_success_rate:
-            warnings.append("Used month-first date parsing")
+            warnings.append(gettext("Used month-first date parsing"))
             with suppress_datetime_warnings():
                 ts_series = pd.to_datetime(series, format=format_1, errors='coerce')
         else:
-            warnings.append("Used day-first date parsing")
+            warnings.append(gettext("Used day-first date parsing"))
             with suppress_datetime_warnings():
                 ts_series = pd.to_datetime(series, format=format_2, errors='coerce', dayfirst=True)
         
@@ -251,16 +268,22 @@ def add_summary_statistics(
             total_count = len(df)
             if null_count > 0:
                 column_report.warnings.append(
-                    f"Contains {null_count} null values ({null_count / total_count:.1%} of data)"
+                    gettext(
+                        "Contains {null_val} null values ({percentage:.1%} of data)"
+                        ).format(null_val=null_count, 
+                                 percentage=null_count / total_count)
                 )
 
             if column_report.new_dtype == "float64":
                 unique_count = df[col].nunique()
                 if unique_count == 1:
-                    column_report.warnings.append("Contains only one unique value")
+                    column_report.warnings.append(gettext(
+                        "Contains only one unique value"
+                        )
+                        )
                 elif unique_count == 2:
                     column_report.warnings.append(
-                        "Contains only two unique values - consider boolean conversion"
+                        gettext("Contains only two unique values - consider boolean conversion")
                     )
 
 

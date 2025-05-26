@@ -54,16 +54,16 @@ msgid "View Cleaning Report"
 msgstr "データクレンジング（前処理）レポートを見る"
 
 msgid "### Summary of Changes"
-msgstr ""### 変更点まとめ"
+msgstr "### 変更点まとめ"
 
-msgid "Original name: `{report.original_column_name}`"
-msgstr "元の名前: `{report.original_column_name}`"
+msgid "Original name: `{report_original_column_name}`"
+msgstr "元の名前: `{report_original_column_name}`"
 
-msgid "Type conversion: `{report.original_dtype}` → `{report.new_dtype}`"
-msgstr "型の変更: `{report.original_dtype}` → `{report.new_dtype}`"
+msgid "Type conversion: `{report_original_dtype}` → `{report_new_dtype}`"
+msgstr "型の変更: `{report_original_dtype}` → `{report_new_dtype}`"
 
 msgid "**Warnings:**"
-msgstr "**注意:**"
+msgstr "**注意:変更点**"
 
 msgid "**Errors:**"
 msgstr "**エラー:**"
@@ -211,3 +211,54 @@ msgstr "データの各列の説明の生成が失敗しました。"
 
 msgid "Processing complete"
 msgstr "データ処理の完了"
+
+msgid "data_cleansing_helper.py from here"
+msgstr "_________________________________"
+
+msgid "Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
+msgstr "スペース/引用符を削除した後、数値に変換されます。成功率： {simple_success_rate:.1%}。"
+
+msgid "Simple numeric conversion partially successful ({simple_success_rate:.1%}) but below threshold"
+msgstr "単純な数値変換は部分的に成功した（{simple_success_rate:.1%}）が、数値として認識するためのしきい値を下回りました。"
+
+msgid "currency symbols"
+msgstr "通貨の記号"
+
+msgid "thousand separators"
+msgstr "数字を区切るカンマ"
+
+msgid "magnitude suffixes (K/M/B)"
+msgstr "大きさを表す記号(K/M/B)"
+
+msgid "percentages"
+msgstr "パーセント"
+
+msgid "Detected patterns in data: {}"
+msgstr "データ中に次のパターンを検知しました: {}"
+
+msgid "Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
+msgstr "パターン処理で数値に変換しました。成功率は以下です。: {conversion_success_rate:.1%}"
+
+msgid "Complex numeric conversion partially successful ({conversion_success_rate:.1%}) but below threshold"
+msgstr "複雑な数値変換は部分的に成功しましたが、成功率({conversion_success_rate:.1%})はしきい値は下回りました。"
+
+msgid "Converted to datetime. Success rate: {success_rate:.1%}"
+msgstr "日付への変換を行いました。成功率は以下です: {success_rate:.1%}"
+
+msgid "Used month-first date parsing"
+msgstr "月が日よりも先のフォーマット(yyyy/mm/dd)として処理を行いました。"
+
+msgid "Used day-first date parsing"
+msgstr "日が月よりも先のフォーマット(yyyy/dd/mm)として処理を行いました。"
+
+msgid "Contains {null_val} null values ({percentage:.1%} of data)"
+msgstr "欠損値が{null_val}だけ含まれています。({percentage:.1%}%)"
+
+msgid "Contains only one unique value"
+msgstr "ただ一つのユニークの値しか含まれていませんでした。"
+
+msgid "Contains only two unique values - consider boolean conversion"
+msgstr "含まれている値は2つの値だけです。booleanとして変換を考えるべきです。"
+
+msgid "Column renamed from '{old_name}' to '{new_name}'"
+msgstr "列名を'{old_name}'から'{new_name}'に変換しました。"
