@@ -137,7 +137,7 @@ async def registry_download_callback() -> None:
         st.session_state.data_source = DataSourceType.REGISTRY
 
         with st.sidebar:  # Use sidebar context
-            with st.spinner("Loading selected datasets..."):
+            with st.spinner(gettext("Loading selected datasets...")):
                 selected_ids = [
                     ds["id"] for ds in st.session_state.selected_registry_datasets
                 ]
