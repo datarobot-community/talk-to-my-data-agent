@@ -95,6 +95,7 @@ from utils.schema import (
     Tool,
     ValidatedQuestion,
 )
+from utils.i18n import gettext
 
 logger = get_logger()
 logging.getLogger("openai").setLevel(logging.WARNING)
