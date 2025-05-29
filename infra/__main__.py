@@ -46,10 +46,9 @@ from utils.custom_job_helper import (
     delete_all_custom_job_schedule,
     get_custom_job_by_name,
 )
+from utils.i18n import LocaleSettings
 from utils.resources import app_env_name, dashboard_env_name, llm_deployment_env_name
 from utils.schema import AppInfra
-from utils.i18n import LocaleSettings
-
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
@@ -177,7 +176,6 @@ app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
     ),
-
 ]
 
 
@@ -223,161 +221,171 @@ pulumi.export(
     app.application_url,
 )
 
-dataset_trace = datarobot.DatasetFromFile(
-    "dataset_trace",
-    file_path=settings_job_infra.dataset_trace_path,
-    use_case_ids=[use_case.id],
-)
-dataset_access_log = datarobot.DatasetFromFile(
-    "dataset_access_log",
-    file_path=settings_job_infra.dataset_access_log_path,
-    use_case_ids=[use_case.id],
-)
 
-# Dataset outputs
-pulumi.export(settings_job_infra.dataset_trace_name, dataset_trace.id)
-pulumi.export("DATASET_TRACE_ID", dataset_trace.id)
-pulumi.export(settings_job_infra.dataset_access_log_name, dataset_access_log.id)
-pulumi.export("DATASET_ACCESS_LOG_ID", dataset_access_log.id)
-
-
-# set the runtime parameters
-job_runtime_parameters = [
-    datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key=key,
-        type="string",
-        value=value,
+def create_monitoring_resources():
+    # Dataset for usage dashboard
+    dataset_trace = datarobot.DatasetFromFile(
+        "dataset_trace",
+        file_path=settings_job_infra.dataset_trace_path,
+        use_case_ids=[use_case.id],
     )
-    for key, value in {
-        "LLM_DEPLOYMENT_ID": llm_deployment.id,
-        "DATAROBOT_APPLICATION_ID": app.id,
-        "DATASET_TRACE_ID": dataset_trace.id,
-        "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
-        "MODE": "append",
-    }.items()
-]
+    dataset_access_log = datarobot.DatasetFromFile(
+        "dataset_access_log",
+        file_path=settings_job_infra.dataset_access_log_path,
+        use_case_ids=[use_case.id],
+    )
 
+    # Dataset outputs
+    pulumi.export(settings_job_infra.dataset_trace_name, dataset_trace.id)
+    pulumi.export("DATASET_TRACE_ID", dataset_trace.id)
+    pulumi.export(settings_job_infra.dataset_access_log_name, dataset_access_log.id)
+    pulumi.export("DATASET_ACCESS_LOG_ID", dataset_access_log.id)
 
-class CustomJobScheduleCleanup(pulumi.ComponentResource):
-    def __init__(self, name, custom_job_name, opts=None):
-        super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
-        self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
-            self._delete_schedules_if_exists
+    # set the runtime parameters
+    job_runtime_parameters = [
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key=key,
+            type="string",
+            value=value,
         )
-        self.register_outputs({"cleanup_done": self.cleanup_done})
+        for key, value in {
+            "LLM_DEPLOYMENT_ID": llm_deployment.id,
+            "DATAROBOT_APPLICATION_ID": app.id,
+            "DATASET_TRACE_ID": dataset_trace.id,
+            "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
+            "MODE": "append",
+        }.items()
+    ]
 
-    def _delete_schedules_if_exists(self, job_name):
-        job = get_custom_job_by_name(job_name)
-        if job is None:
-            # Job does not exist, skip deletion
-            return True
-        job_id = job["id"]
-        delete_all_custom_job_schedule(job_id)
-        return True
-
-
-# Cleanup schedules before updating/creating custom_job
-cleanup = CustomJobScheduleCleanup(
-    "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
-)
-
-job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters)
-# Add content hash to description to force update on file change
-job_description = (
-    f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
-)
-
-custom_job = datarobot.CustomJob(
-    resource_name=settings_job_infra.job_resource_name,
-    name=settings_job_infra.job_resource_name,
-    description=job_description,
-    environment_id=settings_job_infra.base_environment_id,
-    files=job_files,
-    runtime_parameter_values=job_runtime_parameters,
-    resource_bundle_id=settings_job_infra.resource_bundle_id,
-    job_type="default",
-    opts=pulumi.ResourceOptions(
-        depends_on=[cleanup],
-    ),
-)
-
-pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
-pulumi.export("CUSTOM_JOB_ID", custom_job.id)
-
-
-class CustomJobPostActions(pulumi.ComponentResource):
-    def __init__(self, name, custom_job_id, opts=None):
-        super().__init__(
-            "custom:resource:CustomJobPostActions",
-            name,
-            {"custom_job_id": custom_job_id},
-            opts,
-        )
-        import pulumi.runtime
-
-        # Only run the job if we're in the actual update phase, not preview
-        if not pulumi.runtime.is_dry_run():
-            result = custom_job_id.apply(lambda id: settings_job_infra.run_job_once(id))
-            self.custom_run_id = result.apply(
-                lambda r: r["run_id"] if r["success"] else "NA"
+    class CustomJobScheduleCleanup(pulumi.ComponentResource):
+        def __init__(self, name, custom_job_name, opts=None):
+            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
+            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
+                self._delete_schedules_if_exists
             )
-        else:
-            self.custom_run_id = pulumi.Output.from_input("NA")
-        self.schedule_id = custom_job_id.apply(
-            lambda id: settings_job_infra.create_job_schedule(id)
-        )
-        # Register outputs for stack export
-        self.register_outputs(
-            {
-                "custom_run_id": self.custom_run_id,
-                "schedule_id": self.schedule_id,
-            }
-        )
+            self.register_outputs({"cleanup_done": self.cleanup_done})
 
+        def _delete_schedules_if_exists(self, job_name):
+            job = get_custom_job_by_name(job_name)
+            if job is None:
+                # Job does not exist, skip deletion
+                return True
+            job_id = job["id"]
+            delete_all_custom_job_schedule(job_id)
+            return True
 
-# Post-actions after custom_job is fully created/updated
-post_actions = CustomJobPostActions(
-    "custom-job-post-actions",
-    custom_job.id,
-    opts=pulumi.ResourceOptions(depends_on=[custom_job]),
-)
-
-pulumi.export("CUSTOM_JOB_RUN_ID", post_actions.custom_run_id)
-pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
-pulumi.export("MODE", "append")
-
-dashboard_runtime_parameters = [
-    datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key=key,
-        type="string",
-        value=value,
+    # Cleanup schedules before updating/creating custom_job
+    cleanup = CustomJobScheduleCleanup(
+        "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
     )
-    for key, value in {
-        "DATASET_TRACE_ID": dataset_trace.id,
-        "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
-    }.items()
-]
 
-dashboard_files, dashboard_files_hash = settings_dashboard_infra.get_dashboard_files()
-dashboard_description = f"DataRobot Custom Application for Data Analyst Dashboard. Content Hash: {dashboard_files_hash}"
+    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters)
+    # Add content hash to description to force update on file change
+    job_description = (
+        f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
+    )
 
-dashboard_source = datarobot.ApplicationSource(
-    files=dashboard_files,
-    runtime_parameter_values=dashboard_runtime_parameters,
-    resources=datarobot.ApplicationSourceResourcesArgs(
-        resource_label=CustomAppResourceBundles.CPU_XL.value.id,
-    ),
-    **settings_dashboard_infra.dashboard_source_args,
-)
+    custom_job = datarobot.CustomJob(
+        resource_name=settings_job_infra.job_resource_name,
+        name=settings_job_infra.job_resource_name,
+        description=job_description,
+        environment_id=settings_job_infra.base_environment_id,
+        files=job_files,
+        runtime_parameter_values=job_runtime_parameters,
+        resource_bundle_id=settings_job_infra.resource_bundle_id,
+        job_type="default",
+        opts=pulumi.ResourceOptions(
+            depends_on=[cleanup],
+        ),
+    )
 
-dashboard = datarobot.CustomApplication(
-    resource_name=settings_dashboard_infra.dashboard_resource_name,
-    source_version_id=dashboard_source.version_id,
-    use_case_ids=[use_case.id],
-    allow_auto_stopping=True,
-)
+    pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
+    pulumi.export("CUSTOM_JOB_ID", custom_job.id)
 
-pulumi.export(dashboard_env_name, dashboard.id)
-pulumi.export(
-    settings_dashboard_infra.dashboard_resource_name, dashboard.application_url
-)
+    class CustomJobPostActions(pulumi.ComponentResource):
+        def __init__(self, name, custom_job_id, opts=None):
+            super().__init__(
+                "custom:resource:CustomJobPostActions",
+                name,
+                {"custom_job_id": custom_job_id},
+                opts,
+            )
+            import pulumi.runtime
+
+            # Only run the job if we're in the actual update phase, not preview
+            if not pulumi.runtime.is_dry_run():
+                result = custom_job_id.apply(
+                    lambda id: settings_job_infra.run_job_once(id)
+                )
+                self.custom_run_id = result.apply(
+                    lambda r: r["run_id"] if r["success"] else "NA"
+                )
+            else:
+                self.custom_run_id = pulumi.Output.from_input("NA")
+            self.schedule_id = custom_job_id.apply(
+                lambda id: settings_job_infra.create_job_schedule(id)
+            )
+            # Register outputs for stack export
+            self.register_outputs(
+                {
+                    "custom_run_id": self.custom_run_id,
+                    "schedule_id": self.schedule_id,
+                }
+            )
+
+    # Post-actions after custom_job is fully created/updated
+    post_actions = CustomJobPostActions(
+        "custom-job-post-actions",
+        custom_job.id,
+        opts=pulumi.ResourceOptions(depends_on=[custom_job]),
+    )
+
+    pulumi.export("CUSTOM_JOB_RUN_ID", post_actions.custom_run_id)
+    pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
+    pulumi.export("MODE", "append")
+
+    dashboard_runtime_parameters = [
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key=key,
+            type="string",
+            value=value,
+        )
+        for key, value in {
+            "DATASET_TRACE_ID": dataset_trace.id,
+            "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
+        }.items()
+    ]
+
+    dashboard_files, dashboard_files_hash = (
+        settings_dashboard_infra.get_dashboard_files()
+    )
+    dashboard_description = f"DataRobot Custom Application for Data Analyst Dashboard. Content Hash: {dashboard_files_hash}"
+    pulumi.info(f"Dashboard description: {dashboard_description}")
+
+    dashboard_source = datarobot.ApplicationSource(
+        files=dashboard_files,
+        runtime_parameter_values=dashboard_runtime_parameters,
+        resources=datarobot.ApplicationSourceResourcesArgs(
+            resource_label=CustomAppResourceBundles.CPU_XL.value.id,
+        ),
+        **settings_dashboard_infra.dashboard_source_args,
+    )
+
+    dashboard = datarobot.CustomApplication(
+        resource_name=settings_dashboard_infra.dashboard_resource_name,
+        source_version_id=dashboard_source.version_id,
+        use_case_ids=[use_case.id],
+        allow_auto_stopping=True,
+    )
+
+    pulumi.export(dashboard_env_name, dashboard.id)
+    pulumi.export(
+        settings_dashboard_infra.dashboard_resource_name, dashboard.application_url
+    )
+
+
+# Only stop monitoring resources if DISALLOW_MONITORING_RESOURCES is set to true
+if os.environ.get("DISALLOW_MONITORING_RESOURCES", "false").lower() == "true":
+    pulumi.info("Disallowing monitoring resources")
+else:
+    create_monitoring_resources()
