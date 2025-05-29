@@ -70,5 +70,7 @@
   "create_chat": "Create chat",
   "create_chat_description": "Creating a new chat does not affect any of your existing questions.",
   "enter_chat_name": "Enter a name for your chat",
-  "delete_chat": "Delete chat"
+  "delete_chat": "Delete chat",
+  "upload_network_error": "Upload failed due to network error, please try upload again",
+  "upload_file_error": "The dataset(s) is not supported by the system. The following types of datasets may cause errors:\n- File size exceeds 200MB\n- CSV data is not encoded in UTF-8"
 } 

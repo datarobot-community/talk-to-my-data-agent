@@ -40,6 +40,7 @@ from utils.api import (
     process_data_and_update_state,
 )
 from utils.database_helpers import get_external_database, load_app_infra
+from utils.i18n import gettext
 from utils.logging_helper import get_logger
 from utils.schema import (
     AnalystDataset,
@@ -47,7 +48,6 @@ from utils.schema import (
     DataDictionary,
     DataRegistryDataset,
 )
-from utils.i18n import gettext
 
 warnings.filterwarnings("ignore")
 
@@ -87,7 +87,7 @@ async def process_uploaded_file(file: UploadedFile) -> list[str]:
                 f"Loaded CSV {dataset_name}: {len(df)} rows, {len(df.columns)} columns"
             )
 
-        elif file_extension in [".xlsx"]: # xls is out of scope [".xlsx", ".xls"]:
+        elif file_extension in [".xlsx"]:  # xls is out of scope [".xlsx", ".xls"]:
             # Read all sheets
             base_name = os.path.splitext(file.name)[0]
             excel_file = pd.ExcelFile(file)
@@ -105,15 +105,22 @@ async def process_uploaded_file(file: UploadedFile) -> list[str]:
         analyst_db: AnalystDB = st.session_state.analyst_db
         names = []
         for result in results:
-            await analyst_db.register_dataset(result, DataSourceType.FILE)
-            names.append(result.name)
+            reg_result = await analyst_db.register_dataset(result, DataSourceType.FILE)
+            if not reg_result["success"]:
+                logger.error(
+                    f"Error registering dataset {result.name}: {reg_result['msg']}"
+                )
+                # st.sidebar.error(reg_result["msg"])
+                raise ValueError(reg_result["msg"])
+            else:
+                names.append(result.name)
             del result
         del results
         return names
 
     except Exception as e:
         logger.error(f"Error loading {file.name}: {str(e)}", exc_info=True)
-        st.warning(
+        st.sidebar.warning(
             f"このデータは読み込めませんでした。理由は以下の通りです。\n{str(e)}"
         )
         return []
@@ -182,7 +189,7 @@ async def load_from_database_callback() -> None:
                         gettext("Failed to load data from {app_infra_database}").format(
                             app_infra_database=app_infra.database
                         )
-                        )
+                    )
                     return
                 telemetry_json = {
                     "user_email": st.session_state.user_email,
@@ -263,7 +270,7 @@ async def main() -> None:
                 st.write(gettext("**Load Data Files**"))
             uploaded_files = st.file_uploader(
                 gettext("Select 1 or multiple files"),
-                type=["csv", "xlsx"], # xls is out of scope , "xls"],
+                type=["csv", "xlsx"],  # xls is out of scope , "xls"],
                 accept_multiple_files=True,
                 key=st.session_state.file_uploader_key,
             )
@@ -356,7 +363,9 @@ async def main() -> None:
     dataset_names = await analyst_db.list_analyst_datasets()
     # Main content area - conditional rendering based on cleansed data
     if not dataset_names:
-        st.info(gettext("Upload and process your data using the sidebar to get started"))
+        st.info(
+            gettext("Upload and process your data using the sidebar to get started")
+        )
     else:
         for ds_display_name in dataset_names:
             tab1, tab2 = st.tabs([gettext("Raw Data"), gettext("Data Dictionary")])
@@ -398,17 +407,18 @@ async def main() -> None:
                                             st.write(
                                                 gettext(
                                                     "Original name: `{report_original_column_name}`"
-                                                    ).format(
-                                                        report_original_column_name=report.original_column_name
-                                                        )
+                                                ).format(
+                                                    report_original_column_name=report.original_column_name
+                                                )
                                             )
                                         if report.original_dtype:
                                             st.write(
                                                 gettext(
                                                     "Type conversion: `{report_original_dtype}` → `{report_new_dtype}`"
-                                                        ).format(
+                                                ).format(
                                                     report_original_dtype=report.original_dtype,
-                                                    report_new_dtype=report.new_dtype)
+                                                    report_new_dtype=report.new_dtype,
+                                                )
                                             )
 
                                         # Show warnings if any

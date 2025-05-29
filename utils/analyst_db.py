@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, List, Optional, cast
 
 import duckdb
+import langid
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 
@@ -210,7 +212,6 @@ class DatasetHandler(BaseDuckDBHandler):
                 """,
             )
 
-
     async def register_dataframe(
         self,
         df: pd.DataFrame,
@@ -286,7 +287,6 @@ class DatasetHandler(BaseDuckDBHandler):
                     metadata.file_size,
                 ],
             )
-
 
     async def list_datasets(
         self,
@@ -1348,23 +1348,146 @@ class AnalystDB:
         await self.dataset_handler._initialize_database()
         await self.chat_handler._initialize_database()
 
-    # Dataset operations
+    async def _validate_and_fix_dtypes(self, df, dataset_name: str):
+        """Validate and fix dtypes for the given dataframe.
+
+        Converts object columns to numeric if possible, otherwise to string.
+        Logs warnings for columns that cannot be converted to numeric.
+
+        Args:
+            df: Input dataframe to validate and fix dtypes
+            dataset_name: Name of the dataset for logging purposes
+
+        Returns:
+            pd.DataFrame: The fixed dataframe with validated dtypes
+        """
+        dataset_df = df.to_df() if hasattr(df, "to_df") else df
+        failed_columns = []
+        for col in dataset_df.columns:
+            if dataset_df[col].dtype == object:
+                converted = pd.to_numeric(dataset_df[col], errors="coerce")
+                mask = (~dataset_df[col].isnull()) & (converted.isnull())
+                if mask.any():
+                    sample_vals = dataset_df[col][mask].astype(str).unique()[:5]
+                    failed_columns.append(
+                        {
+                            "column": col,
+                            "original_dtype": str(dataset_df[col].dtype),
+                            "sample_problematic_values": sample_vals.tolist(),
+                        }
+                    )
+                    dataset_df[col] = dataset_df[col].astype(str)
+                else:
+                    dataset_df[col] = converted
+        if failed_columns:
+            error_msg = (
+                f"Conversion failed for dataset '{dataset_name}'. "
+                f"The following columns could not be converted to numeric types:\n"
+            )
+            for col_info in failed_columns:
+                error_msg += (
+                    f"- Column: {col_info['column']} (dtype: {col_info['original_dtype']})\n"
+                    f"  Problematic values: {col_info['sample_problematic_values']}\n"
+                )
+            logger.warning(error_msg)
+        return dataset_df
+
+    async def _is_text_column(self, series: pd.Series) -> bool:
+        """
+        Detect if a column is a text column using language detection and heuristics.
+        Returns True if the column is considered text, False otherwise.
+        """
+        # Drop NA and convert to string
+        lines = series.dropna().astype(str)
+        if len(lines) == 0:
+            return False
+        # Detect language on a sample of lines
+        sample_lines = lines.sample(min(20, len(lines)), random_state=42)
+        lang_counts = {}
+        for line in sample_lines:
+            lang, _ = langid.classify(line)
+            lang_counts[lang] = lang_counts.get(lang, 0) + 1
+        if not lang_counts:
+            return False
+        detected_lang = max(lang_counts, key=lang_counts.get)
+        # Heuristics
+        n_lines = len(lines)
+        n_unique = lines.nunique()
+        unique_ratio = n_unique / n_lines
+        mean_len = lines.str.len().mean()
+        longest_line = lines.str.len().max()
+        # For percentiles
+        pct_7_chars = (lines.str.len() >= 7).mean()
+        # For word-based stats
+        mean_spaces = lines.str.count(r" ").mean()
+        pct_4_words = (lines.str.split().apply(len) >= 4).mean()
+        longest_words = lines.str.split().apply(len).max()
+        # For CJK
+        if detected_lang in {"ja", "zh", "ko"}:
+            criteria = [
+                unique_ratio > 0.3 or n_unique > 1000,
+                mean_len >= 4,
+                pct_7_chars >= 0.1,
+                longest_line >= 12,
+            ]
+        else:
+            criteria = [
+                unique_ratio > 0.3 or n_unique > 1000,
+                mean_spaces >= 1.5,
+                pct_4_words >= 0.1,
+                longest_words >= 6,
+            ]
+        return sum(criteria) >= 3
+
     async def register_dataset(
         self,
         df: AnalystDataset | CleansedDataset,
         data_source: DataSourceType,
         file_size: int = 0,
-    ) -> None:
-        if isinstance(df, CleansedDataset):
-            is_cleansed = True
-            await self.dataset_handler.store_cleansing_report(
-                df.name, df.cleaning_report
-            )
-        else:
-            is_cleansed = False
+    ) -> dict[str, object]:
+        """
+        Register a dataset (standard or cleansed) in the database.
+
+        Returns:
+            dict: {"success": bool, "msg": str}
+        """
+        is_cleansed = isinstance(df, CleansedDataset)
+        if is_cleansed:
+            try:
+                await self.dataset_handler.store_cleansing_report(
+                    df.name, df.cleaning_report
+                )
+            except Exception as e:
+                logger.error(f"Error storing cleansing report for '{df.name}': {e}")
+                return {
+                    "success": False,
+                    "msg": f"Error storing cleansing report for '{df.name}': {e}",
+                }
+        # dataset_df = df.to_df() if hasattr(df, "to_df") else df
+        try:
+            dataset_df = await self._validate_and_fix_dtypes(df, df.name)
+        except Exception as e:
+            logger.error(f"Error validating/fixing dtypes for '{df.name}': {e}")
+            return {
+                "success": False,
+                "msg": f"Error validating/fixing dtypes for '{df.name}': {e}",
+            }
+
+        if False:  # TODO: decide whether to enable text detection or not, eventually.
+            text_cols = []
+            for col in dataset_df.columns:
+                if await self._is_text_column(dataset_df[col]):
+                    text_cols.append(col)
+            if text_cols:
+                logger.warning(
+                    f"Detected text columns from dataset '{df.name}': {text_cols}"
+                )
+                # TODO: decide whether to delete the text col or raise an error, eventually.
+                # dataset_df = dataset_df.drop(columns=text_cols)
+                # return {"success": False, "msg": f"Detected text columns from dataset '{df.name}': {text_cols}"}
         try:
             await self.dataset_handler.register_dataframe(
-                df.to_df(),
+                dataset_df,
                 f"{df.name}_cleansed" if is_cleansed else df.name,
                 dataset_type=(
                     DatasetType.CLEANSED if is_cleansed else DatasetType.STANDARD
@@ -1374,7 +1497,12 @@ class AnalystDB:
                 file_size=file_size,
             )
         except Exception as e:
-            logger.warning(f"Error registering dataset: {e}")
+            logger.error(f"Error registering dataset: {e}")
+            return {
+                "success": False,
+                "msg": f"Error registering dataset '{df.name}': {e}",
+            }
+        return {"success": True, "msg": ""}
 
     async def get_dataset(
         self, name: str, max_rows: int | None = 10000

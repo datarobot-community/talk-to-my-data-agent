@@ -7,6 +7,7 @@ interface TruncatedTextProps {
   tooltip?: boolean;
   className?: string;
   children?: string;
+  multiline?: boolean;
 }
 
 export const TruncatedText: React.FC<TruncatedTextProps> = ({
@@ -15,10 +16,23 @@ export const TruncatedText: React.FC<TruncatedTextProps> = ({
   maxLength = 18,
   tooltip = true,
   children,
+  multiline = false,
 }) => {
   text = text || children?.toString() || "";
   const isTruncated = text.length > maxLength;
   const truncatedText = isTruncated ? `${text.slice(0, maxLength)}...` : text;
+
+  if (multiline) {
+    return (
+      <span
+        className={cn(className)}
+        style={{ whiteSpace: "pre-line" }}
+        title={tooltip && isTruncated ? text : undefined}
+      >
+        {text}
+      </span>
+    );
+  }
 
   return (
     <span
