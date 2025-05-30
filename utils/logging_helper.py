@@ -21,17 +21,15 @@ logging.basicConfig(level=logging.INFO)
 
 
 def get_logger(name: str = "DataAnalystBackend") -> logging.Logger:
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    consoleHandle = logging.StreamHandler()
-    consoleHandle.setLevel(logging.INFO)
-    consoleHandle.setFormatter(formatter)
     logger = logging.getLogger(name)
-    logger.propagate = False  # Prevent propagation to root logger
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
-    logger.addHandler(consoleHandle)
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = True  # Let logs go to root logger (Uvicorn will show them)
     return logger
 
 

@@ -144,7 +144,7 @@ export const MultiSelect = React.forwardRef<
                         style={{ animationDuration: `${animation}s` }}
                         variant="secondary"
                       >
-                        <TruncatedText>{option?.label}</TruncatedText>
+                        <TruncatedText multiline={!!(option?.label && option.label.includes('\n'))}>{option?.label}</TruncatedText>
                         {option?.postfix && (
                           <span className="ml-1">{option?.postfix}</span>
                         )}

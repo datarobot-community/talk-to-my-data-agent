@@ -52,7 +52,13 @@ export const AddDataModal = () => {
     onError: (error: UploadError | AxiosError) => {
       setIsPending(false);
       console.error(error);
-      setError(error.message || "An error occurred while uploading files");
+      if (error.message === "upload_network_error") {
+        setError(t("upload_network_error"));
+      } else if (error.message === "upload_file_error" && "filenames" in error) {
+        setError(`${(error as any).filenames} ${t("upload_file_error")}`);
+      } else {
+        setError(error.message || "An error occurred while uploading files");
+      }
     },
   });
 
@@ -97,7 +103,7 @@ export const AddDataModal = () => {
                 Local files
               </div>
               <div className="text-muted-foreground text-sm font-normal leading-normal">
-                Select one or more CSV, XLSX, XLS files, up to 200MB.
+                Select one or more CSV, XLSX, files, up to 200MB.
               </div>
             </div>
             <FileUploader onFilesChange={setFiles} progress={progress} />
@@ -126,7 +132,7 @@ export const AddDataModal = () => {
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription>
-                      <TruncatedText maxLength={100}>{error}</TruncatedText>
+                      <TruncatedText maxLength={100} multiline>{error}</TruncatedText>
                     </AlertDescription>
                   </Alert>
                 )}

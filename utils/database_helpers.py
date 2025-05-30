@@ -360,9 +360,14 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         continue
                 names = []
                 for dataframe in dataframes:
-                    await analyst_db.register_dataset(
+                    reg_result = await analyst_db.register_dataset(
                         dataframe, DataSourceType.DATABASE
                     )
+                    if not reg_result["success"]:
+                        logger.error(
+                            f"Failed to register dataset {dataframe.name}: {reg_result['msg']}"
+                        )
+                        continue
                     names.append(dataframe.name)
                 return names
 
@@ -520,11 +525,15 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
 
                 names = []
                 for dataframe in dataframes:
-                    await analyst_db.register_dataset(
+                    reg_result = await analyst_db.register_dataset(
                         dataframe, DataSourceType.DATABASE
                     )
+                    if not reg_result["success"]:
+                        logger.error(
+                            f"Failed to register dataset {dataframe.name}: {reg_result['msg']}"
+                        )
+                        continue
                     names.append(dataframe.name)
-
                 return names
 
         except Exception as e:
@@ -738,9 +747,14 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                 # Register datasets
                 names = []
                 for dataframe in dataframes:
-                    await analyst_db.register_dataset(
+                    reg_result = await analyst_db.register_dataset(
                         dataframe, DataSourceType.DATABASE
                     )
+                    if not reg_result["success"]:
+                        logger.error(
+                            f"Failed to register dataset {dataframe.name}: {reg_result['msg']}"
+                        )
+                        continue
                     names.append(dataframe.name)
                 return names
 

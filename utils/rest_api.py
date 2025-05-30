@@ -76,7 +76,8 @@ from utils.schema import (
     LoadDatabaseRequest,
 )
 
-logger = get_logger()
+logger = get_logger("DataAnalystBackend")
+print("logger initialized")
 
 
 async def get_database(user_id: str) -> AnalystDB:
@@ -386,17 +387,21 @@ async def upload_files(
     files: List[UploadFile] | None = None,
     registry_ids: str | None = Form(None),
 ) -> list[FileUploadResponse]:
+    logger.info(f"Received upload request: files={files}")
+    print(f"Received upload request: files={files}")
     dataset_names = []
     response: list[FileUploadResponse] = []
     if files:
         for file in files:
             try:
+                logger.info(f"Processing file: {file.filename}")
                 file_size = file.size or 0
                 contents = await file.read()
                 if file.filename is None:
                     continue
 
                 file_extension = os.path.splitext(file.filename)[1].lower()
+                logger.info(f"File extension: {file_extension}")
 
                 if file_extension == ".csv":
                     logger.info(f"Loading CSV: {file.filename}")
@@ -409,9 +414,16 @@ async def upload_files(
                     dataset = AnalystDataset(name=dataset_name, data=df)
 
                     # Register dataset with the database
-                    await analyst_db.register_dataset(
+                    reg_result = await analyst_db.register_dataset(
                         dataset, DataSourceType.FILE, file_size=file_size
                     )
+                    if not reg_result["success"]:
+                        error_response: FileUploadResponse = {
+                            "filename": file.filename,
+                            "error": reg_result["msg"],
+                        }
+                        response.append(error_response)
+                        continue
 
                     # Add to processing queue
                     dataset_names.append(dataset.name)
@@ -424,6 +436,10 @@ async def upload_files(
                     }
                     response.append(file_response)
 
+                    logger.info(
+                        f"Registering dataset: {dataset_name}, shape={df.shape}"
+                    )
+
                 elif file_extension in [".xlsx", ".xls"]:
                     base_name = os.path.splitext(file.filename)[0]
                     excel_dataset = pd.read_excel(
@@ -433,9 +449,16 @@ async def upload_files(
                         for sheet_name, data in excel_dataset.items():
                             dataset_name = f"{base_name}_{sheet_name}"
                             dataset = AnalystDataset(name=dataset_name, data=data)
-                            await analyst_db.register_dataset(
+                            reg_result = await analyst_db.register_dataset(
                                 dataset, DataSourceType.FILE, file_size=file_size
                             )
+                            if not reg_result["success"]:
+                                error_response: FileUploadResponse = {
+                                    "filename": file.filename,
+                                    "error": reg_result["msg"],
+                                }
+                                response.append(error_response)
+                                continue
                             # Add to processing queue
                             dataset_names.append(dataset.name)
 
@@ -449,9 +472,16 @@ async def upload_files(
                     elif isinstance(excel_dataset, pd.DataFrame):
                         dataset_name = base_name
                         dataset = AnalystDataset(name=dataset_name, data=excel_dataset)
-                        await analyst_db.register_dataset(
+                        reg_result = await analyst_db.register_dataset(
                             dataset, DataSourceType.FILE, file_size=file_size
                         )
+                        if not reg_result["success"]:
+                            error_response: FileUploadResponse = {
+                                "filename": file.filename,
+                                "error": reg_result["msg"],
+                            }
+                            response.append(error_response)
+                            continue
                         # Add to processing queue
                         dataset_names.append(dataset.name)
 
@@ -466,6 +496,9 @@ async def upload_files(
                     raise ValueError(f"Unsupported file type: {file_extension}")
 
             except Exception as e:
+                logger.error(
+                    f"Exception processing file {file.filename}: {e}", exc_info=True
+                )
                 error_response: FileUploadResponse = {
                     "filename": file.filename or "unknown_file",
                     "error": str(e),

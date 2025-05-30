@@ -20,6 +20,7 @@ export interface UploadError extends Error {
     data: unknown;
   };
   isAxiosError?: boolean;
+  filenames?: string;
 }
 
 export const useFetchAllDatasets = ({ limit = 100 } = {}) => {
@@ -66,20 +67,27 @@ export const useFileUploadMutation = ({
           (file: FileUploadResponse) => file.error
         );
         if (datasetsWithError.length > 0) {
-          let message = "";
-          for (const datasetWithError of datasetsWithError) {
-            message = `Error uploading ${
-              datasetWithError.filename || datasetWithError.dataset_name
-            }: ${datasetWithError.error} \n\n${message}`;
+          const filenames = datasetsWithError
+            .map((file) => file.filename || file.dataset_name)
+            .filter(Boolean);
+          let filenamesStr = "";
+          if (filenames.length === 1) {
+            filenamesStr = filenames[0] || "";
+          } else if (filenames.length === 2) {
+            filenamesStr = `${filenames[0]} and ${filenames[1]}`;
+          } else if (filenames.length > 2) {
+            filenamesStr = `${filenames.slice(0, -1).join(", ")} and ${filenames[filenames.length - 1]}`;
           }
-
-          const error = new Error(message) as UploadError;
-          error.responseData = response;
+          const error = new Error("upload_file_error");
+          (error as UploadError).responseData = response;
+          (error as UploadError).filenames = filenamesStr;
           throw error;
         }
-
         return response;
       }
+
+      const error = new Error("upload_network_error");
+      throw error;
     },
     onMutate: async ({ files }) => {
       const previousDictionaries =

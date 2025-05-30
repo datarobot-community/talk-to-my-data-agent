@@ -62,6 +62,7 @@ from utils.code_execution import (
 from utils.data_cleansing_helpers import add_summary_statistics, process_column
 from utils.database_helpers import get_external_database
 from utils.dr_helper import async_submit_actuals_to_datarobot, initialize_deployment
+from utils.i18n import gettext
 from utils.logging_helper import get_logger, log_api_call
 from utils.schema import (
     AnalysisError,
@@ -95,7 +96,6 @@ from utils.schema import (
     Tool,
     ValidatedQuestion,
 )
-from utils.i18n import gettext
 
 logger = get_logger()
 logging.getLogger("openai").setLevel(logging.WARNING)
@@ -321,10 +321,19 @@ async def download_registry_datasets(
             )
             continue
     for result_dataset in result_datasets:
-        await analyst_db.register_dataset(
+        reg_result = await analyst_db.register_dataset(
             result_dataset, DataSourceType.REGISTRY, size or 0
         )
-        downloaded_datasets.append(DownloadedRegistryDataset(name=result_dataset.name))
+        if not reg_result["success"]:
+            downloaded_datasets.append(
+                DownloadedRegistryDataset(
+                    name=result_dataset.name, error=reg_result["msg"]
+                )
+            )
+        else:
+            downloaded_datasets.append(
+                DownloadedRegistryDataset(name=result_dataset.name)
+            )
     return downloaded_datasets
 
 
@@ -956,6 +965,7 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
     Raises:
         ValueError: If a dataset is empty
     """
+    logger.info(f"Cleansing dataset: {dataset.name}")
 
     if dataset.to_df().empty:
         raise ValueError(f"Dataset {dataset.name} is empty")
@@ -1757,9 +1767,17 @@ async def process_data_and_update_state(
                     analysis_dataset_name, max_rows=None
                 )
                 cleansed_dataset = await cleanse_dataframe(analysis_dataset)
-                await analyst_db.register_dataset(
+                reg_result = await analyst_db.register_dataset(
                     cleansed_dataset, data_source=DataSourceType.GENERATED
                 )
+                if not reg_result["success"]:
+                    logger.error(
+                        f"Failed to register cleansed dataset {analysis_dataset_name}: {reg_result['msg']}"
+                    )
+                    yield gettext(
+                        "Failed to register cleansed dataset: {analysis_dataset_name}"
+                    ).format(analysis_dataset_name=analysis_dataset_name)
+                    continue
                 yield gettext("Cleansed dataset: {analysis_dataset_name}").format(
                     analysis_dataset_name=analysis_dataset_name
                 )
@@ -1770,8 +1788,18 @@ async def process_data_and_update_state(
             logger.info("Cleansing datasets complete")
             yield gettext("Cleansing datasets complete")
             log_memory()
-        except Exception:
-            logger.error("Data processing failed", exc_info=True)
+        except Exception as e:
+            logger.error(
+                "Data processing failed during dataset cleansing",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "datasets": new_dataset_names,
+                    "data_source": data_source_type.value,
+                    "memory_usage": f"{psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB",
+                },
+                exc_info=True,
+            )
             yield gettext("Data processing failed")
             raise
     else:
