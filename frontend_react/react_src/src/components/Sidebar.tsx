@@ -208,9 +208,9 @@ const SidebarHeader = () => {
           onClick={() => i18n.changeLanguage(i18n.language === "en" ? "ja" : "en")}
         >
           {i18n.language === "en" ? (
-            <span role="img" aria-label="Japanese" style={{ fontSize: 20 }}>🇯🇵</span>
+            <span role="img" aria-label="Switch to Japanese" style={{ fontSize: 20 }}>🇺🇸</span>
           ) : (
-            <span role="img" aria-label="English" style={{ fontSize: 20 }}>🇺🇸</span>
+            <span role="img" aria-label="Switch to English" style={{ fontSize: 20 }}>🇯🇵</span>
           )}
         </Button>
       </div>
