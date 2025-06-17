@@ -40,7 +40,69 @@
 }
 
 @layer base {
-  :root {
+  /* Light Theme (Default) */
+  :root:not(.dark) {
+    /* Primary Surfaces */
+    --background: 0 0% 100%;                    /* #FFFFFF - Pure white */
+    --foreground: 210 22% 11%;                  /* #1A202C - Very dark blue-gray */
+    
+    /* Secondary Surfaces */
+    --card: 0 0% 100%;                          /* #FFFFFF - White cards */
+    --card-foreground: 210 22% 11%;             /* #1A202C - Dark text on cards */
+    --popover: 0 0% 100%;                       /* #FFFFFF - White popovers */
+    --popover-foreground: 210 22% 11%;          /* #1A202C - Dark text */
+    
+    /* Interactive Elements */
+    --primary: 213 93% 68%;                     /* #44BFFC - DataRobot Blue */
+    --primary-foreground: 0 0% 100%;            /* #FFFFFF - White text on blue */
+    --secondary: 210 40% 96%;                   /* #F7FAFC - Very light blue-gray */
+    --secondary-foreground: 210 22% 11%;        /* #1A202C - Dark text */
+    
+    /* Muted Elements */
+    --muted: 210 40% 96%;                       /* #F7FAFC - Light background */
+    --muted-foreground: 215 25% 27%;            /* #4A5568 - Medium gray text */
+    --accent: 210 40% 94%;                      /* #EDF2F7 - Light accent */
+    --accent-foreground: 210 22% 11%;           /* #1A202C - Dark text */
+    
+    /* System Colors */
+    --destructive: 0 84% 60%;                   /* #E53E3E - Red */
+    --destructive-foreground: 0 0% 100%;        /* #FFFFFF - White text */
+    
+    /* Borders & Inputs */
+    --border: 220 13% 91%;                      /* #E2E8F0 - Light border */
+    --input: 220 13% 91%;                       /* #E2E8F0 - Input background */
+    --ring: 213 93% 68%;                        /* #44BFFC - Focus ring */
+    --radius: 0.5rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Custom DataRobot Surface Tokens */
+    --surface-primary-90: 0 0% 100%;            /* #FFFFFF */
+    --surface-secondary-80: 0 0% 99%;           /* #FCFCFC */
+    --surface-additional-70: 210 40% 98%;       /* #F9FAFB */
+    --surface-selected-60: 210 40% 94%;         /* #EDF2F7 */
+    --surface-hover-55: 210 40% 92%;            /* #E2E8F0 */
+    
+    --text-primary: 210 22% 11%;                /* #1A202C */
+    --text-secondary: 215 25% 27%;              /* #4A5568 */
+    --text-tertiary: 215 20% 44%;               /* #718096 */
+    --text-disabled: 215 14% 64%;               /* #A0AEC0 */
+    
+    --divider-contrast: 220 13% 91%;            /* #E2E8F0 */
+    --divider-neutral: 220 13% 87%;             /* #CBD5E0 */
+    --divider-accent: 213 93% 68%;              /* #44BFFC */
+    
+    --border-green: 160 84% 39%;                /* #38A169 */
+    --border-yellow: 45 93% 47%;                /* #D69E2E */
+    --border-red: 0 84% 60%;                    /* #E53E3E */
+    --border-turquoise: 184 91% 41%;            /* #0BC5EA */
+  }
+
+  /* Dark Theme */
+  .dark {
     --background: var(--surface-primary-90);
     --foreground: var(--text-primary);
     --card: var(--surface-secondary-80);

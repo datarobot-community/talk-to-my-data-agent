@@ -3,7 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTable } from "@fortawesome/free-solid-svg-icons/faTable";
 import { faComments } from "@fortawesome/free-regular-svg-icons/faComments";
-import drLogo from "@/assets/DataRobot_white.svg";
+import { faCog } from "@fortawesome/free-solid-svg-icons";
+import drLogoWhite from "@/assets/DataRobot_white.svg";
+import drLogoBlack from "@/assets/DataRobot_black.svg";
 import {
   SidebarMenu,
   SidebarMenuOptionType,
@@ -18,9 +20,9 @@ import { useGeneratedDictionaries } from "@/api-state/dictionaries/hooks";
 import { cn } from "@/lib/utils";
 import { useFetchAllChats } from "@/api-state/chat-messages/hooks";
 import { Button } from "@/components/ui/button";
-import { faCog } from "@fortawesome/free-solid-svg-icons/faCog";
 import { SettingsModal } from "@/components/SettingsModal";
 import { useTranslation } from "react-i18next";
+import { useAppState } from "@/state/hooks";
 
 export const Sidebar = () => {
   return (
@@ -156,6 +158,7 @@ const SidebarHeader = () => {
   const navigate = useNavigate();
   const [activeKey, setActiveKey] = useState("");
   const { t, i18n } = useTranslation();
+  const { theme } = useAppState();
 
   useEffect(() => {
     if (pathname.includes(ROUTES.DATA)) {
@@ -192,11 +195,12 @@ const SidebarHeader = () => {
     <div className="flex flex-col gap-4 h-full">
       <div className="flex items-center justify-between gap-2">
         <img
-          src={drLogo}
+          src={theme === 'light' ? drLogoBlack : drLogoWhite}
           alt="DataRobot"
           className="w-[130px] cursor-pointer"
           onClick={() => navigate(ROUTES.DATA)}
         />
+        {/* Language Toggle */}
         <Button
           variant="outline"
           size="sm"

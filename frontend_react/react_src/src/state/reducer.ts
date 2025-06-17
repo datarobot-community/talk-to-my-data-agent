@@ -1,6 +1,6 @@
 import { AppStateData, Action } from './types';
 import { ACTION_TYPES, STORAGE_KEYS } from './constants';
-import { getStorageItem, setStorageItem } from './storage';
+import { getStorageItem, setStorageItem, getTheme, setTheme } from './storage';
 
 import { DATA_SOURCES } from '@/constants/dataSources';
 
@@ -12,6 +12,7 @@ export const createInitialState = (): AppStateData => {
     enableBusinessInsights: getStorageItem(STORAGE_KEYS.ENABLE_BUSINESS_INSIGHTS) !== "false", // Enable by default
     dataSource: getStorageItem(STORAGE_KEYS.DATA_SOURCE) || DATA_SOURCES.FILE, // Default to FILE
     expandGraphsInsightsDefaultOpen: getStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN) !== "false", // default to true
+    theme: getTheme(),
   };
 };
 
@@ -65,6 +66,17 @@ export const reducer = (state: AppStateData, action: Action): AppStateData => {
         ...state,
         expandGraphsInsightsDefaultOpen: action.payload,
       };
+    case ACTION_TYPES.SET_THEME:
+      setTheme(action.payload);
+      if (action.payload === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      return {
+        ...state,
+        theme: action.payload,
+      };
     default:
       return state;
   }
@@ -93,5 +105,9 @@ export const actions = {
   setExpandGraphsInsightsDefaultOpen: (isOpen: boolean): Action => ({
     type: ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN,
     payload: isOpen
+  }),
+  setTheme: (theme: 'light' | 'dark'): Action => ({
+    type: ACTION_TYPES.SET_THEME,
+    payload: theme
   }),
 };
