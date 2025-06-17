@@ -83,6 +83,11 @@ in project root
 uvicorn utils.rest_api:app --port 8080
 ```
 
+with debug and hot reload
+```bash
+uvicorn utils.rest_api:app --port 8080 --reload --log-level debug
+```
+
 ## Building
 
 To build the application for production:

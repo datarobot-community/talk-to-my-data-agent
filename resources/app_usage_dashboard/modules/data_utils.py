@@ -16,7 +16,21 @@ def get_or_generate_data(_today):
     chat_path = Path("data/trace_chat.parquet")
     raw_path = Path("data/trace_raw.parquet")
 
-    run_pipeline()
+    # Check if files exist and were modified today
+    should_refresh = False
+    if not chat_path.exists() or not raw_path.exists():
+        should_refresh = True
+    else:
+        # Check if files were last modified before today
+        chat_mtime = datetime.datetime.fromtimestamp(chat_path.stat().st_mtime).date()
+        raw_mtime = datetime.datetime.fromtimestamp(raw_path.stat().st_mtime).date()
+        if chat_mtime < _today or raw_mtime < _today:
+            should_refresh = True
+
+    if should_refresh:
+        st.info(f"Data is stale. Refreshing for {_today}...")
+        run_pipeline()
+
     try:
         df_chat = pd.read_parquet(chat_path)
     except Exception as e:
