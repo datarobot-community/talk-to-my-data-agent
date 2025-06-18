@@ -32,6 +32,10 @@ export const AppStateProvider: React.FC<{
     dispatch(actions.setExpandGraphsInsightsDefaultOpen(isOpen));
   };
 
+  const setTheme = (theme: 'light' | 'dark') => {
+    dispatch(actions.setTheme(theme));
+  };
+
   const contextValue: AppState = {
     ...state,
     hideWelcomeModal,
@@ -41,6 +45,7 @@ export const AppStateProvider: React.FC<{
     setDataSource,
     expandGraphsInsightsDefaultOpen: state.expandGraphsInsightsDefaultOpen,
     setExpandGraphsInsightsDefaultOpen,
+    setTheme,
   };
 
   return (

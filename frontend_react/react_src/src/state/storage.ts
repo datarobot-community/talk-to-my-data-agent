@@ -41,3 +41,15 @@ export const isExpandGraphsInsightsDefaultOpen = (): boolean => {
 export const setExpandGraphsInsightsDefaultOpen = (isOpen: boolean): void => {
   setStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN, isOpen ? 'true' : 'false');
 };
+
+export const getTheme = (): 'light' | 'dark' => {
+  const stored = getStorageItem(STORAGE_KEYS.THEME);
+  if (stored === 'light' || stored === 'dark') return stored;
+  
+  // Default to system preference
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
+export const setTheme = (theme: 'light' | 'dark'): void => {
+  setStorageItem(STORAGE_KEYS.THEME, theme);
+};

@@ -14,7 +14,6 @@
 
 from utils.i18n import gettext
 
-
 SYSTEM_PROMPT_GET_DICTIONARY = gettext("""\
 YOUR ROLE:
 You are a data dictionary maker.
@@ -63,8 +62,7 @@ Format your response as a JSON object with the following fields:
 
 NECESSARY CONSIDERATIONS:
 Do not refer to specific column names or tables in the data. Just use common language when suggesting a question. Let the next analyst figure out which columns and tables they'll need to use.
-"""
-)
+""")
 SYSTEM_PROMPT_REPHRASE_MESSAGE = gettext("""\
 ROLE
 You are an AI assistant whose job is to review the entire chat history between the user and the AI, then paraphrase the user’s latest message in a way that captures their complete intent. This paraphrased statement will be passed along to an analytics engine, so it must accurately and comprehensively represent the user’s question, including any relevant context from previous messages if needed.
@@ -352,7 +350,34 @@ Avoid Box and Whisker plots unless it's highly appropriate for the data or the u
 Avoid heatmaps unless it's highly appropriate for the data or the user specifically requests it.
 
 Simple, not overly busy or complex.
-No background colors or themes; use the default theme.
+No background colors or themes; use transparent backgrounds for theme compatibility.
+
+Theme Compatibility Guidelines:
+Ensure all colors have sufficient contrast for both light and dark themes.
+Use transparent backgrounds: plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)'
+
+Text and Annotations for Light Theme:
+- Primary text: '#1A202C' (dark blue-gray)
+- Secondary text: '#4A5568' (medium gray) 
+- Grid lines: '#E2E8F0' (light gray)
+- Axis lines: '#CBD5E0' (medium light gray)
+
+DataRobot Brand Color Palette (optimized for both themes):
+- Primary: '#44BFFC' (DataRobot Blue)
+- Success: '#38A169' (Green) 
+- Error: '#E53E3E' (Red)
+- Warning: '#D69E2E' (Orange)
+- Info: '#0BC5EA' (Teal)
+- Secondary: '#7C6BF5' (Purple - darker variant)
+
+Layout Configuration Example:
+fig.update_layout(
+    font={'color': '#1A202C', 'family': 'DM Sans'},
+    plot_bgcolor='rgba(0,0,0,0)',
+    paper_bgcolor='rgba(0,0,0,0)',
+    xaxis={'gridcolor': '#E2E8F0', 'linecolor': '#CBD5E0'},
+    yaxis={'gridcolor': '#E2E8F0', 'linecolor': '#CBD5E0'}
+)
 
 Use DataRobot Brand Colors
 Primary Colors:

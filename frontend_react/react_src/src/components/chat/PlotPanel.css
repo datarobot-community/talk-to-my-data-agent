@@ -1,3 +1,7 @@
 .plot-container {
+  /* No filter for light theme */
+}
+
+.dark .plot-container {
   filter: invert(90%) hue-rotate(180deg);
 }

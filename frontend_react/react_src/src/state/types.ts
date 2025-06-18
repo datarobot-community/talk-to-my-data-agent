@@ -7,6 +7,7 @@ export interface AppStateData {
   enableBusinessInsights: boolean;
   dataSource: string;
   expandGraphsInsightsDefaultOpen: boolean;
+  theme: 'light' | 'dark';
 }
 
 export interface AppStateActions {
@@ -16,6 +17,7 @@ export interface AppStateActions {
   setEnableBusinessInsights: (enabled: boolean) => void;
   setDataSource: (source: string) => void;
   setExpandGraphsInsightsDefaultOpen: (isOpen: boolean) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 export type AppState = AppStateData & AppStateActions;
@@ -26,4 +28,5 @@ export type Action =
   | { type: "SET_ENABLE_CHART_GENERATION"; payload: boolean }
   | { type: "SET_ENABLE_BUSINESS_INSIGHTS"; payload: boolean }
   | { type: "SET_DATA_SOURCE"; payload: string }
-  | { type: "SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN"; payload: boolean };
+  | { type: "SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN"; payload: boolean }
+  | { type: "SET_THEME"; payload: 'light' | 'dark' };
