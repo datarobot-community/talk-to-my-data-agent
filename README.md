@@ -70,6 +70,22 @@ Codespace users can **skip steps 1 and 2**. For local development, follow all of
    ```
    Python 3.10 - 12 are supported
 
+5. **Install Rust on Mac** (if needed):
+   
+   Some Python packages (such as pydantic-core, jiter, etc.) require a Rust compiler. To install Rust on Mac:
+   
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+   Follow the installer instructions to proceed.
+   
+   After completion, run:
+   
+   ```bash
+   source ~/.cargo/env
+   rustc --version
+   # Example: rustc 1.77.2 (or higher)
+   ```
 
 Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
 and `pulumi` invocation see [here](#setup-for-advanced-users).
