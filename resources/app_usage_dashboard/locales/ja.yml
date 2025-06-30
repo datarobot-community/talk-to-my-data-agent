@@ -31,8 +31,9 @@ ja:
     janome_tokenize_error: "janomeによる日本語の形態素解析中にエラーが発生しました: {error}"
     janome_init_error: "janomeが利用できないか初期化に失敗しました。日本語の形態素解析はできません。"
   kpi_labels:
-    total_users: "総ユーザー数"
-    recent_active_users: "最近のアクティブユーザー"
+    total_users: "総ユーザー数（全期間）"
+    total_users_all_time: "総ユーザー数（全期間）"
+    recent_active_users: "アクティブユーザー数（選択期間）"
     new_users: "新規ユーザー"
     user_retention_rate: "ユーザーリテンション率"
     user_email: "ユーザー"
@@ -80,4 +81,4 @@ ja:
     unexpected_finish_count: "予期しない終了チャット数"
     user_activity_heatmap: "ユーザーチャット数"
   warnings:
-    no_data_for_wordcloud: "ワードクラウド用のデータがありません。" 
+    no_data_for_wordcloud: "ワードクラウド用のデータがありません。"
