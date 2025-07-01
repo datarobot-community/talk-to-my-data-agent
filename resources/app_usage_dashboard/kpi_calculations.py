@@ -100,7 +100,7 @@ def calculate_all_kpis(
     timeframe: (start, end) for current period
     previous_timeframe: (start, end) for retention calculation
     """
-    total_users = calculate_total_unique_users(df)
+    total_users_all_time = calculate_total_unique_users(df)
     recent_active_users = calculate_recent_active_users(df, *timeframe)
     new_users = calculate_new_users(df, *timeframe)
     retention_rate = None
@@ -109,14 +109,17 @@ def calculate_all_kpis(
             df, previous_timeframe, timeframe
         )
     total_chats = calculate_total_chats(df)
-    avg_chats_per_user = calculate_average_chats_per_user(total_chats, total_users)
+    avg_chats_per_user = calculate_average_chats_per_user(
+        total_chats, total_users_all_time
+    )
     recent_total_chats = calculate_recent_total_chats(df, *timeframe)
     recent_avg_chats_per_user = calculate_recent_average_chats_per_user(
         recent_total_chats, recent_active_users
     )
 
     return {
-        "total_users": total_users,
+        "total_users": total_users_all_time,
+        "total_users_all_time": total_users_all_time,  # Keep both for backward compatibility
         "recent_active_users": recent_active_users,
         "new_users": new_users,
         "retention_rate": retention_rate,

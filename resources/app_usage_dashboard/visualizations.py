@@ -1,3 +1,4 @@
+import traceback
 from typing import Any, Optional
 
 import numpy as np
@@ -6,11 +7,50 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from i18n_setup import _
+from streamlit.logger import get_logger
+from wordcloud import WordCloud
 
-# Word cloud generation has been moved to wordcloud_utils.py. Please use that module for all word cloud related functionality.
+# For Japanese tokenization, use janome
+try:
+    from janome.tokenizer import Tokenizer
+
+    tokenizer = Tokenizer()
+    JANOME_AVAILABLE = True
+except ImportError:
+    JANOME_AVAILABLE = False
+
+# For TF-IDF
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+
+logger = get_logger("streamlit")
+
+# --- Chart Generators ---
 
 
 # Example: Active User Trend (Line Chart)
+def get_active_user_trend_data(
+    df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
+) -> pd.DataFrame:
+    """
+    Get the data for active user trend chart.
+    """
+    if "date" not in df.columns or "user_email" not in df.columns:
+        return pd.DataFrame()
+    mask = (df["date"] >= timeframe[0]) & (df["date"] <= timeframe[1])
+    filtered = df.loc[mask].copy()
+    filtered["period"] = (
+        pd.to_datetime(filtered["date"]).dt.to_period(granularity).dt.to_timestamp()
+    )
+    trend = filtered.groupby("period")["user_email"].nunique().reset_index()
+    trend.columns = ["period", "active_users"]
+    return trend
+
+
 def plot_active_user_trend(
     df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
 ) -> go.Figure:
@@ -18,22 +58,17 @@ def plot_active_user_trend(
     Plot the trend of active users over time.
     granularity: 'D' (daily), 'W' (weekly), 'M' (monthly)
     """
-    if "date" not in df.columns or "user_email" not in df.columns:
+    trend = get_active_user_trend_data(df, timeframe, granularity)
+    if trend.empty:
         return go.Figure()
-    mask = (df["date"] >= timeframe[0]) & (df["date"] <= timeframe[1])
-    filtered = df.loc[mask].copy()
-    filtered["period"] = (
-        pd.to_datetime(filtered["date"]).dt.to_period(granularity).dt.to_timestamp()
-    )
-    trend = filtered.groupby("period")["user_email"].nunique().reset_index()
     fig = px.line(
         trend,
         x="period",
-        y="user_email",
+        y="active_users",
         markers=True,
         labels={
             "period": _(f"filters.granularity.{granularity.lower()}"),
-            "user_email": _("kpi_labels.total_users"),
+            "active_users": _("kpi_labels.total_users"),
         },
         title=_("charts.active_user_trend"),
     )
@@ -41,20 +76,32 @@ def plot_active_user_trend(
 
 
 # Number of Chats Trend (Line Chart)
-def plot_number_of_chats_trend(
+def get_number_of_chats_trend_data(
     df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
-) -> go.Figure:
+) -> pd.DataFrame:
     """
-    Plot the trend of number of chats (user messages) over time.
+    Get the data for number of chats trend chart.
     """
     if "date" not in df.columns:
-        return go.Figure()
+        return pd.DataFrame()
     mask = (df["date"] >= timeframe[0]) & (df["date"] <= timeframe[1])
     filtered = df.loc[mask].copy()
     filtered["period"] = (
         pd.to_datetime(filtered["date"]).dt.to_period(granularity).dt.to_timestamp()
     )
     trend = filtered.groupby("period").size().reset_index(name="num_chats")
+    return trend
+
+
+def plot_number_of_chats_trend(
+    df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
+) -> go.Figure:
+    """
+    Plot the trend of number of chats (user messages) over time.
+    """
+    trend = get_number_of_chats_trend_data(df, timeframe, granularity)
+    if trend.empty:
+        return go.Figure()
     fig = px.line(
         trend,
         x="period",
@@ -70,14 +117,15 @@ def plot_number_of_chats_trend(
 
 
 # User Activity Heatmap
-def plot_user_activity_heatmap(
+def get_user_activity_heatmap_data(
     df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
-) -> go.Figure:
+) -> pd.DataFrame:
     """
-    Plot a heatmap of user activity (number of chats per user per period).
+    Generate the pivot table data for user activity heatmap.
+    Returns a DataFrame with users as index, periods as columns, and chat counts as values.
     """
     if "date" not in df.columns or "user_email" not in df.columns:
-        return go.Figure()
+        return pd.DataFrame()
     mask = (df["date"] >= timeframe[0]) & (df["date"] <= timeframe[1])
     filtered = df.loc[mask].copy()
     filtered["period"] = (
@@ -90,8 +138,26 @@ def plot_user_activity_heatmap(
         aggfunc="count",
         fill_value=0,
     )
+    return pivot
+
+
+def plot_user_activity_heatmap(
+    df: pd.DataFrame, timeframe: tuple[pd.Timestamp, pd.Timestamp], granularity: str
+) -> go.Figure:
+    """
+    Plot a heatmap of user activity (number of chats per user per period).
+    Dynamically adjusts height and margins for large datasets.
+    """
+    pivot = get_user_activity_heatmap_data(df, timeframe, granularity)
     if pivot.empty:
         return go.Figure()
+    # Dynamic height calculation
+    base_height = 300
+    row_height = 22
+    min_height = 300
+    max_height = 1200
+    n_rows = pivot.shape[0]
+    height = min(max_height, max(base_height + n_rows * row_height, min_height))
     fig = go.Figure(
         data=go.Heatmap(
             z=pivot.values,
@@ -108,6 +174,9 @@ def plot_user_activity_heatmap(
         xaxis_title=_(f"filters.granularity.{granularity.lower()}"),
         yaxis_title=_("kpi_labels.user_email"),
         coloraxis_colorbar_title=_("charts.num_chats"),
+        height=height,
+        yaxis=dict(automargin=True),
+        xaxis=dict(automargin=True),
     )
     return fig
 
@@ -296,3 +365,76 @@ def plot_unexpected_finish_trend(
         title=_("charts.unexpected_finish_trend"),
     )
     return fig
+
+
+# --- Word Cloud Utilities ---
+
+
+def generate_user_wordcloud(text_data, font_path, current_language, _):
+    if not text_data:
+        st.warning(_("warnings.no_data_for_wordcloud"))
+        return
+    processed_text = text_data
+    if current_language == "ja":
+        if JANOME_AVAILABLE:
+            try:
+                words = [token.surface for token in tokenizer.tokenize(text_data)]
+                processed_text = " ".join(words)
+            except Exception as e:
+                st.error(_("errors.janome_tokenize_error", error=str(e)))
+                return
+        else:
+            st.error(_("errors.janome_init_error"))
+            return
+    # Count word frequencies
+    from collections import Counter
+
+    word_freq = Counter(processed_text.split())
+    try:
+        wordcloud = WordCloud(
+            font_path=font_path, width=800, height=400, background_color="white"
+        ).generate_from_frequencies(word_freq)
+        st.image(wordcloud.to_array())
+    except RuntimeError as e:
+        st.error(_("errors.wordcloud_font_error", font_path=font_path, e=str(e)))
+    except Exception as e:
+        st.error(_("errors.wordcloud_unexpected_error", e=str(e)))
+
+
+def generate_error_wordcloud(text_list, font_path, current_language, _):
+    if not text_list or not any(text_list):
+        st.warning(_("warnings.no_data_for_wordcloud"))
+        return
+    if current_language == "ja":
+        if JANOME_AVAILABLE:
+            try:
+                # Tokenize each error message
+                text_list = [
+                    " ".join([token.surface for token in tokenizer.tokenize(t)])
+                    for t in text_list
+                ]
+            except Exception as e:
+                st.error(_("errors.janome_tokenize_error", error=str(e)))
+                logger.error(_("errors.janome_tokenize_error", error=str(e)))
+                logger.error(traceback.format_exc())
+                return
+        else:
+            st.error(_("errors.janome_init_error"))
+            return
+    if not SKLEARN_AVAILABLE:
+        st.error("scikit-learn is required for TF-IDF word cloud.")
+        return
+    try:
+        vectorizer = TfidfVectorizer(stop_words="english", max_features=100)
+        tfidf_matrix = vectorizer.fit_transform(text_list)
+        scores = tfidf_matrix.sum(axis=0).A1
+        words = vectorizer.get_feature_names_out()
+        word_scores = dict(zip(words, scores))
+        wordcloud = WordCloud(
+            font_path=font_path, width=800, height=400, background_color="white"
+        ).generate_from_frequencies(word_scores)
+        st.image(wordcloud.to_array())
+    except RuntimeError as e:
+        st.error(_("errors.wordcloud_font_error", font_path=font_path, e=str(e)))
+    except Exception as e:
+        st.error(_("errors.wordcloud_unexpected_error", e=str(e)))

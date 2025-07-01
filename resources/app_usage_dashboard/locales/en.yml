@@ -31,8 +31,9 @@ en:
     janome_tokenize_error: "Error tokenizing Japanese text with janome: {error}"
     janome_init_error: "Janome is not available or failed to initialize. Japanese tokenization is not possible."
   kpi_labels:
-    total_users: "Total Users"
-    recent_active_users: "Recent Active Users"
+    total_users: "Total Users (All Time)"
+    total_users_all_time: "Total Users (All Time)"
+    recent_active_users: "Active Users (Selected Period)"
     new_users: "New Users"
     user_retention_rate: "User Retention Rate"
     user_email: "User"
@@ -80,4 +81,4 @@ en:
     unexpected_finish_count: "Unexpected Finish Count"
     user_activity_heatmap: "User Activity Heatmap"
   warnings:
-    no_data_for_wordcloud: "No data available for word cloud." 
+    no_data_for_wordcloud: "No data available for word cloud."
