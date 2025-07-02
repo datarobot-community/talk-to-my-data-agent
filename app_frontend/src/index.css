@@ -1,0 +1,139 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+@tailwind utilities;
+
+/* @variant dark (&:where(.dark, .dark *)); */
+
+@plugin "tailwindcss-animate";
+
+@theme inline {
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
+    --color-popover: hsl(var(--popover));
+    --color-popover-foreground: hsl(var(--popover-foreground));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+    --color-destructive: hsl(var(--destructive));
+    --color-destructive-foreground: hsl(var(--destructive-foreground));
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
+    --color-chart-1: hsl(var(--chart-1));
+    --color-chart-2: hsl(var(--chart-2));
+    --color-chart-3: hsl(var(--chart-3));
+    --color-chart-4: hsl(var(--chart-4));
+    --color-chart-5: hsl(var(--chart-5));
+    --color-success: hsl(var(--border-turquoise));
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+    :root {
+        --background: var(--surface-primary-90);
+        --foreground: var(--text-primary);
+        --card: var(--surface-secondary-80);
+        --card-foreground: var(--text-primary);
+        --popover: var(--surface-additional-70);
+        --popover-foreground: var(--text-primary);
+        --primary: var(--text-primary);
+        --primary-foreground: 240 5.9% 10%;
+        --secondary: 210 10% 27%;
+        --secondary-foreground: var(--text-primary);
+        --muted: var(--surface-additional-70);
+        --muted-foreground: var(--text-disabled);
+        --accent: var(--surface-selected-60);
+        --accent-foreground: var(--text-primary);
+        --destructive: 355 77% 69%;
+        --destructive-foreground: var(--text-primary);
+        --border: var(--divider-neutral);
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
+        --radius: 0.5rem;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+
+        --surface-primary-90: 207 16% 11%;
+        --surface-secondary-80: 207 13% 13%;
+        --surface-additional-70: 207 12% 15%;
+        --surface-selected-60: 210 12% 19%;
+        --surface-hover-55: 208 12% 21%;
+
+        --text-accent: 0 0% 100%;
+        --text-primary: 204 12% 92%;
+        --text-secondary: 210 13% 75%;
+        --text-tertiary: 213 9% 60%;
+        --text-disabled: 210 7% 48%;
+
+        --divider-contrast: 212 11% 27%;
+        --divider-neutral: 210 12% 19%;
+        --divider-accent: 205 60% 51%;
+
+        --border-green: 135 32% 53%;
+        --border-yellow: 40 69% 54%;
+        --border-red: 355 77% 69%;
+        --border-turquoise: 184 33% 52%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply m-0;
+        @apply bg-background text-foreground;
+        font:
+            400 14px 'DM Sans',
+            sans-serif;
+    }
+}
+
+#root {
+    height: 100vh;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background: hsl(var(--muted-foreground));
+    cursor: default;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.9);
+}
+
+/* Firefox Scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color: hsl(var(--foreground));
+        background-color: hsl(var(--background));
+    }
+}

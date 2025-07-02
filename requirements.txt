@@ -1,0 +1,84 @@
+# infra
+pulumi==3.153.0
+pulumi-datarobot>=0.8.15,<0.9
+datarobot-pulumi-utils>=0.0.2.post8,<0.1
+jinja2>=3.1.5,<4.0
+PyYAML>=6.0.2,<7.0
+
+# dev
+mypy>=1.14.1,<2.0
+pandas-stubs>=2.2.3.241126,<3.0
+types-requests>=2.32.0.20241016,<3.0
+types-pyyaml>=6.0.12.20241230,<7.0
+ruff>=0.9,<1.0
+pytest>=8.3.4,<9.0
+pytest-cov>=6.0.0,<7.0
+pytest-mock>=3.14.0,<4.0
+pytest-asyncio>=0.25.2,<1.0
+pytest-httpx>=0.30.0,<0.31.0
+
+# genai testing
+rich>=13.9.4,<14.0
+inquirer>=3.4.0,<4.0
+nbformat>=5.10.0,<6.0
+
+# ======= frontend/requirements.txt ======= #
+
+# python sandbox libraries
+pandas>=2.2.3,<3.0
+numpy>=2.1.3,<3.0
+scipy>=1.15.1,<2.0
+statsmodels>=0.14.4,<1.0
+scikit-learn>=1.6.1,<2.0
+lightgbm>=4.5.0,<5.0
+tslearn>=0.6.3,<1.0
+spacy>=3.8.3,<4.0
+pyarrow<19.0.0
+polars>=1.22.0,<2.0
+
+# plotting
+kaleido==0.2.0
+plotly>=5.24.1,<6.0
+textblob>=0.19.0,<1.0
+
+# data
+openpyxl>=3.1.5,<4.0
+snowflake-connector-python>=3.12.4,<4.0
+google-cloud-bigquery>=3.27.0,<4.0
+google-auth>=2.37.0,<3.0
+snowflake-sqlalchemy>=1.7.3,<2.0
+sqlalchemy>=2.0.37,<3.0
+cryptography>=44.0.0,<45.0
+hdbcli>=2.23.27,<3.0
+
+# genai
+openai>=1.59.9,<2
+instructor>=1.3.4,<2.0
+boto3>=1.36.2,<2.0
+
+# frontend
+streamlit==1.44.1
+st-theme>=1.2.3,<2.0
+streamlit-javascript>=0.1.5,<1.0
+
+# backend
+datarobot>=3.6.0,<4.0
+fastapi>=0.115.6,<1.0
+python-multipart>=0.0.20,<1.0
+uvicorn==0.34.2,<1.0
+psutil>=6.1.1,<7.0
+pydantic==2.7.4,<3.0
+pydantic-settings==2.4.0,<3.0
+joblib>=1.4.2,<2.0
+duckdb>=1.2.0,<1.3
+fastexcel>=0.12.1,<1.0
+aiofiles==24.1.0
+types-aiofiles==24.1.0.20241221
+httpx>=0.23.0,<1.0,<1.0
+pillow==11.2.1
+
+# dev & compatibility
+eval_type_backport>=0.2.2,<1.0
+db-dtypes>=1.3.1,<2.0
+typing-extensions>=4.12.2,<5.0
+numba>=0.61.0,<1.0

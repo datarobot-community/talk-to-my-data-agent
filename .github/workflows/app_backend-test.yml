@@ -1,0 +1,58 @@
+---
+name: Test app_backend
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'app_backend/**.py'
+
+  pull_request:
+    branches: ["main"]
+    paths:
+      - 'app_backend/**.py'
+
+jobs:
+  tests:
+    name: "FastAPI: app_backend ${{ matrix.python-version }}"
+    runs-on: "ubuntu-latest"
+    defaults:
+      run:
+        working-directory: app_backend
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: "actions/checkout@v4"
+
+      # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: app_backend
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Dependencies
+        working-directory: app_backend
+        run: uv sync --all-extras --dev
+
+      - name: Run Static Checks
+        working-directory: app_backend
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy --pretty --explicit-package-bases .
+
+      - name: Test
+        working-directory: app_backend
+        run: uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+
+      - name: Get Cover
+        uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: app_backend/.coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,17 @@
+{
+  "extends": ["./tsconfig.app.json", "./tsconfig.node.json"],
+  "compilerOptions": {
+    "lib": ["esnext", "dom"],
+    "types": ["vitest/globals", "vitest", "node", "@testing-library/jest-dom"],
+    "module": "ESNext",
+    "target": "ESNext",
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "~/*": ["./src/*"]
+    }
+  },
+  "include": ["setupTests.ts", "src", "tests", "**/*.test.ts", "**/*.test.tsx"]
+}

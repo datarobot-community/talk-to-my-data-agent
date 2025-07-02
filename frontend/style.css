@@ -1,0 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto");
+
+html,
+body,
+[class*="css"] {
+  font-family: "Roboto", sans-serif;
+}
+
+.main {
+  padding: 0rem 1rem;
+}
+
+.stProgress > div > div > div > div {
+  background-color: #1c83e1;
+}
+
+.stDownloadButton button {
+  width: 100%;
+}
+
+/* Add rounded corners to images */
+img {
+  border-radius: 8px;
+}
+/* Remove rounded corners from DataRobot logo */
+.st-key-datarobot-logo img {
+  border-radius: 0;
+}
+/* Add rounded corners to chat input */
+.stChatInput {
+  border-radius: 12px;
+}
+
+/* Add rounded corners to chat messages */
+.stChatMessage {
+  border-radius: 12px;
+  padding-right: 0;
+}
+
+/* Add rounded corners to buttons */
+button {
+  border-radius: 8px !important;
+}
+
+/* Add rounded corners to input fields */
+.stTextInput input {
+  border-radius: 8px;
+}
+
+div[class*="st-key-delete_msg_"] {
+  height: 40px;
+  width: 30px;
+  align-self: end;
+  margin-right: 16px;
+}

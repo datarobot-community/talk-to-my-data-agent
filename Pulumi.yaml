@@ -1,0 +1,11 @@
+---
+name: dataanalyst
+runtime:
+  name: python
+main: infra
+description: Data Analyst
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python
+  datarobot:tracecontext: dataanalyst
