@@ -1,0 +1,38 @@
+
+name: Pulumi Up
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update:
+    name: Pulumi Update
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Run Pulumi Up
+      - uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: ryosukehata/dataanalyst/ttmd-pandas-react
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}
+          DATAROBOT_ENDPOINT: ${{ secrets.DATAROBOT_ENDPOINT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          OPENAI_API_VERSION: ${{ secrets.OPENAI_API_VERSION }}
+          OPENAI_API_DEPLOYMENT_ID: ${{ secrets.OPENAI_API_DEPLOYMENT_ID
+          FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
+          SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
