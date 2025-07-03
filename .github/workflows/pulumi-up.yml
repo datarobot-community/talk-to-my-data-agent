@@ -36,3 +36,5 @@ jobs:
           OPENAI_API_DEPLOYMENT_ID: ${{ secrets.OPENAI_API_DEPLOYMENT_ID }}
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
+          DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
+
