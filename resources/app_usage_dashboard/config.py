@@ -1,11 +1,9 @@
 import json
 import subprocess
 
-from pydantic import AliasChoices, Field
 from pydantic_settings import (
     BaseSettings,
     EnvSettingsSource,
-    PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
 from pydantic_settings.sources import parse_env_vars

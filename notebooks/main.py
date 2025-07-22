@@ -3,7 +3,7 @@
 import os  # Added import for os.path.exists
 
 # Import necessary datetime components for timezone handling
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import matplotlib.pyplot as plt
 import pandas as pd
