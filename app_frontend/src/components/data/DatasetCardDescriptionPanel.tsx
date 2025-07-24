@@ -1,18 +1,16 @@
 import { useState, forwardRef } from 'react';
 import { DictionaryTable as DT } from '@/api/dictionaries/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   useDeleteGeneratedDictionary,
   useUpdateDictionaryCell,
   useDownloadDictionary,
 } from '@/api/dictionaries/hooks';
+import { DatasetCardActionBar } from '@/components/data';
 import { useDatasetMetadata } from '@/api/cleansed-datasets/hooks';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
-import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
 import loader from '@/assets/loader.svg';
 import { DictionaryTable } from './DictionaryTable';
 import { CleansedDataTable } from './CleansedDataTable';
@@ -20,6 +18,7 @@ import { ValueOf } from '@/state/types';
 import { DATA_TABS } from '@/state/constants';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
+import { useDatasetDictionarySearch } from '@/hooks/useDatasetSearch';
 
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
 
@@ -35,6 +34,8 @@ export const DatasetCardDescriptionPanel = forwardRef<
 >(({ dictionary, isProcessing = true, viewMode = 'description' }, ref) => {
   const { t } = useTranslation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { searchText, setSearchText, filteredDictionary, getOriginalRowIndex } =
+    useDatasetDictionarySearch(dictionary);
   const { mutate: deleteDictionary, isPending: isDeleting } = useDeleteGeneratedDictionary({
     onSuccess: () => {
       setIsDeleteDialogOpen(false);
@@ -108,36 +109,18 @@ export const DatasetCardDescriptionPanel = forwardRef<
                 testId="data-processed-badge"
                 className="leading-tight text-sm"
               >
-                <FontAwesomeIcon className="mr-2 w-4 h-4 " icon={faCheck} />
+                <FontAwesomeIcon className="mr-1 w-4 h-4 " icon={faCheck} />
                 {t('Processed')}
               </Badge>
             )}
           </div>
-          <div className="flex gap-2 px-2">
-            <Button
-              variant="link"
-              onClick={() => {
-                downloadDictionary({ name: dictionary.name });
-              }}
-              title={t('Download dictionary as CSV')}
-              disabled={isProcessing || isDownloading}
-            >
-              {isDownloading ? (
-                <img src={loader} alt={t('downloading')} className="w-4 h-4 animate-spin" />
-              ) : (
-                <FontAwesomeIcon icon={faDownload} />
-              )}
-            </Button>
-            <Button
-              variant="link"
-              onClick={() => {
-                setIsDeleteDialogOpen(true);
-              }}
-              title={t('Delete dictionary')}
-            >
-              <FontAwesomeIcon icon={faTrash} />
-            </Button>
-          </div>
+          <DatasetCardActionBar
+            onSearch={setSearchText}
+            onDownload={() => downloadDictionary({ name: dictionary.name })}
+            onDelete={() => setIsDeleteDialogOpen(true)}
+            isDownloading={isDownloading}
+            isProcessing={isProcessing}
+          />
         </div>
       </div>
       <div className="flex flex-col flex-1 text-lg">
@@ -149,12 +132,13 @@ export const DatasetCardDescriptionPanel = forwardRef<
           <ScrollArea className="mt-4 h-96">
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <DictionaryTable
-                data={dictionary}
+                data={filteredDictionary}
                 onUpdateCell={(rowIndex, field, value) => {
+                  const originalRowIndex = getOriginalRowIndex(rowIndex);
                   updateCell(
                     {
                       name: dictionary.name,
-                      rowIndex,
+                      rowIndex: originalRowIndex,
                       field,
                       value,
                     },
@@ -168,7 +152,11 @@ export const DatasetCardDescriptionPanel = forwardRef<
                 }}
               />
             ) : (
-              <CleansedDataTable datasetName={dictionary.name} rowsPerPage={50} />
+              <CleansedDataTable
+                datasetName={dictionary.name}
+                rowsPerPage={50}
+                searchText={searchText}
+              />
             )}
           </ScrollArea>
         )}

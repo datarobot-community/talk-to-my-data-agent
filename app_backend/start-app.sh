@@ -5,7 +5,7 @@ DEV_MODE=${DEV_MODE:-false}
 LOG_LEVEL="info"
 EXTRA_OPTS=(--proxy-headers)
 
-if [ "${DEV_MODE,,}" = "true" ]; then
+if [ "$(echo "$DEV_MODE" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
   EXTRA_OPTS+=("--reload")
 fi
 

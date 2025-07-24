@@ -67,10 +67,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
               {files.map((file, index) => (
                 <div
                   key={index}
-                  className="h-min-[52px] pt-4 flex-col justify-start items-start gap-2.5 flex"
+                  className="h-min-[36px] pt-4 flex-col justify-start items-start gap-2.5 flex"
                 >
-                  <div className="self-stretch h-9 bg-secondary/50 rounded border border-primary/10 justify-start items-center gap-2 inline-flex">
-                    <div className="w-9 self-stretch p-2 bg-secondary rounded-tl-[3px] rounded-bl-[3px] flex-col justify-center items-center gap-2 inline-flex">
+                  <div className="self-stretch bg-secondary/50 rounded border border-primary/10 justify-start items-center gap-2 inline-flex">
+                    <div className="w-9 self-stretch bg-secondary rounded-tl-[3px] rounded-bl-[3px] flex-col justify-center items-center gap-2 inline-flex">
                       <div className="w-9 h-9 flex-col justify-center items-center gap-2.5 flex">
                         <div className="text-center text-sm font-black leading-tight">
                           <FileIcon
@@ -83,7 +83,9 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                       </div>
                     </div>
                     <div className="grow shrink basis-0 flex-col justify-center items-start inline-flex">
-                      <div className="text-sm font-normal leading-tight">{file.name}</div>
+                      <div className="py-1 text-sm font-normal leading-normal whitespace-wrap break-all">
+                        {file.name}
+                      </div>
                     </div>
                     <div className="w-9 h-9 p-2 justify-center items-center flex">
                       <div className="w-5 h-5 flex-col justify-center items-center gap-2.5 inline-flex">

@@ -16,17 +16,19 @@ import { useTranslation } from '@/i18n';
 interface CleansedDataTableProps {
   datasetName: string;
   rowsPerPage?: number;
+  searchText?: string;
 }
 
 export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   datasetName,
   rowsPerPage = 50,
+  searchText,
 }) => {
   const { ref, inView } = useInView();
   const { t } = useTranslation();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status, isError, error } =
-    useInfiniteCleansedDataset(datasetName, rowsPerPage);
+    useInfiniteCleansedDataset(datasetName, rowsPerPage, searchText);
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {

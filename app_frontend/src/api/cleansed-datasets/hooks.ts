@@ -2,15 +2,16 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { cleansedDatasetKeys, datasetMetadataKeys } from './keys';
 import { getCleansedDataset, getDatasetMetadata } from './api-requests';
 
-export const useInfiniteCleansedDataset = (name: string, limit = 100) => {
+export const useInfiniteCleansedDataset = (name: string, limit = 100, search?: string) => {
   return useInfiniteQuery({
-    queryKey: cleansedDatasetKeys.detail(name),
+    queryKey: cleansedDatasetKeys.detail(name, search),
     initialPageParam: 0,
     queryFn: ({ pageParam = 0, signal }) =>
       getCleansedDataset({
         name,
         skip: pageParam,
         limit,
+        search,
         signal,
       }),
     getNextPageParam: (lastPage, allPages) => {

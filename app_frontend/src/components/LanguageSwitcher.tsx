@@ -1,4 +1,4 @@
-import { useTranslation } from '@/i18n';
+import { saveLanguage, useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,10 +9,11 @@ import {
 
 const languages = [
   { code: 'en', name: 'English' },
-  { code: 'es', name: 'Español' },
+  { code: 'es_419', name: 'Español' },
   { code: 'fr', name: 'Français' },
   { code: 'ja', name: '日本語' },
   { code: 'ko', name: '한국어' },
+  { code: 'pt_BR', name: 'Português' },
 ];
 
 export const LanguageSwitcher = () => {
@@ -21,7 +22,7 @@ export const LanguageSwitcher = () => {
   const currentLang = languages.find(lang => lang.code === currentLanguage);
 
   const handleLanguageChange = (languageCode: string) => {
-    localStorage.setItem('language', languageCode);
+    saveLanguage(languageCode);
     changeLanguage(languageCode);
   };
 

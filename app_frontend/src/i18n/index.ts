@@ -9,29 +9,48 @@ import jaTranslations from './locales/ja.json';
 import koTranslations from './locales/ko.json';
 import ptTranslations from './locales/pt_BR.json';
 
+const updateResources = (data: Record<string, string>) => {
+  return Object.keys(data).reduce(
+    (acc, key) => {
+      acc[key] = data[key] || key;
+      return acc;
+    },
+    {} as Record<string, string>
+  );
+};
+
 const resources = {
   es: {
-    translation: esTranslations,
+    translation: updateResources(esTranslations),
   },
   fr: {
-    translation: frTranslations,
+    translation: updateResources(frTranslations),
   },
   ja: {
-    translation: jaTranslations,
+    translation: updateResources(jaTranslations),
   },
   ko: {
-    translation: koTranslations,
+    translation: updateResources(koTranslations),
   },
   pt: {
-    translation: ptTranslations,
+    translation: updateResources(ptTranslations),
   },
+};
+
+const languageKey = 'TTMData_language';
+
+export const getSavedLanguage = () => {
+  return localStorage.getItem(languageKey);
+};
+
+export const saveLanguage = (language: string) => {
+  localStorage.setItem(languageKey, language);
 };
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: localStorage.getItem('language') || 'en',
+  lng: getSavedLanguage() || 'en',
   fallbackLng: 'en',
-
   interpolation: {
     escapeValue: false,
   },

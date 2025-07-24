@@ -5,6 +5,7 @@ export interface DataRobotInfoResponse {
     uid: string;
     username: string;
     email: string;
+    language: string;
     [key: string]: string | number | boolean | null | undefined;
   } | null;
   datarobot_api_token: string | null;

@@ -1,11 +1,23 @@
+import { useLayoutEffect, useState } from 'react';
 import './App.css';
 import Pages from './pages';
 import { useDataRobotInfo } from './api/user/hooks';
+import i18n, { getSavedLanguage } from './i18n';
 
 function App() {
-  useDataRobotInfo();
+  const { data: dataRobotInfo } = useDataRobotInfo();
+  const [isReady, setIsReady] = useState(false);
 
-  return <Pages />;
+  useLayoutEffect(() => {
+    if (dataRobotInfo?.datarobot_account_info?.language && !getSavedLanguage()) {
+      i18n.changeLanguage(dataRobotInfo.datarobot_account_info.language as string);
+    }
+    if (dataRobotInfo) {
+      setIsReady(true);
+    }
+  }, [dataRobotInfo]);
+
+  return isReady && <Pages />;
 }
 
 export default App;

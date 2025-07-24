@@ -1,3 +1,10 @@
+# OS detection
+ifeq ($(OS),Windows_NT)
+	SET_ENV_SCRIPT = ./set_env.bat
+else
+	SET_ENV_SCRIPT = . ./set_env.sh
+endif
+
 .PHONY: copyright-check apply-copyright fix-licenses check-licenses
 
 help:
@@ -26,7 +33,9 @@ lint: ## Lint the code
 check-all: check-licenses lint ## Run all checks
 
 run-local-dev-backend:
+	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=False DEV_MODE=True ./app_backend/start-app.sh
 
 run-local-static-backend:
+	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend DEV_MODE=True ./app_backend/start-app.sh

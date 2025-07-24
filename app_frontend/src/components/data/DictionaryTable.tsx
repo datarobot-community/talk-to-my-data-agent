@@ -68,7 +68,7 @@ const EditableCell: React.FC<EditableCellProps> = ({ initialValue, rowIndex, fie
   ) : (
     <div
       onDoubleClick={handleDoubleClick}
-      className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px]"
+      className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px] text-muted-foreground"
       title="Double-click to edit"
     >
       {value}

@@ -34,16 +34,19 @@ export const getCleansedDataset = async ({
   name,
   skip = 0,
   limit = 100,
+  search,
   signal,
 }: {
   name: string;
   skip?: number;
   limit?: number;
+  search?: string;
   signal?: AbortSignal;
 }): Promise<CleansedDataset> => {
   const encodedName = encodeURIComponent(name);
+  const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
   const { data } = await apiClient.get<CleansedDataset>(
-    `/v1/datasets/${encodedName}/cleansed?skip=${skip}&limit=${limit}`,
+    `/v1/datasets/${encodedName}/cleansed?skip=${skip}&limit=${limit}${searchParam}`,
     { signal }
   );
   return data;

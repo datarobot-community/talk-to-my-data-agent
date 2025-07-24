@@ -601,15 +601,17 @@ async def get_cleansed_dataset(
     name: str,
     skip: int = 0,
     limit: int = 10000,
+    search: str | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> DatasetCleansedResponse:
     """
-    Get a cleansed dataset by name from the database with pagination support.
+    Get a cleansed dataset by name from the database with pagination and search support.
 
     Args:
         name: The name of the dataset
         skip: Number of records to skip (for pagination)
         limit: Maximum number of records to return (for pagination)
+        search: Optional search term to filter columns by name (raw data view)
 
     Returns:
         A dictionary containing the cleaning report (if available) and the dataset as a list of records.
@@ -638,6 +640,25 @@ async def get_cleansed_dataset(
 
         # Convert the dataset to a DataFrame
         df_display = ds_display.to_df()
+
+        # Apply search filter if provided - filter columns by name
+        if search and search.strip():
+            search_term = search.strip().lower()
+            original_columns = list(df_display.columns)
+            matching_columns = [
+                col for col in original_columns if search_term in col.lower()
+            ]
+            if matching_columns:
+                # Select only the matching columns
+                try:
+                    df_display = df_display.select(matching_columns)
+                except Exception as e:
+                    logger.error(f"Error selecting columns: {e}")
+                    # Fallback to original dataframe if selection fails
+                    pass
+            else:
+                # No matching columns, create empty dataframe
+                df_display = df_display.select([]).limit(0)
 
         # Apply pagination (skip and limit)
         if skip > 0 or limit > 0:

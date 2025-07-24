@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RESPONSE_TABS } from './constants';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n';
 
 export interface TabState {
   isLoading?: boolean;

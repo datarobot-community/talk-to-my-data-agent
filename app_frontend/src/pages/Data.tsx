@@ -4,12 +4,7 @@ import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
 import { useNavigate } from 'react-router-dom';
 import { generateDataRoute } from '@/pages/routes';
 
-import {
-  DatasetCardDescriptionPanel,
-  DataViewTabs,
-  SearchControl,
-  ClearDatasetsButton,
-} from '@/components/data';
+import { DatasetCardDescriptionPanel, DataViewTabs, ClearDatasetsButton } from '@/components/data';
 import { ValueOf } from '@/state/types';
 import { useTranslation } from '@/i18n';
 import { DATA_TABS } from '@/state/constants';
@@ -73,7 +68,6 @@ export const Data: React.FC = () => {
             defaultValue={viewMode}
             onChange={value => setViewMode(value as ValueOf<typeof DATA_TABS>)}
           />
-          <SearchControl />
         </div>
         <div className="flex items-center">{!!data?.length && <ClearDatasetsButton />}</div>
       </div>
