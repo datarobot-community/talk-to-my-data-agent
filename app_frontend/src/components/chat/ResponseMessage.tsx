@@ -148,7 +148,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       businessErrors,
       analysisAttempts,
     };
-  }, [message, date]);
+  }, [message, displayDate]);
 
   return (
     <MessageContainer>

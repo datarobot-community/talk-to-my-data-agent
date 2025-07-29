@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from 'react';
+import { Toaster } from '@/components/ui/sonner';
 import './App.css';
 import Pages from './pages';
 import { useDataRobotInfo } from './api/user/hooks';
@@ -17,7 +18,12 @@ function App() {
     }
   }, [dataRobotInfo]);
 
-  return isReady && <Pages />;
+  return (
+    <>
+      {isReady && <Pages />}
+      <Toaster />
+    </>
+  );
 }
 
 export default App;

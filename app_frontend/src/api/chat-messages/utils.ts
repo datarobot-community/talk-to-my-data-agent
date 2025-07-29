@@ -1,4 +1,4 @@
-import i18n, { t } from 'i18next';
+import i18n from '@/i18n';
 
 const now = new Date();
 
@@ -22,7 +22,7 @@ const configureChatName = (language: string) => {
     minute: '2-digit',
     hour12: true,
   }).format(now);
-  return t('Chat {{formattedDate}} {{formattedTime}}', { formattedDate, formattedTime });
+  return i18n.t('Chat {{formattedDate}} {{formattedTime}}', { formattedDate, formattedTime });
 };
 
 export const getChatName = () => {

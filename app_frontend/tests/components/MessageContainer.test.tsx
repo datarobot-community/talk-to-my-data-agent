@@ -4,7 +4,7 @@ import { MessageContainer } from '@/components/chat/MessageContainer';
 
 describe('MessageContainer Component', () => {
   // Setup and teardown for all tests
-  let scrollIntoViewMock;
+  let scrollIntoViewMock: ReturnType<typeof vi.fn>;
   let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView;
 
   beforeEach(() => {

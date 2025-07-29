@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import i18n from '@/i18n';
 import apiClient from '../apiClient';
 import { DictionaryRow, DictionaryTable } from './types';
 
@@ -108,6 +110,7 @@ export const downloadDictionary = async ({
     document.body.removeChild(a);
   } catch (error) {
     console.error('Error downloading dictionary:', error);
+    toast.error(i18n.t('Error downloading dictionary'));
     throw error;
   }
 };

@@ -50,7 +50,7 @@ describe('NewChatModal Component', () => {
   });
 
   test('renders the trigger button correctly', () => {
-    render(<NewChatModal />);
+    render(<NewChatModal highlight={false} />);
     const newChatButton = screen.getByRole('button', { name: /new chat/i });
     expect(newChatButton).toBeInTheDocument();
     expect(screen.getByTestId('mock-icon')).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('NewChatModal Component', () => {
       isPending: true,
     });
 
-    render(<NewChatModal />);
+    render(<NewChatModal highlight={false} />);
 
     // Find and click the New Chat button to open the dialog
     const triggerButton = screen.getByRole('button', { name: /new chat/i });

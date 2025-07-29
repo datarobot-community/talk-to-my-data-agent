@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import i18n from '@/i18n';
 import apiClient from '../apiClient';
 import { IChat, IChatMessage } from './types';
 import { getChatName } from './utils';
@@ -176,6 +178,6 @@ export const handleDownload = async (chatId: string) => {
     window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Download error:', error);
-    alert('There was a problem downloading the file.');
+    toast.error(i18n.t('There was a problem downloading the file.'));
   }
 };

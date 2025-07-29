@@ -26,6 +26,7 @@ export const Data: React.FC = () => {
     if (location.state?.cancelScroll && dataId) {
       navigate(generateDataRoute(dataId), { state: null, replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
