@@ -15,9 +15,12 @@ const buttonVariants = cva(
         outline:
           'border border-button bg-background shadow-xs hover:bg-accent hover:text-accent-foreground',
         secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
+        'secondary-round':
+          'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 rounded-full h-9 w-9 p-0',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },
+      // TODO: rounded-md shouldn't be part of size!, but of the variants
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         sm: 'h-8 rounded-md px-3 has-[>svg]:px-2.5',

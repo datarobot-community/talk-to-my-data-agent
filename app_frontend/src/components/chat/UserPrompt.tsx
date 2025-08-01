@@ -1,7 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
 import { usePostMessage, useFetchAllChats } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state';
 import { useTranslation } from '@/i18n';
@@ -9,11 +7,11 @@ import { DATA_SOURCES } from '@/constants/dataSources';
 
 export const UserPrompt = ({
   chatId,
-  allowSend,
+  isProcessing,
   allowedDataSources,
 }: {
   chatId?: string;
-  allowSend?: boolean;
+  isProcessing?: boolean;
   allowedDataSources?: string[];
 }) => {
   const { t } = useTranslation();
@@ -24,9 +22,7 @@ export const UserPrompt = ({
     dataSource: globalDataSource,
   } = useAppState();
   const { data: chats } = useFetchAllChats();
-  const isDisabled = !allowedDataSources?.[0];
-
-  const [message, setMessage] = useState('');
+  const isDataUploadRequired = !allowedDataSources?.[0];
 
   // Find the active chat to get its data source setting
   const activeChat = chatId ? chats?.find(chat => chat.id === chatId) : undefined;
@@ -38,41 +34,27 @@ export const UserPrompt = ({
       : allowedDataSources?.[0] || DATA_SOURCES.FILE;
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
 
-  const sendMessage = () => {
-    if (message.trim()) {
-      mutate({
-        message,
-        chatId,
-        enableChartGeneration,
-        enableBusinessInsights,
-        dataSource: chatDataSource,
-      });
-      setMessage('');
-    }
+  const sendMessage = (message: string) => {
+    mutate({
+      message,
+      chatId,
+      enableChartGeneration,
+      enableBusinessInsights,
+      dataSource: chatDataSource,
+    });
   };
 
   return (
     <PromptInput
-      icon={FontAwesomeIcon}
-      iconProps={{
-        icon: isDisabled ? null : faPaperPlane,
-        behavior: 'append',
-        onClick: sendMessage,
-      }}
+      sendButtonArrangement="append"
+      onSend={sendMessage}
+      isProcessing={isProcessing}
       placeholder={
-        isDisabled
+        isDataUploadRequired
           ? t('Please upload and process data using the sidebar before starting the chat')
           : t('Ask another question about your datasets.')
       }
-      onKeyDown={e => {
-        if (allowSend && e.key === 'Enter' && !(e.shiftKey || e.altKey)) {
-          sendMessage();
-        }
-      }}
-      disabled={isDisabled}
-      aria-disabled={isDisabled}
-      onChange={e => setMessage(e.target.value)}
-      value={message}
+      isDisabled={isDataUploadRequired}
     />
   );
 };

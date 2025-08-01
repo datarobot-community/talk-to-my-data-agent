@@ -52,6 +52,7 @@ async def get_env() -> Response:
         "API_PORT": os.getenv("PORT"),
         "DATAROBOT_ENDPOINT": os.getenv("DATAROBOT_ENDPOINT", ""),
         "IS_STATIC_FRONTEND": SERVE_STATIC_FRONTEND,
+        "USE_DATAROBOT_LLM_GATEWAY": os.getenv("USE_DATAROBOT_LLM_GATEWAY", "false"),
     }
     js = f"window.ENV = {json.dumps(env_vars)};"
     return Response(content=js, media_type="application/javascript")

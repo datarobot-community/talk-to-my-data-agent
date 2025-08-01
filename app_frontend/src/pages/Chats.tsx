@@ -105,7 +105,7 @@ export const Chats: React.FC = () => {
       }
     },
   });
-  const allowSend = !messages?.some(message => message.in_progress);
+  const isProcessing = messages?.some(message => message.in_progress);
   const { data: dictionaries } = useGeneratedDictionaries();
   const { data: multipleMetadata } = useMultipleDatasetMetadata(
     dictionaries?.map(d => d.name) || []
@@ -164,13 +164,15 @@ export const Chats: React.FC = () => {
             />
           ))}
         </ScrollArea>
-        <Suspense fallback={<ComponentLoading />}>
-          <UserPrompt
-            allowedDataSources={allowedDataSources}
-            chatId={activeChat?.id}
-            allowSend={allowSend}
-          />
-        </Suspense>
+        <div className="flex w-full justify-center">
+          <Suspense fallback={<ComponentLoading />}>
+            <UserPrompt
+              allowedDataSources={allowedDataSources}
+              chatId={activeChat?.id}
+              isProcessing={isProcessing}
+            />
+          </Suspense>
+        </div>
       </>
     );
   };

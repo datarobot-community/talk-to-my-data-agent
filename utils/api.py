@@ -110,6 +110,8 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("openai.http_client").setLevel(logging.WARNING)
 
 VALUE_ERROR_MESSAGE = "Input data cannot be empty (no dataset provided)"
+DEFAULT_LLM_GATEWAY_MODEL = "azure/gpt-4o"
+DEFAULT_LLM_GATEWAY_MODEL_SMALL = "azure/gpt-4o-mini"
 
 
 def log_memory() -> None:
@@ -119,13 +121,22 @@ def log_memory() -> None:
 
 
 def initialize_deployment() -> tuple[RESTClientObject, str]:
+    """Initialize either LLM Gateway or DataRobot-hosted LLM deployment based on environment settings and credential priority."""
     try:
         dr_client = dr.Client()
         chat_agent_deployment_id = LLMDeployment().id
+        if chat_agent_deployment_id is None:
+            raise ValueError(
+                "LLM Deployment ID is required but not found. Please check your infrastructure setup."
+            )
         deployment_chat_base_url = (
             f"{dr_client.endpoint.rstrip('/')}/deployments/{chat_agent_deployment_id}/"
         )
+        logger.info(
+            f"Using the DataRobot-hosted LLM deployment (configured at infrastructure time) at: {deployment_chat_base_url}"
+        )
         return dr_client, deployment_chat_base_url
+
     except ValidationError as e:
         raise ValueError(
             "Unable to load Deployment ID."
@@ -137,10 +148,10 @@ def initialize_deployment() -> tuple[RESTClientObject, str]:
 
 class AsyncLLMClient:
     async def __aenter__(self) -> instructor.AsyncInstructor:
-        dr_client, deployment_chat_base_url = initialize_deployment()
+        dr_client, deployment_base_url = initialize_deployment()
         self.openai_client = AsyncOpenAI(
             api_key=dr_client.token,
-            base_url=deployment_chat_base_url,
+            base_url=deployment_base_url,
             timeout=90,
             max_retries=2,
         )

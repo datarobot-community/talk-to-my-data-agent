@@ -1,7 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
 import chatMidnight from '@/assets/chat-midnight.svg';
 import { usePostMessage, useFetchAllChats } from '@/api/chat-messages/hooks';
 import { useTranslation } from '@/i18n';
@@ -23,7 +21,6 @@ export const InitialPrompt = ({
   } = useAppState();
   const { data: chats } = useFetchAllChats();
   const { mutate } = usePostMessage();
-  const [message, setMessage] = useState('');
   const isDisabled = !allowedDataSources?.[0];
 
   // Find the active chat to get its data source setting
@@ -36,17 +33,14 @@ export const InitialPrompt = ({
       : allowedDataSources?.[0] || DATA_SOURCES.FILE;
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
 
-  const sendMessage = () => {
-    if (message.trim()) {
-      mutate({
-        message,
-        chatId,
-        enableChartGeneration,
-        enableBusinessInsights,
-        dataSource: chatDataSource,
-      });
-      setMessage('');
-    }
+  const sendMessage = (message: string) => {
+    mutate({
+      message,
+      chatId,
+      enableChartGeneration,
+      enableBusinessInsights,
+      dataSource: chatDataSource,
+    });
   };
 
   return (
@@ -65,28 +59,11 @@ export const InitialPrompt = ({
             )}
           </p>
           <PromptInput
-            icon={FontAwesomeIcon}
-            iconProps={{
-              icon: isDisabled ? null : faPaperPlane,
-              behavior: 'append',
-              'data-testid': 'send-message-button',
-              onClick: sendMessage,
-            }}
-            disabled={isDisabled}
-            aria-disabled={isDisabled}
-            data-testid="initial-prompt-input"
-            onChange={e => setMessage(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !(e.shiftKey || e.altKey)) {
-                sendMessage();
-              }
-            }}
-            value={message}
-            placeholder={
-              isDisabled
-                ? t('Please upload and process data using the sidebar before starting the chat')
-                : t('Ask another question about your datasets.')
-            }
+            sendButtonArrangement="append"
+            onSend={sendMessage}
+            isDisabled={isDisabled}
+            testId="initial-prompt-input"
+            placeholder={t('Ask another question about your datasets.')}
           />
         </div>
       </div>
