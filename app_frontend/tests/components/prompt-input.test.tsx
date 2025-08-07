@@ -161,8 +161,8 @@ describe('PromptInput Tooltip', () => {
 
   it('shows "Send message" tooltip when message has content and not disabled/processing', () => {
     render(<PromptInput initialValue="Hello" />);
-    const sendButtonSpan = screen.getByTestId('send-message-button').parentElement;
-    expect(sendButtonSpan).toHaveAttribute('title', 'Send message');
+    const sendButton = screen.getByTestId('send-message-button');
+    expect(sendButton).toHaveAttribute('title', 'Send message');
   });
 });
 

@@ -9,9 +9,11 @@ import { DATA_SOURCES } from '@/constants/dataSources';
 export const InitialPrompt = ({
   chatId,
   allowedDataSources,
+  testId,
 }: {
   allowedDataSources?: string[];
   chatId?: string;
+  testId?: string;
 }) => {
   const { t } = useTranslation();
   const {
@@ -44,7 +46,7 @@ export const InitialPrompt = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col p-4">
+    <div className="flex-1 flex flex-col p-4" data-testid={testId}>
       <div className="flex flex-col flex-1 items-center justify-center">
         <div className="w-[400px] flex flex-col flex-1 items-center justify-center">
           <img src={chatMidnight} alt="" />

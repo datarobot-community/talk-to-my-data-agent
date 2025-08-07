@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import i18n from '@/i18n';
 import {
   createChat,
   deleteChat,
   deleteMessage,
+  exportChatMessages,
   getChatMessages,
   getChats,
   IChatCreated,
@@ -347,4 +351,46 @@ export const useUpdateChatDataSource = () => {
   });
 
   return mutation;
+};
+
+export interface IExportChatParams {
+  chatId: string;
+  messageId?: string | null;
+}
+
+export const useExport = () => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const exportChat = async ({ chatId, messageId }: IExportChatParams) => {
+    setIsLoading(true);
+
+    try {
+      const response = await exportChatMessages({ chatId, messageId });
+
+      const contentDisposition = response.headers['content-disposition'];
+      const filenameMatch = contentDisposition?.match(/filename="?([^";\s]+)"?/);
+      const filename = filenameMatch?.[1] || i18n.t('chat-export');
+
+      const url = window.URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(i18n.t('There was a problem downloading the file.'));
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    exportChat,
+    isLoading,
+  };
 };

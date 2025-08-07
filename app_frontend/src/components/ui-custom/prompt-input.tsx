@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useImperativeHandle, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
-import { useTranslation } from '@/i18n';
 import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
+import { useTranslation } from '@/i18n';
 
 import { cn } from '~/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -117,17 +117,15 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
           disabled={isDisabled}
           {...props}
         />
-        <span title={buttonTooltip}>
-          {/* wrap with span so the tooltip will be shown even when disabled */}
-          <Button
-            variant="ghost"
-            testId="send-message-button"
-            disabled={isButtonDisabled}
-            onClick={handleSend}
-          >
-            <FontAwesomeIcon icon={isProcessing ? faHourglassHalf : faPaperPlane} size="lg" />
-          </Button>
-        </span>
+        <Button
+          variant="ghost"
+          testId="send-message-button"
+          disabled={isButtonDisabled}
+          onClick={handleSend}
+          title={buttonTooltip}
+        >
+          <FontAwesomeIcon icon={isProcessing ? faHourglassHalf : faPaperPlane} size="lg" />
+        </Button>
       </div>
     );
   }

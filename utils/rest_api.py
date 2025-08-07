@@ -51,6 +51,7 @@ from openai.types.chat.chat_completion_user_message_param import (
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils.dataframe import dataframe_to_rows
+from starlette.background import BackgroundTask
 
 from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
 from utils.database_helpers import get_external_database
@@ -87,6 +88,8 @@ from utils.schema import (
 )
 
 logger = get_logger()
+
+MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
 
 
 async def get_database(user_id: str) -> AnalystDB:
@@ -1020,32 +1023,88 @@ async def save_chat_messages(
     request: Request,
     chat_id: str,
     analyst_db: AnalystDB = Depends(get_initialized_db),
+    message_id: str | None = None,
 ) -> StreamingResponse:
     """
     This API controller saves a chat ID to an excel spreadsheet which
     saves key information, then is streamed back to the user.
     """
+    temp_files: list[str] = []
+
     chat_messages: List[AnalystChatMessage] = await analyst_db.get_chat_messages(
         chat_id=chat_id
     )
+
+    # If a specific message_id is provided, filter messages to include
+    # only that user message and its following assistant response.
+    if message_id:
+        idx = next((i for i, m in enumerate(chat_messages) if m.id == message_id), None)
+        if idx is None or chat_messages[idx].role != "user":
+            raise HTTPException(detail="User message not found", status_code=404)
+        # Ensure there is a following assistant message
+        if idx == len(chat_messages) - 1 or chat_messages[idx + 1].role != "assistant":
+            filtered_messages = [chat_messages[idx]]
+        else:
+            filtered_messages = [chat_messages[idx], chat_messages[idx + 1]]
+        chat_messages = filtered_messages
     if not chat_messages:
-        raise HTTPException(detail="No chat messages found.", status_code=404)
+        # Create an empty workbook with basic structure for empty chats
+        analysis_workbook = Workbook()
+        # Remove the default sheet
+        analysis_workbook.remove(analysis_workbook.active)
+
+        # Create a single sheet indicating the chat is empty
+        empty_sheet = analysis_workbook.create_sheet("Empty Chat")
+        empty_sheet["A1"] = "Chat Export"
+        empty_sheet["A3"] = "This chat contains no messages to export yet."
+
+        output = io.BytesIO()
+        analysis_workbook.save(output)
+        output.seek(0)
+
+        filename = f"chat_{chat_id}_empty.xlsx"
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
     if any(msg.in_progress for msg in chat_messages):
         raise HTTPException(
             detail="Cannot download while a chat is in progress.", status_code=425
         )
     analysis_workbook = Workbook()
-    data_sheets = 0
-    charts_sheets = 0
-    sheet = analysis_workbook.active
-    sheet["A1"] = "Analysis Report"
-    for chat_message in chat_messages:
-        if chat_message.role == "user":
-            # We ignore the user prompt, and the assistant comes up with an "enhanced prompt"
-            pass
-        elif chat_message.role == "assistant":
-            sheet["A3"] = "Question"
-            sheet["A4"] = chat_message.content
+    data_sheets_count = 0
+    charts_sheets_count = 0
+    report_sheets_count = 0
+
+    # Remove the initial default sheet created by Workbook()
+    analysis_workbook.remove(analysis_workbook.active)
+
+    for i, chat_message in enumerate(chat_messages):
+        if chat_message.role == "assistant":
+            # Handle Analysis Report sheet
+            report_sheets_count += 1
+            report_sheet_name = (
+                "Sheet" if report_sheets_count == 1 else f"Sheet {report_sheets_count}"
+            )
+            report_sheet = analysis_workbook.create_sheet(report_sheet_name)
+
+            report_sheet["A1"] = "Analysis Report"
+
+            # Since messages alternate user/assistant, the previous message is always the user question
+            user_question = (
+                chat_messages[i - 1].content
+                if i > 0 and chat_messages[i - 1].role == "user"
+                else "No question found"
+            )
+
+            report_sheet["A3"] = "Question"
+            report_sheet["A4"] = user_question
+            report_sheet["A6"] = "Answer"
+            report_sheet["A7"] = chat_message.content
+
             business_components: list[GetBusinessAnalysisResult] = [
                 component
                 for component in chat_message.components
@@ -1053,40 +1112,70 @@ async def save_chat_messages(
             ]
             for index, business_component in enumerate(business_components):
                 cell_index = index + 1  # Excel uses 1 indexing
-                sheet.cell(6, cell_index).value = "Bottom Line"
-                sheet.cell(7, cell_index).value = business_component.bottom_line
+                report_sheet.cell(9, cell_index).value = "Bottom Line"
+                report_sheet.cell(10, cell_index).value = business_component.bottom_line
 
-                sheet.cell(9, cell_index).value = "Additional Insights"
-                sheet.cell(
-                    10, cell_index
+                report_sheet.cell(12, cell_index).value = "Additional Insights"
+                report_sheet.cell(
+                    13, cell_index
                 ).value = business_component.additional_insights
 
-                sheet.cell(12, cell_index).value = "Follow-up Questions:"
+                report_sheet.cell(15, cell_index).value = "Follow-up Questions:"
                 for q_index, followup_question in enumerate(
                     business_component.follow_up_questions
                 ):
-                    sheet.cell(13 + q_index, cell_index).value = followup_question
-            # The "Data" sheet
+                    report_sheet.cell(
+                        16 + q_index, cell_index
+                    ).value = followup_question
+
+            # Handle Data sheets
             run_analysis_components: List[RunAnalysisResult] = [
                 component
                 for component in chat_message.components
                 if isinstance(component, RunAnalysisResult)
             ]
-            data_sheet = analysis_workbook.create_sheet(
-                f"Data {data_sheets}" if data_sheets else "Data"
-            )
-            data_sheets += 1
             for run_analysis_component in run_analysis_components:
                 if not run_analysis_component.dataset:
                     continue
-                dataset: polars.dataframe.frame.DataFrame = (
-                    run_analysis_component.dataset.data.df
+                data_sheets_count += 1
+                data_sheet_name = (
+                    "Data" if data_sheets_count == 1 else f"Data {data_sheets_count}"
                 )
-                for r in dataframe_to_rows(
-                    dataset.to_pandas(), index=False, header=True
-                ):
-                    data_sheet.append(r)
-            # The Tables
+                data_sheet = analysis_workbook.create_sheet(data_sheet_name)
+
+                try:
+                    dataset: polars.dataframe.frame.DataFrame = (
+                        run_analysis_component.dataset.data.df
+                    )
+
+                    # Convert to pandas with error handling for large datasets
+                    pandas_df = dataset.to_pandas()
+
+                    # Add size check to prevent memory issues and Excel limits
+                    original_rows = pandas_df.shape[0]
+                    if original_rows > MAX_EXCEL_ROWS:
+                        logger.warning(
+                            f"Dataset too large ({original_rows} rows), truncating to {MAX_EXCEL_ROWS} rows"
+                        )
+                        pandas_df = pandas_df.head(MAX_EXCEL_ROWS)
+                        # Add a notice row at the top of the sheet
+                        data_sheet.append(
+                            [
+                                f"NOTICE: Dataset truncated from {original_rows:,} to {MAX_EXCEL_ROWS:,} rows due to Excel limitations"
+                            ]
+                        )
+                        data_sheet.append([])
+
+                    for r in dataframe_to_rows(pandas_df, index=False, header=True):
+                        data_sheet.append(r)
+
+                except Exception as e:
+                    logger.error(f"Failed to process dataset: {e}")
+                    # Create error sheet instead of crashing
+                    data_sheet["A1"] = "Dataset Processing Error"
+                    data_sheet["A2"] = f"Error: {str(e)}"
+
+            # Handle Charts sheets
             run_charts_components: List[RunChartsResult] = [
                 component
                 for component in chat_message.components
@@ -1099,34 +1188,68 @@ async def save_chat_messages(
                 ]:
                     if not js or not f:
                         continue
-                    charts_sheets += 1
-                    charts_sheet = analysis_workbook.create_sheet(
-                        f"Chart {charts_sheets}"
-                    )
+                    charts_sheets_count += 1
+                    charts_sheet_name = f"Chart {charts_sheets_count}"
+                    charts_sheet = analysis_workbook.create_sheet(charts_sheet_name)
+
                     # Save the chart data by removing the some keys from this field
                     # We don't know what exactly is going to be graphed, so this is an easy way of covering
                     # ourselves
-                    fig_json = json.loads(js).get("data", [{}])[0]
-                    [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
-                    df = pd.DataFrame(fig_json)
-                    for r in dataframe_to_rows(df, index=False, header=True):
-                        charts_sheet.append(r)
-                    with tempfile.NamedTemporaryFile(
-                        suffix=".png", delete=False
-                    ) as tmpfile:
-                        f.write_image(tmpfile.name)
-                        img = XLImage(tmpfile.name)
-                        charts_sheet.add_image(img, "F3")
+                    try:
+                        parsed_json = json.loads(js)
+                        data_list = parsed_json.get("data", [])
+                        if data_list and len(data_list) > 0:
+                            fig_json = data_list[
+                                0
+                            ].copy()  # Create copy to avoid modifying original
+                            [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
+                            df = pd.DataFrame(fig_json)
+                            for r in dataframe_to_rows(df, index=False, header=True):
+                                charts_sheet.append(r)
+
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".png", delete=False
+                        ) as tmpfile:
+                            f.write_image(tmpfile.name)
+                            img = XLImage(tmpfile.name)
+                            charts_sheet.add_image(img, "F3")
+                            temp_files.append(tmpfile.name)
+                    except (
+                        json.JSONDecodeError,
+                        KeyError,
+                        IndexError,
+                        ValueError,
+                    ) as e:
+                        logger.warning(f"Failed to process chart data: {e}")
+                        # Create error sheet instead of crashing
+                        charts_sheet["A1"] = "Chart Processing Error"
+                        charts_sheet["A2"] = f"Error: {str(e)}"
+                    except Exception as e:
+                        logger.error(f"Unexpected error processing chart: {e}")
+                        continue  # Skip this chart but continue processing
     output = io.BytesIO()
     analysis_workbook.save(output)
     output.seek(0)
 
+    # Generate filename based on whether message_id was provided
+    if message_id:
+        filename = f"chat_{chat_id}_message_{message_id}.xlsx"
+    else:
+        filename = f"chat_{chat_id}_messages.xlsx"
+
+    # Create background task to cleanup temporary files
+    def cleanup_files(file_paths: List[str]) -> None:
+        for fp in file_paths:
+            if os.path.exists(fp):
+                os.remove(fp)
+
+    background_task = BackgroundTask(cleanup_files, temp_files) if temp_files else None
+
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename=chat_{chat_id}_messages.xlsx"
-        },
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        background=background_task,
     )
 
 

@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button';
-import playgroundMidnight from '@/assets/playground-midnight.svg';
+import addData from '@/assets/add-data.svg';
+import startChatting from '@/assets/start-chatting.svg';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useAppState } from '@/state';
@@ -20,20 +21,35 @@ export const WelcomeModal = () => {
 
   return (
     <Dialog defaultOpen={showWelcome} open={open} onOpenChange={open => !open && setOpen(open)}>
-      <DialogContent className="sm:max-w-[725px]">
-        <div className="grid gap-4 py-4">
-          <div className="grid justify-center gap-4">
-            <img src={playgroundMidnight} alt="" />
-          </div>
-        </div>
+      <DialogContent className="sm:max-w-[768px]">
         <DialogHeader>
-          <DialogTitle className="text-center mb-4">{t('Talk to my data')}</DialogTitle>
-          <DialogDescription className="text-center mb-10">
-            {t("Use DataRobot's intuitive chat-based analyst to ask questions about your data.")}
-            <br />
-            <br />
-            {t('Get started by selecting the datasets you want to work with.')}
-          </DialogDescription>
+          <DialogTitle className="text-center mb-4">
+            {t('Welcome to the “Talk To My Data” App')}
+          </DialogTitle>
+          <div className="flex justify-center gap-10">
+            <div className="w-[280px]">
+              <div className="grid justify-center mb-3">
+                <img src={addData} alt="" />
+              </div>
+              <p className="text-center text-base font-semibold">{t('Add data')}</p>
+              <DialogDescription className="text-center text-base text-muted-foreground leading-[20px] tracking-[-0.02px]">
+                {t(
+                  'Upload the datasets you want to analyze, no preprocessing or wrangling required!'
+                )}
+              </DialogDescription>
+            </div>
+            <div className="w-[280px]">
+              <div className="grid justify-center mb-3">
+                <img src={startChatting} alt="" />
+              </div>
+              <p className="text-center text-base font-semibold">{t('Start chatting')}</p>
+              <DialogDescription className="text-center text-base text-muted-foreground leading-[20px] tracking-[-0.02px]">
+                {t(
+                  'Ask question and DataRobot automatically generates analytical code, datasets, and charts.'
+                )}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
         <Separator className="border-t mt-6" />
         <DialogFooter>

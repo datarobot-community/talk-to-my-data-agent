@@ -23,6 +23,8 @@ interface ResponseMessageProps {
   date?: string;
   message?: IChatMessage;
   isLoading?: boolean;
+  isProcessing?: boolean;
+  testId?: string;
 }
 
 const isMessageComponent = (component: unknown): component is IMessageComponent => {
@@ -61,6 +63,8 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   message,
   chatId,
   isLoading = false,
+  isProcessing = false,
+  testId,
 }) => {
   const [activeTab, setActiveTab] = useState(RESPONSE_TABS.SUMMARY);
   const { t } = useTranslation();
@@ -151,7 +155,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   }, [message, displayDate]);
 
   return (
-    <MessageContainer>
+    <MessageContainer testId={testId}>
       <MessageHeader avatar={DataRobotAvatar} name={t('DataRobot')} date={displayDate} />
 
       {isLoading ? (
@@ -185,6 +189,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
               <InsightsTabContent
                 additionalInsights={additionalInsights}
                 followUpQuestions={followUpQuestions}
+                isProcessing={isProcessing}
                 chatId={chatId}
               />
             </>

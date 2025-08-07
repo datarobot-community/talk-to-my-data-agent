@@ -1,5 +1,3 @@
-import { toast } from 'sonner';
-import i18n from '@/i18n';
 import apiClient from '../apiClient';
 import { IChat, IChatMessage } from './types';
 import { getChatName } from './utils';
@@ -159,25 +157,30 @@ export const renameChat = async ({
   return updateChat({ chatId, name, signal });
 };
 
-export const handleDownload = async (chatId: string) => {
-  try {
-    const response = await apiClient.get(`/v1/chats/${chatId}/messages/download/`, {
-      responseType: 'blob',
-    });
+export interface IExportChatMessagesParams {
+  chatId: string;
+  messageId?: string | null;
+  signal?: AbortSignal;
+}
 
-    const contentDisposition = response.headers['content-disposition'];
-    const filename = contentDisposition.split('filename=')[1].replace(/["']/g, '').trim();
+export interface IExportResponse {
+  data: Blob;
+  headers: Record<string, string | undefined>;
+}
 
-    const url = window.URL.createObjectURL(response.data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Download error:', error);
-    toast.error(i18n.t('There was a problem downloading the file.'));
-  }
+export const exportChatMessages = async ({
+  chatId,
+  messageId,
+  signal,
+}: IExportChatMessagesParams): Promise<IExportResponse> => {
+  const response = await apiClient.get(`/v1/chats/${chatId}/messages/download/`, {
+    responseType: 'blob',
+    signal,
+    params: { message_id: messageId },
+  });
+
+  return {
+    data: response.data,
+    headers: response.headers as Record<string, string | undefined>,
+  };
 };

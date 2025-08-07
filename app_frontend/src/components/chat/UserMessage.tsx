@@ -1,46 +1,58 @@
 import React, { useEffect, useRef } from 'react';
 import { MessageHeader } from './MessageHeader';
 import { formatMessageDate } from './utils';
-import { useDeleteMessage } from '@/api/chat-messages/hooks';
+import { useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
 import { useTranslation } from '@/i18n';
+import { IChatMessage } from '@/api/chat-messages/types';
+
 interface UserMessageProps {
-  id?: string;
-  date?: string;
+  messageId?: string;
   timestamp?: string;
-  message?: string;
+  message: string;
   chatId?: string;
-  responseId?: string;
+  testId?: string;
+  responseMessage?: IChatMessage;
 }
 
 export const UserMessage: React.FC<UserMessageProps> = ({
-  id,
-  date,
+  chatId,
+  messageId,
   timestamp,
   message,
-  chatId,
-  responseId,
+  testId,
+  responseMessage,
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { mutate: deleteMessage, isPending } = useDeleteMessage();
+  const { mutate: deleteMessage, isPending: isDeleting } = useDeleteMessage();
+  const { exportChat, isLoading: isExporting } = useExport();
   const { t } = useTranslation();
   useEffect(() => {
-    ref.current?.scrollIntoView(false);
-  });
+    // When being somewhere in the middle of the chat and asking question scroll to it
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [message]);
 
-  // Use the formatted timestamp if available, otherwise fallback to date prop or default
-  const displayDate = timestamp ? formatMessageDate(timestamp) : date || '';
+  const displayDate = timestamp ? formatMessageDate(timestamp) : '';
 
   const handleDelete = () => {
-    if (id) {
+    if (messageId) {
       deleteMessage({
-        messageId: id,
         chatId: chatId,
+        messageId: messageId,
       });
     }
-    if (responseId) {
+    if (responseMessage?.id) {
       deleteMessage({
-        messageId: responseId,
         chatId: chatId,
+        messageId: responseMessage.id,
+      });
+    }
+  };
+
+  const handleExport = () => {
+    if (chatId) {
+      exportChat({
+        chatId,
+        messageId,
       });
     }
   };
@@ -49,12 +61,17 @@ export const UserMessage: React.FC<UserMessageProps> = ({
     <div
       className="p-3 bg-card rounded flex-col justify-start items-start gap-3 flex mb-2.5 mr-2"
       ref={ref}
+      data-testid={testId}
     >
       <MessageHeader
         name={t('You')}
         date={displayDate}
         onDelete={handleDelete}
-        isLoading={isPending}
+        onExport={handleExport}
+        isDeleting={isDeleting}
+        isExporting={isExporting}
+        isResponseInProgress={responseMessage?.in_progress}
+        isResponseFailing={!!responseMessage?.error}
       />
       <div className="self-stretch text-sm font-normal leading-tight whitespace-pre-line">
         {message}

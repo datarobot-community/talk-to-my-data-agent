@@ -48,5 +48,12 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': 'off',
     },
+  },
+  // Disable no-explicit-any for test files
+  {
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   }
 );

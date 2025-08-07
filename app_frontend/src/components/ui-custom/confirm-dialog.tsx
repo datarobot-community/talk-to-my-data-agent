@@ -52,10 +52,15 @@ export function ConfirmDialog({
           <DialogDescription className="mb-2">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
+          <Button variant="outline" onClick={handleCancel} testId="confirm-dialog-cancel">
             {cancelText}
           </Button>
-          <Button variant={variant} onClick={onConfirm} disabled={isLoading}>
+          <Button
+            variant={variant}
+            onClick={onConfirm}
+            disabled={isLoading}
+            testId="confirm-dialog-confirm"
+          >
             {isLoading && (
               <img src={loader} alt={t('processing')} className="w-4 h-4 animate-spin" />
             )}

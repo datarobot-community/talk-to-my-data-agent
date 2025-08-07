@@ -8,17 +8,19 @@ interface InsightsTabContentProps {
   additionalInsights?: string | null;
   followUpQuestions?: string[] | null;
   chatId?: string;
+  isProcessing?: boolean;
 }
 
 export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
   additionalInsights,
   followUpQuestions,
+  isProcessing,
   chatId,
 }) => {
   const { t } = useTranslation();
 
   return (
-    <div>
+    <>
       {/* <InfoText>
         DataRobot generates additional content based on your original question.
       </InfoText> */}
@@ -27,7 +29,11 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
           <MarkdownContent content={additionalInsights} />
         </HeaderSection>
       )}
-      <SuggestedQuestionsSection questions={followUpQuestions} chatId={chatId} />
-    </div>
+      <SuggestedQuestionsSection
+        questions={followUpQuestions}
+        chatId={chatId}
+        isProcessing={isProcessing}
+      />
+    </>
   );
 };

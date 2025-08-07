@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2025-08-07
+
+### Added
+
+- Export individual chat message (question-answer) functionality. That includes underlying data, charts, summary and insights.
+- Integration of LLM Gateway with Model Deployments
+
+### Changed
+
+- Updated welcome modal
+- Disabled clicking follow-up suggestions while answering is in progress; replaced icon with button
+
+### Fixed
+
+- Improved overall exporting experience
+- Better visual feedback when something fails
+- UX improvements for chat messages: removed excessive auto-scrolling and enhanced the Send button
+
 ## [0.3.4] - 2025-08-01
 
 ### Added
@@ -50,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Set LLM Gateway Inference runtime parameter to False always for user-provided credentials 
+- Set LLM Gateway Inference runtime parameter to False always for user-provided credentials
 
 ## [0.2.00] - 2025-06-16
 

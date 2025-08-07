@@ -9,10 +9,12 @@ export const UserPrompt = ({
   chatId,
   isProcessing,
   allowedDataSources,
+  testId,
 }: {
   chatId?: string;
   isProcessing?: boolean;
   allowedDataSources?: string[];
+  testId?: string;
 }) => {
   const { t } = useTranslation();
   const { mutate } = usePostMessage();
@@ -55,6 +57,7 @@ export const UserPrompt = ({
           : t('Ask another question about your datasets.')
       }
       isDisabled={isDataUploadRequired}
+      testId={testId}
     />
   );
 };

@@ -41,6 +41,8 @@ function Button({
   size,
   asChild = false,
   testId,
+  title,
+  disabled,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
@@ -49,14 +51,23 @@ function Button({
   }) {
   const Comp = asChild ? Slot : 'button';
 
-  return (
+  const buttonElement = (
     <Comp
       data-slot="button"
       data-testid={testId}
       className={cn(buttonVariants({ variant, size }), className)}
+      disabled={disabled}
+      title={title}
       {...props}
     />
   );
+
+  /* wrap with span so the tooltip (title) will be shown even when disabled */
+  if (disabled && title) {
+    return <span title={title}>{buttonElement}</span>;
+  }
+
+  return buttonElement;
 }
 
 export { Button, buttonVariants };
