@@ -1,46 +1,86 @@
-import { render, screen } from '@testing-library/react';
-import { test, describe, expect, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import { test, describe, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { MessageHeader } from '@/components/chat/MessageHeader';
+import { IChatMessage } from '@/api/chat-messages/types';
+import { renderWithProviders } from '../test-utils';
+
+vi.mock('@/hooks/useChatMessages', () => ({
+  useChatMessages: vi.fn(),
+}));
+import { useChatMessages } from '@/hooks/useChatMessages';
 
 describe('MessageHeader Component', () => {
+  const mockMessage = {
+    id: 'msg-1',
+    role: 'user' as const,
+    content: 'Test message',
+    created_at: '2024-01-01T00:00:00Z',
+    components: [],
+  } as IChatMessage;
+
   const defaultProps = {
-    name: 'Test User',
-    date: '2024-01-01',
-  };
+    messageId: 'msg-1',
+    chatId: 'chat-1',
+  } as const;
 
-  test('renders basic header information', () => {
-    render(<MessageHeader {...defaultProps} />);
-
-    expect(screen.getByText('Test User')).toBeInTheDocument();
-    expect(screen.getByText('2024-01-01')).toBeInTheDocument();
+  // Default mock configuration
+  const createMockChatMessages = (overrides = {}) => ({
+    messages: [],
+    isLoading: false,
+    isSending: false,
+    isDeleting: false,
+    isExporting: false,
+    hasInProgressMessages: false,
+    hasFailedMessages: false,
+    fetchError: null,
+    sendError: null,
+    deleteError: null,
+    getMessage: () => mockMessage,
+    getResponseMessage: () => ({ id: 'resp-1' }) as IChatMessage,
+    sendMessage: vi.fn(),
+    deleteMessagePair: vi.fn(),
+    exportMessage: vi.fn(),
+    ...overrides,
   });
 
-  test('renders delete button when onDelete is provided', () => {
-    const onDelete = vi.fn();
-    render(<MessageHeader {...defaultProps} onDelete={onDelete} />);
+  beforeEach(() => {
+    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages());
+  });
+
+  test('renders basic header information for user message', () => {
+    renderWithProviders(<MessageHeader {...defaultProps} />);
+
+    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.getByText(/Jan/)).toBeInTheDocument(); // Formatted date
+  });
+
+  test('renders action buttons for user message', () => {
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
+    const exportButton = screen.getByRole('button', { name: /export chat/i });
+
     expect(deleteButton).toBeInTheDocument();
+    expect(exportButton).toBeInTheDocument();
   });
 
-  test('renders export button and calls onExport when clicked', async () => {
+  test('calls export hook when export button clicked', async () => {
     const user = userEvent.setup();
-    const onExport = vi.fn();
-    render(<MessageHeader {...defaultProps} onExport={onExport} />);
+    const exportMessage = vi.fn();
+    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ exportMessage }));
+
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /export chat/i });
-    expect(exportButton).toBeInTheDocument();
-
     await user.click(exportButton);
 
-    expect(onExport).toHaveBeenCalledTimes(1);
+    expect(exportMessage).toHaveBeenCalledWith('msg-1');
   });
 
   test('shows confirm dialog when delete button is clicked', async () => {
     const user = userEvent.setup();
-    const onDelete = vi.fn();
-    render(<MessageHeader {...defaultProps} onDelete={onDelete} />);
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
     await user.click(deleteButton);
@@ -49,10 +89,12 @@ describe('MessageHeader Component', () => {
     expect(screen.getByText('Are you sure you want to delete this message?')).toBeInTheDocument();
   });
 
-  test('calls onDelete when confirm dialog is confirmed', async () => {
+  test('calls delete hook when confirm dialog is confirmed', async () => {
     const user = userEvent.setup();
-    const onDelete = vi.fn();
-    render(<MessageHeader {...defaultProps} onDelete={onDelete} />);
+    const deleteMessagePair = vi.fn();
+    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ deleteMessagePair }));
+
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
     await user.click(deleteButton);
@@ -60,13 +102,12 @@ describe('MessageHeader Component', () => {
     const confirmButton = screen.getByTestId('confirm-dialog-confirm');
     await user.click(confirmButton);
 
-    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(deleteMessagePair).toHaveBeenCalledWith('msg-1');
   });
 
   test('closes confirm dialog when cancel is clicked', async () => {
     const user = userEvent.setup();
-    const onDelete = vi.fn();
-    render(<MessageHeader {...defaultProps} onDelete={onDelete} />);
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
     await user.click(deleteButton);
@@ -75,20 +116,24 @@ describe('MessageHeader Component', () => {
     await user.click(cancelButton);
 
     expect(screen.queryByText('Delete message')).not.toBeInTheDocument();
-    expect(onDelete).not.toHaveBeenCalled();
+    // No side-effect hook expected on cancel
   });
 
   test('disables export button when isExporting is true', () => {
-    const onExport = vi.fn();
-    render(<MessageHeader {...defaultProps} onExport={onExport} isExporting={true} />);
+    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ isExporting: true }));
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /exporting/i });
     expect(exportButton).toBeDisabled();
   });
 
   test('disables export button when response is in progress', () => {
-    const onExport = vi.fn();
-    render(<MessageHeader {...defaultProps} onExport={onExport} isResponseInProgress={true} />);
+    vi.mocked(useChatMessages).mockReturnValue(
+      createMockChatMessages({
+        getResponseMessage: () => ({ id: 'resp-1', in_progress: true }) as IChatMessage,
+      })
+    );
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', {
       name: /Wait for agent to finish responding/i,
@@ -97,8 +142,12 @@ describe('MessageHeader Component', () => {
   });
 
   test('disables export button when response is failing', () => {
-    const onExport = vi.fn();
-    render(<MessageHeader {...defaultProps} onExport={onExport} isResponseFailing={true} />);
+    vi.mocked(useChatMessages).mockReturnValue(
+      createMockChatMessages({
+        getResponseMessage: () => ({ id: 'resp-1', error: 'boom' }) as IChatMessage,
+      })
+    );
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /cannot export chat with errors/i });
     expect(exportButton).toBeDisabled();
@@ -106,12 +155,34 @@ describe('MessageHeader Component', () => {
   });
 
   test('shows correct tooltip when response is in progress', () => {
-    const onExport = vi.fn();
-    render(<MessageHeader {...defaultProps} onExport={onExport} isResponseInProgress={true} />);
+    vi.mocked(useChatMessages).mockReturnValue(
+      createMockChatMessages({
+        getResponseMessage: () => ({ id: 'resp-1', in_progress: true }) as IChatMessage,
+      })
+    );
+    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', {
       name: /Wait for agent to finish responding/i,
     });
     expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
+  });
+
+  test('does not render action buttons for assistant message', () => {
+    const assistantMessage = { ...mockMessage, role: 'assistant' as const };
+    vi.mocked(useChatMessages).mockReturnValue(
+      createMockChatMessages({
+        getMessage: () => assistantMessage,
+        getResponseMessage: () => assistantMessage,
+      })
+    );
+
+    renderWithProviders(<MessageHeader {...defaultProps} />);
+
+    expect(screen.getByText('DataRobot')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /delete message and response/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /export chat/i })).not.toBeInTheDocument();
   });
 });

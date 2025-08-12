@@ -7,18 +7,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
 import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
 import { useTranslation } from '@/i18n';
-import {
-  useFetchAllMessages,
-  useDeleteChat,
-  useFetchAllChats,
-  useExport,
-} from '@/api/chat-messages/hooks';
-import { InitialPrompt, UserMessage, UserPrompt } from '@/components/chat';
+import { useDeleteChat, useFetchAllChats, useExport } from '@/api/chat-messages/hooks';
+import { useChatMessages } from '@/hooks/useChatMessages';
+import { InitialPrompt, UserPrompt, UserMessage } from '@/components/chat';
 import { ROUTES } from './routes';
 import { Loading } from '@/components/ui-custom/loading';
 import { RenameChatModal } from '@/components/RenameChatModal';
 import { DataSourceToggle } from '@/components/DataSourceToggle';
-import { IChatMessage } from '@/api/chat-messages/types';
+
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
 import { useMultipleDatasetMetadata } from '@/api/cleansed-datasets/hooks';
 import { DATA_SOURCES } from '@/constants/dataSources';
@@ -37,60 +33,6 @@ const ComponentLoading = () => {
   return <div className="p-4 text-sm">{t('Loading component...')}</div>;
 };
 
-const ChatMessageItem = ({
-  message,
-  messages,
-  isProcessing,
-  chatId,
-  index,
-}: {
-  message: IChatMessage;
-  messages: IChatMessage[];
-  isProcessing: boolean;
-  chatId?: string;
-  index: number;
-}) => {
-  const responseId = messages[index + 1]?.id;
-  const responseMessage = messages.find(message => message.id === responseId);
-
-  return (
-    <div className="table table-fixed w-full">
-      {message.role === 'user' ? (
-        <>
-          <UserMessage
-            messageId={message.id}
-            message={message.content}
-            timestamp={message.created_at}
-            chatId={chatId}
-            responseMessage={responseMessage}
-            testId={`user-message-${index}`}
-          />
-          {message.in_progress && (
-            <Suspense fallback={<ComponentLoading />}>
-              <ResponseMessage
-                message={message}
-                isLoading={true}
-                chatId={chatId}
-                testId={`response-message-${index}`}
-              />
-            </Suspense>
-          )}
-        </>
-      ) : (
-        <Suspense fallback={<ComponentLoading />}>
-          <ResponseMessage
-            message={message}
-            isLoading={false}
-            isProcessing={isProcessing}
-            chatId={chatId}
-            testId="response-message"
-          />
-        </Suspense>
-      )}
-    </div>
-  );
-};
-
 export const Chats: React.FC = () => {
   const { t } = useTranslation();
   const { chatId } = useParams<{ chatId?: string }>();
@@ -98,9 +40,12 @@ export const Chats: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // API data hooks
-  const { data: messages = [], status: messagesStatus } = useFetchAllMessages({
-    chatId,
-  });
+  const {
+    messages,
+    isLoading: messagesLoading,
+    hasInProgressMessages,
+    hasFailedMessages,
+  } = useChatMessages(chatId);
   const { data: chats } = useFetchAllChats();
   // Find the active chat based on chatId param
   const activeChat = chats ? chats.find(chat => chat.id === chatId) : undefined;
@@ -126,8 +71,6 @@ export const Chats: React.FC = () => {
     },
   });
   const { exportChat, isLoading: isExporting } = useExport();
-  const isProcessing = messages?.some(message => message.in_progress);
-  const hasErrors = messages?.some(message => message.error);
   const { data: dictionaries } = useGeneratedDictionaries();
   const { data: multipleMetadata } = useMultipleDatasetMetadata(
     dictionaries?.map(d => d.name) || []
@@ -156,63 +99,21 @@ export const Chats: React.FC = () => {
     };
   }, [multipleMetadata]);
 
-  const exportButtonTooltip = hasErrors
+  const exportButtonTooltip = hasFailedMessages
     ? t('Cannot export chat with errors')
     : isExporting
       ? t('Exporting...')
-      : isProcessing
+      : hasInProgressMessages
         ? t('Wait for agent to finish responding')
         : t('Export chat');
 
-  const isExportButtonDisabled = isExporting || isProcessing || hasErrors;
+  const isExportButtonDisabled = isExporting || hasInProgressMessages || hasFailedMessages;
 
   // Handler for deleting the current chat
   const handleDeleteChat = () => {
     if (activeChat?.id) {
       deleteChat({ chatId: activeChat.id });
     }
-  };
-
-  // Render chat messages
-  const renderMessages = () => {
-    if (!messages || messages.length === 0) {
-      return (
-        <Suspense fallback={<ComponentLoading />}>
-          <InitialPrompt
-            allowedDataSources={allowedDataSources}
-            chatId={activeChat?.id}
-            testId="initial-prompt"
-          />
-        </Suspense>
-      );
-    }
-
-    return (
-      <>
-        <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
-          {messages?.map((message, index) => (
-            <ChatMessageItem
-              key={index}
-              index={index}
-              messages={messages}
-              isProcessing={isProcessing}
-              message={message}
-              chatId={activeChat?.id}
-            />
-          ))}
-        </ScrollArea>
-        <div className="flex w-full justify-center">
-          <Suspense fallback={<ComponentLoading />}>
-            <UserPrompt
-              allowedDataSources={allowedDataSources}
-              chatId={activeChat?.id}
-              isProcessing={isProcessing}
-              testId="user-prompt"
-            />
-          </Suspense>
-        </div>
-      </>
-    );
   };
 
   // Render the header with chat title and actions
@@ -264,12 +165,51 @@ export const Chats: React.FC = () => {
       <div className="flex justify-between items-center gap-2 h-9">{renderChatHeader()}</div>
       <Separator className="my-4 border-t" />
 
-      {messagesStatus === 'pending' && !messages?.length ? (
+      {messagesLoading && !messages?.length ? (
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loading />
         </div>
+      ) : messages?.length === 0 ? (
+        <InitialPrompt
+          allowedDataSources={allowedDataSources}
+          chatId={activeChat?.id}
+          testId="initial-prompt"
+        />
       ) : (
-        renderMessages()
+        <>
+          <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
+            {messages?.map(message =>
+              activeChat?.id ? (
+                <div key={message.id} className="flex flex-col w-full">
+                  {message.role === 'user' && (
+                    <UserMessage
+                      message={message}
+                      chatId={activeChat.id}
+                      testId={`user-message-${message.id}`}
+                    />
+                  )}
+                  {message.role === 'assistant' && (
+                    // Suspense is needed because of lazy-loading
+                    <Suspense fallback={<ComponentLoading />}>
+                      <ResponseMessage
+                        message={message}
+                        chatId={activeChat.id}
+                        testId={`response-message-${message.id}`}
+                      />
+                    </Suspense>
+                  )}
+                </div>
+              ) : null
+            )}
+          </ScrollArea>
+          <div className="flex w-full justify-center">
+            <UserPrompt
+              allowedDataSources={allowedDataSources}
+              chatId={activeChat?.id}
+              testId="user-prompt"
+            />
+          </div>
+        </>
       )}
     </div>
   );

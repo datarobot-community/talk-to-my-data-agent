@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
 import chatMidnight from '@/assets/chat-midnight.svg';
-import { usePostMessage, useFetchAllChats } from '@/api/chat-messages/hooks';
+import { useFetchAllChats } from '@/api/chat-messages/hooks';
 import { useTranslation } from '@/i18n';
 import { useAppState } from '@/state/hooks';
 import { DATA_SOURCES } from '@/constants/dataSources';
+import { useChatMessages } from '@/hooks/useChatMessages';
 
 export const InitialPrompt = ({
   chatId,
@@ -22,7 +23,7 @@ export const InitialPrompt = ({
     dataSource: globalDataSource,
   } = useAppState();
   const { data: chats } = useFetchAllChats();
-  const { mutate } = usePostMessage();
+  const { sendMessage } = useChatMessages(chatId);
   const isDisabled = !allowedDataSources?.[0];
 
   // Find the active chat to get its data source setting
@@ -34,16 +35,6 @@ export const InitialPrompt = ({
       ? dataSource
       : allowedDataSources?.[0] || DATA_SOURCES.FILE;
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
-
-  const sendMessage = (message: string) => {
-    mutate({
-      message,
-      chatId,
-      enableChartGeneration,
-      enableBusinessInsights,
-      dataSource: chatDataSource,
-    });
-  };
 
   return (
     <div className="flex-1 flex flex-col p-4" data-testid={testId}>
@@ -62,7 +53,13 @@ export const InitialPrompt = ({
           </p>
           <PromptInput
             sendButtonArrangement="append"
-            onSend={sendMessage}
+            onSend={(message: string) =>
+              sendMessage(message, {
+                enableChartGeneration,
+                enableBusinessInsights,
+                dataSource: chatDataSource,
+              })
+            }
             isDisabled={isDisabled}
             testId="initial-prompt-input"
             placeholder={t('Ask another question about your datasets.')}

@@ -5,16 +5,17 @@ interface MessageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   testId?: string;
 }
 
-export const MessageContainer: React.FC<MessageContainerProps> = React.memo(
-  ({ children, testId, ...props }) => {
+export const MessageContainer = React.memo(
+  React.forwardRef<HTMLDivElement, MessageContainerProps>(({ children, testId, ...props }, ref) => {
     return (
       <div
         className="p-3 bg-card rounded flex-col justify-start items-start gap-3 flex mb-8 mr-2"
         data-testid={testId}
+        ref={ref}
         {...props}
       >
         {children}
       </div>
     );
-  }
+  })
 );

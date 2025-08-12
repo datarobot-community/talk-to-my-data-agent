@@ -7,6 +7,9 @@ const mockMutate = vi.fn();
 const mockUseGeneratedDictionaries = vi.fn();
 const mockUsePostMessage = vi.fn();
 const mockUseAppState = vi.fn();
+const mockUseFetchAllMessages = vi.fn();
+const mockUseDeleteMessage = vi.fn();
+const mockUseExport = vi.fn();
 
 // Mock hooks to control SuggestedPrompt behavior
 vi.mock('@/api/dictionaries/hooks', () => ({
@@ -15,6 +18,9 @@ vi.mock('@/api/dictionaries/hooks', () => ({
 
 vi.mock('@/api/chat-messages/hooks', () => ({
   usePostMessage: () => mockUsePostMessage(),
+  useFetchAllMessages: () => mockUseFetchAllMessages(),
+  useDeleteMessage: () => mockUseDeleteMessage(),
+  useExport: () => mockUseExport(),
 }));
 
 vi.mock('@/state/hooks', () => ({
@@ -24,12 +30,15 @@ vi.mock('@/state/hooks', () => ({
 describe('InsightsTabContent', () => {
   beforeEach(() => {
     mockUseGeneratedDictionaries.mockReturnValue({ data: [{ id: 1, name: 'test' }] });
-    mockUsePostMessage.mockReturnValue({ mutate: mockMutate });
+    mockUsePostMessage.mockReturnValue({ mutate: mockMutate, isPending: false, error: null });
     mockUseAppState.mockReturnValue({
       enableChartGeneration: true,
       enableBusinessInsights: true,
       dataSource: 'test-source',
     });
+    mockUseFetchAllMessages.mockReturnValue({ data: [], isLoading: false, error: null });
+    mockUseDeleteMessage.mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    mockUseExport.mockReturnValue({ exportChat: vi.fn(), isLoading: false });
   });
 
   afterEach(() => {
@@ -45,7 +54,6 @@ describe('InsightsTabContent', () => {
         additionalInsights={additionalInsights}
         followUpQuestions={followUpQuestions}
         chatId="test-chat"
-        isProcessing={false}
       />
     );
 
@@ -71,12 +79,13 @@ describe('InsightsTabContent', () => {
   });
 
   test('shows disabled suggested prompt buttons when processing', () => {
+    // Mock messages with in_progress status to simulate processing state
+    mockUseFetchAllMessages.mockReturnValue({
+      data: [{ id: 1, in_progress: true, content: 'test' }],
+    });
+
     renderWithProviders(
-      <InsightsTabContent
-        followUpQuestions={['Question 1']}
-        chatId="test-chat"
-        isProcessing={true}
-      />
+      <InsightsTabContent followUpQuestions={['Question 1']} chatId="test-chat" />
     );
 
     expect(screen.queryByText('Data insights')).not.toBeInTheDocument();

@@ -4,13 +4,14 @@ import { Chats } from '@/pages/Chats';
 import { renderWithProviders, mockScrollIntoView } from '../test-utils';
 
 vi.mock('@/api/chat-messages/hooks', () => ({
-  useFetchAllMessages: vi.fn(),
   useFetchAllChats: vi.fn(),
   useDeleteChat: vi.fn(),
   useExport: vi.fn(),
   useRenameChat: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  usePostMessage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useDeleteMessage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('@/hooks/useChatMessages', () => ({
+  useChatMessages: vi.fn(),
 }));
 
 vi.mock('@/api/dictionaries/hooks', () => ({
@@ -30,20 +31,34 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-import {
-  useFetchAllMessages,
-  useFetchAllChats,
-  useDeleteChat,
-  useExport,
-} from '@/api/chat-messages/hooks';
+import { useFetchAllChats, useDeleteChat, useExport } from '@/api/chat-messages/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useChatMessages } from '@/hooks/useChatMessages';
 
-const mockUseFetchAllMessages = vi.mocked(useFetchAllMessages);
 const mockUseFetchAllChats = vi.mocked(useFetchAllChats);
 const mockUseDeleteChat = vi.mocked(useDeleteChat);
 const mockUseExport = vi.mocked(useExport);
 const mockUseParams = vi.mocked(useParams);
 const mockUseNavigate = vi.mocked(useNavigate);
+const mockUseChatMessages = vi.mocked(useChatMessages);
+
+const defaultChatMessagesReturn = {
+  messages: [],
+  isLoading: false,
+  hasInProgressMessages: false,
+  hasFailedMessages: false,
+  getMessage: vi.fn(),
+  getResponseMessage: vi.fn(),
+  sendMessage: vi.fn(),
+  deleteMessagePair: vi.fn(),
+  exportMessage: vi.fn(),
+  isDeleting: false,
+  isExporting: false,
+  isSending: false,
+  fetchError: null,
+  sendError: null,
+  deleteError: null,
+} as any;
 
 describe('Chats Component', () => {
   let cleanupScrollMock: () => void;
@@ -63,11 +78,7 @@ describe('Chats Component', () => {
     cleanupScrollMock = mockScrollIntoView();
 
     mockUseNavigate.mockReturnValue(mockNavigate);
-    mockUseFetchAllMessages.mockReturnValue({
-      data: [],
-      status: 'success',
-      isLoading: false,
-    } as any);
+    mockUseChatMessages.mockReturnValue(defaultChatMessagesReturn);
     mockUseExport.mockReturnValue({
       exportChat: mockExportChat,
       isLoading: false,
@@ -112,11 +123,10 @@ describe('Chats Component', () => {
       data: [],
       isLoading: false,
     } as any);
-    mockUseFetchAllMessages.mockReturnValue({
-      data: [],
-      status: 'pending',
+    mockUseChatMessages.mockReturnValue({
+      ...defaultChatMessagesReturn,
       isLoading: true,
-    } as any);
+    });
 
     renderWithProviders(<Chats />);
 
@@ -135,15 +145,14 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseFetchAllMessages.mockReturnValue({
-      data: mockMessages,
-      status: 'success',
-      isLoading: false,
-    } as any);
+    mockUseChatMessages.mockReturnValue({
+      ...defaultChatMessagesReturn,
+      messages: mockMessages,
+    });
 
     renderWithProviders(<Chats />);
 
-    expect(screen.getByTestId('user-message-0')).toBeInTheDocument();
+    expect(screen.getByTestId('user-message-msg-1')).toBeInTheDocument();
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(screen.getByTestId('user-prompt')).toBeInTheDocument();
   });
@@ -189,11 +198,11 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseFetchAllMessages.mockReturnValue({
-      data: mockMessages,
-      status: 'success',
-      isLoading: false,
-    } as any);
+    mockUseChatMessages.mockReturnValue({
+      ...defaultChatMessagesReturn,
+      messages: mockMessages,
+      hasFailedMessages: true,
+    });
 
     renderWithProviders(<Chats />);
 
@@ -214,11 +223,11 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseFetchAllMessages.mockReturnValue({
-      data: mockMessages,
-      status: 'success',
-      isLoading: false,
-    } as any);
+    mockUseChatMessages.mockReturnValue({
+      ...defaultChatMessagesReturn,
+      messages: mockMessages,
+      hasInProgressMessages: true,
+    });
 
     renderWithProviders(<Chats />);
 

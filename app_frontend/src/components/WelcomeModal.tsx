@@ -19,9 +19,16 @@ export const WelcomeModal = () => {
   const [open, setOpen] = useState(showWelcome);
   const { t } = useTranslation();
 
+  const handleOpenChange = (modalOpen: boolean) => {
+    setOpen(modalOpen);
+    if (!modalOpen) {
+      hideWelcomeModal();
+    }
+  };
+
   return (
-    <Dialog defaultOpen={showWelcome} open={open} onOpenChange={open => !open && setOpen(open)}>
-      <DialogContent className="sm:max-w-[768px]">
+    <Dialog defaultOpen={showWelcome} open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[768px]" data-testid="welcome-modal">
         <DialogHeader>
           <DialogTitle className="text-center mb-4">
             {t('Welcome to the “Talk To My Data” App')}
@@ -53,13 +60,7 @@ export const WelcomeModal = () => {
         </DialogHeader>
         <Separator className="border-t mt-6" />
         <DialogFooter>
-          <Button
-            testId="welcome-modal-hide-button"
-            onClick={() => {
-              setOpen(false);
-              hideWelcomeModal();
-            }}
-          >
+          <Button testId="welcome-modal-hide-button" onClick={() => handleOpenChange(false)}>
             {t('Select data')}
           </Button>
         </DialogFooter>

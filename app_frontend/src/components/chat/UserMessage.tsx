@@ -1,61 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { MessageHeader } from './MessageHeader';
-import { formatMessageDate } from './utils';
-import { useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
-import { useTranslation } from '@/i18n';
 import { IChatMessage } from '@/api/chat-messages/types';
+import { Loading } from './Loading';
 
 interface UserMessageProps {
-  messageId?: string;
-  timestamp?: string;
-  message: string;
-  chatId?: string;
+  message: IChatMessage;
+  chatId: string;
   testId?: string;
-  responseMessage?: IChatMessage;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({
-  chatId,
-  messageId,
-  timestamp,
-  message,
-  testId,
-  responseMessage,
-}) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, testId }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { mutate: deleteMessage, isPending: isDeleting } = useDeleteMessage();
-  const { exportChat, isLoading: isExporting } = useExport();
-  const { t } = useTranslation();
+
   useEffect(() => {
     // When being somewhere in the middle of the chat and asking question scroll to it
     ref.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [message]);
-
-  const displayDate = timestamp ? formatMessageDate(timestamp) : '';
-
-  const handleDelete = () => {
-    if (messageId) {
-      deleteMessage({
-        chatId: chatId,
-        messageId: messageId,
-      });
-    }
-    if (responseMessage?.id) {
-      deleteMessage({
-        chatId: chatId,
-        messageId: responseMessage.id,
-      });
-    }
-  };
-
-  const handleExport = () => {
-    if (chatId) {
-      exportChat({
-        chatId,
-        messageId,
-      });
-    }
-  };
+  }, [message.content]);
 
   return (
     <div
@@ -63,19 +23,15 @@ export const UserMessage: React.FC<UserMessageProps> = ({
       ref={ref}
       data-testid={testId}
     >
-      <MessageHeader
-        name={t('You')}
-        date={displayDate}
-        onDelete={handleDelete}
-        onExport={handleExport}
-        isDeleting={isDeleting}
-        isExporting={isExporting}
-        isResponseInProgress={responseMessage?.in_progress}
-        isResponseFailing={!!responseMessage?.error}
-      />
+      <MessageHeader messageId={message.id} chatId={chatId} />
       <div className="self-stretch text-sm font-normal leading-tight whitespace-pre-line">
-        {message}
+        {message.content}
       </div>
+      {message.in_progress && (
+        <div className="flex w-full justify-start">
+          <Loading />
+        </div>
+      )}
     </div>
   );
 };

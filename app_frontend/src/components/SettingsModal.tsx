@@ -32,6 +32,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     setEnableChartGeneration,
     enableBusinessInsights,
     setEnableBusinessInsights,
+    includeCsvBom,
+    setIncludeCsvBom,
   } = useAppState();
 
   const {
@@ -52,11 +54,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     useState(enableChartGeneration);
   const [localEnableBusinessInsights, setLocalEnableBusinessInsights] =
     useState(enableBusinessInsights);
+  const [localIncludeCsvBom, setLocalIncludeCsvBom] = useState(includeCsvBom);
 
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
     setEnableChartGeneration(localEnableChartGeneration);
     setEnableBusinessInsights(localEnableBusinessInsights);
+    setIncludeCsvBom(localIncludeCsvBom);
     onOpenChange(false);
   };
 
@@ -109,6 +113,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             <div className="my-4 space-y-4 flex justify-between items-center">
               <h3 className="font-semibold m-0">{t('Language')}</h3>
               <LanguageSwitcher />
+            </div>
+            <div
+              className="flex items-center justify-between gap-4 py-2"
+              title={t(
+                'Include the byte order mark (BOM) in exported CSVs for better compatibility with international characters.'
+              )}
+            >
+              <Label htmlFor="include-csv-bom" className="cursor-pointer">
+                {t('Include BOM')}
+              </Label>
+              <Switch
+                id="include-csv-bom"
+                checked={localIncludeCsvBom}
+                onCheckedChange={e => setLocalIncludeCsvBom(e)}
+              />
             </div>
           </>
 

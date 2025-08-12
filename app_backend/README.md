@@ -5,7 +5,10 @@
 - FastAPI
 - React 18 with TypeScript served as static files
 
-## Development
+<a id="backend-local-dev"></a>
+
+## Local Development
+
 
 Start the backend from the project root:
 
@@ -13,40 +16,33 @@ Start the backend from the project root:
 make run-local-dev-backend
 ```
 
-To start the development server, cd into the `app_frontend` directory first:
+Now run the [local React Frontend](../app_frontend/README.md#react-local-dev)
 
-```bash
-npm i
-npm run dev
-```
+## Building frontend for production
 
-Make sure to open the frontend url (likely on vite default port 5173) _not_ the backend url.
-
-### Known issue with Apple Silicon (arm64)
-
-If you're on an Apple Silicon (arm64) machine, you might encounter issues with optional dependencies or platform-specific packages. If you encounter errors after a teammate updates `package-lock.json` on a different architecture, delete `node_modules` and `package-lock.json`, then run `npm install` again.
-
-```bash
-rm -rf node_modules package-lock.json
-npm i
-npm run dev
-```
-
-## Building
-
-To build the application for production:
+To build the frontend part of the application for production:
 
 ```bash
 npm run build
 ```
 
-The build output will be placed in the `../app_backend/static/` directory, which is then used by the Python backend to serve the application. When using the React frontend through the `FRONTEND_TYPE="react"` environment variable, the application will look for the built files in this location.
+The build output will be placed in the `../app_backend/static/` directory, which is then used by the Python backend to serve the application.
 
 You can run it locally using the static files by starting it from project root with:
 
 ```bash
 make run-local-static-backend
 ```
+
+## Linting
+
+From the repo root, use Makefile targets:
+
+```bash
+make lint      # check formatting, style, and types
+make fix-lint  # auto-format and fix issues
+```
+
 
 ## Codespaces
 
@@ -125,11 +121,12 @@ npm run dev
 
 Navigate to `Session environment` and find the frontend app link on port 5173 in the exposed ports section.
 
+
 ## Testing
 
 To run tests:
 
-```
+```bash
 uv run pytest --cov --cov-report term --cov-report html
 ```
 
@@ -176,7 +173,9 @@ Create a `routes.toml` file like:
 
 And run locally with:
 
-`traefik --configFile=traefik.toml`
+```bash
+traefik --configFile=traefik.toml
+```
 
 With the fastapi running now accessing:
 

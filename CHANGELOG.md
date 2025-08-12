@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2025-08-12
+
+### Features
+
+- Allow adding BOM when exporting and fix dictionary exports containing Japanese characters in name.
+- Performance improvements: Cache DataRobot client and Deployment ID.
+
+### Bug Fixes
+
+- Message deletion fixes.
+
+### Improvements
+
+- Hide welcome modal on close click.
+- Updated README with local React development instructions.
+
 ## [0.3.5] - 2025-08-07
 
 ### Added

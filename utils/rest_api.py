@@ -706,7 +706,9 @@ async def delete_dictionary(
 
 @router.get("/dictionaries/{name}/download")
 async def download_dictionary(
-    name: str, analyst_db: AnalystDB = Depends(get_initialized_db)
+    name: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+    bom: bool = False,
 ) -> Response:
     """
     Download a dictionary as a CSV file.
@@ -730,11 +732,13 @@ async def download_dictionary(
     df.write_csv(csv_content)
 
     # Create response with CSV attachment
-    response = Response(content=csv_content.getvalue())
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename={name}_dictionary.csv"
-    )
-    response.headers["Content-Type"] = "text/csv"
+    csv_text = csv_content.getvalue()
+    if bom:
+        csv_text = (
+            "\ufeff" + csv_text
+        )  # Prefix UTF-8 BOM for Excel compatibility with international characters
+    response = Response(content=csv_text)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
 
     return response
 
@@ -1062,12 +1066,9 @@ async def save_chat_messages(
         analysis_workbook.save(output)
         output.seek(0)
 
-        filename = f"chat_{chat_id}_empty.xlsx"
-
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     if any(msg.in_progress for msg in chat_messages):
@@ -1231,12 +1232,6 @@ async def save_chat_messages(
     analysis_workbook.save(output)
     output.seek(0)
 
-    # Generate filename based on whether message_id was provided
-    if message_id:
-        filename = f"chat_{chat_id}_message_{message_id}.xlsx"
-    else:
-        filename = f"chat_{chat_id}_messages.xlsx"
-
     # Create background task to cleanup temporary files
     def cleanup_files(file_paths: List[str]) -> None:
         for fp in file_paths:
@@ -1248,7 +1243,6 @@ async def save_chat_messages(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
         background=background_task,
     )
 

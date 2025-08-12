@@ -58,16 +58,20 @@ export const updateDictionaryCell = async ({
 export const downloadDictionary = async ({
   name,
   signal,
+  includeBom,
 }: {
   name: string;
   signal?: AbortSignal;
+  includeBom?: boolean;
 }): Promise<void> => {
   const encodedName = encodeURIComponent(name);
 
   try {
     // Use fetch directly instead of apiClient to get raw response with blob
     const response = await fetch(
-      `${apiClient.defaults.baseURL}/v1/dictionaries/${encodedName}/download`,
+      `${apiClient.defaults.baseURL}/v1/dictionaries/${encodedName}/download${
+        includeBom ? '?bom=true' : ''
+      }`,
       {
         method: 'GET',
         headers: {
@@ -83,16 +87,7 @@ export const downloadDictionary = async ({
       throw new Error(`Failed to download dictionary: ${response.statusText}`);
     }
 
-    // Get the filename from the Content-Disposition header or use a default
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = `${name}_dictionary.csv`;
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1];
-      }
-    }
-
+    const filename = i18n.t('{{name}}_dictionary.csv', { name });
     // Convert response to blob
     const blob = await response.blob();
 

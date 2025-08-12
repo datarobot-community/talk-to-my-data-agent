@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import functools
 import inspect
 import json
 import logging
@@ -120,6 +121,7 @@ def log_memory() -> None:
     logger.info(f"Memory usage: {memory:.2f} MB")
 
 
+@functools.cache
 def initialize_deployment() -> tuple[RESTClientObject, str]:
     """Initialize either LLM Gateway or DataRobot-hosted LLM deployment based on environment settings and credential priority."""
     try:

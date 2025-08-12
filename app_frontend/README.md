@@ -18,18 +18,6 @@ This application provides a modern React-based frontend for the **Talk to My Dat
 - Jest for testing
 - React Query for API state management
 
-## Development
-
-See README in `app_backend` directory
-
-## Testing
-
-To run the test suite:
-
-```bash
-npm run test
-```
-
 ## Project Structure
 
 - `src/api`: API client and hooks for data fetching
@@ -39,6 +27,70 @@ npm run test
 - `src/state`: Application state management
 - `src/assets`: Static assets like images and icons
 
+
+<a id="react-local-dev"></a>
+
+## Development
+
+**Prerequisites:** Start [backend first](../app_backend/README.md#backend-local-dev)
+
+From the `app_frontend` directory:
+```bash
+npm i
+npm run dev
+```
+
+Open http://localhost:5173 (frontend) not the backend URL. 
+The dev server proxies `/api` calls to the backend on port 8080.
+
+### Known issue with Apple Silicon (arm64)
+
+If you're on an Apple Silicon (arm64) machine, you might encounter issues with optional dependencies or platform-specific packages. If you encounter errors after a teammate updates `package-lock.json` on a different architecture, delete `node_modules` and `package-lock.json`, then run `npm install` again.
+
+```bash
+rm -rf node_modules package-lock.json
+npm i
+```
+
+## Testing
+
+To run the test suite:
+
+```bash
+npm run test
+```
+
+## Building
+
+To build the application for production:
+
+```bash
+npm run build
+```
+
+The build output will be placed in the `../app_backend/static/` directory, which is then used by the Python backend to serve the application. 
+
+You can run it locally using the static files by starting it from project root with:
+
+```bash
+make run-local-static-backend
+```
+
+> ⚠️ Note: Rebuild the React frontend code before deploying changes.
+
+## Linting
+
+To run the linter:
+
+```bash
+npm run lint
+```
+
+To automatically fix linting errors:
+
+```bash
+npm run lint:fix
+```
 
 ## Expanding the ESLint configuration
 

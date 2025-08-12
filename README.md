@@ -75,6 +75,21 @@ Codespace users can **skip steps 1 and 2**. For local development, follow all of
 Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
 and `pulumi` invocation see [here](#setup-for-advanced-users).
 
+
+## Template development
+
+The Talk to My Data agent supports two frontend options:
+- **React** (default): a modern JavaScript-based frontend with enhanced UI features which uses FastAPI Backend. See the [React Frontend Development Guide](app_frontend/README.md)
+- **Streamlit:** A Python-based frontend with a simple interface. See the [Streamlit Frontend Development Guide](frontend/README.md)
+
+To change the frontend:
+1. In `.env`: Set `FRONTEND_TYPE="streamlit"` to use the Streamlit frontend instead of the default React.
+2. Run the following to update your stack (Or rerun your quickstart.py)
+   ```bash
+   source set_env.sh  # On windows use `set_env.bat`
+   pulumi up
+   ```
+
 ## Architecture overview
 
 ![image](https://s3.us-east-1.amazonaws.com/datarobot_public/drx/ttmd2-schematic.jpg)
@@ -112,31 +127,6 @@ Your data privacy is important to us. Data handling is governed by the DataRobot
 
 
 ## Make changes
-
-### Change the frontend
-
-The Talk to My Data agent supports two frontend options:
-
-1. Streamlit frontend (default): A Python-based frontend with a simple interface
-2. React frontend: A modern JavaScript-based frontend with enhanced UI features
-
-To change the frontend:
-
-1. In `.env`: Set `FRONTEND_TYPE="react"` to use the React frontend instead of the default Streamlit frontend
-2. Run `pulumi up` to update your stack (Or rerun your quickstart)
-   ```bash
-   source set_env.sh  # On windows use `set_env.bat`
-   pulumi up
-   ```
-
-> **⚠️ Important note:**  
-> If you make changes to the React frontend code, you need to rebuild it before deploying:
-> ```bash
-> cd app_frontend
-> npm install
-> npm run build
-> ```
-> The built files will be placed in `app_frontend/static/` which will be used by the deployment. See `app_frontend/README.md` for more details on developing and building the React frontend.
 
 ### Change the LLM
 
@@ -212,6 +202,7 @@ The Talk to my Data Agent supports connecting to BigQuery.
       source set_env.sh  # On windows use `set_env.bat`
       pulumi up
       ```
+
 #### SAP Datasphere
 
 The Talk to my Data Agent supports connecting to SAP Datasphere.

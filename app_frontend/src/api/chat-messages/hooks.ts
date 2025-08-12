@@ -367,9 +367,9 @@ export const useExport = () => {
     try {
       const response = await exportChatMessages({ chatId, messageId });
 
-      const contentDisposition = response.headers['content-disposition'];
-      const filenameMatch = contentDisposition?.match(/filename="?([^";\s]+)"?/);
-      const filename = filenameMatch?.[1] || i18n.t('chat-export');
+      const filename = messageId
+        ? i18n.t('chat_{{chatId}}_message_{{messageId}}.xlsx', { chatId, messageId })
+        : i18n.t('chat_{{chatId}}_messages.xlsx', { chatId });
 
       const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');

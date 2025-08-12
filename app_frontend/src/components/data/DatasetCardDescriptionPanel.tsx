@@ -19,6 +19,7 @@ import { DATA_TABS } from '@/state/constants';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import { useDatasetDictionarySearch } from '@/hooks/useDatasetSearch';
+import { useAppState } from '@/state';
 
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
 
@@ -43,6 +44,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
   });
   const { mutate: updateCell } = useUpdateDictionaryCell();
   const { mutate: downloadDictionary, isPending: isDownloading } = useDownloadDictionary();
+  const { includeCsvBom } = useAppState();
   const { data: metadata, isLoading: isLoadingMetadata } = useDatasetMetadata(dictionary.name);
 
   // Format file size from bytes to KB/MB/GB as appropriate
@@ -116,7 +118,9 @@ export const DatasetCardDescriptionPanel = forwardRef<
           </div>
           <DatasetCardActionBar
             onSearch={setSearchText}
-            onDownload={() => downloadDictionary({ name: dictionary.name })}
+            onDownload={() =>
+              downloadDictionary({ name: dictionary.name, includeBom: includeCsvBom })
+            }
             onDelete={() => setIsDeleteDialogOpen(true)}
             isDownloading={isDownloading}
             isProcessing={isProcessing}

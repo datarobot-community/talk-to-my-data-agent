@@ -3,28 +3,26 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
 import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
-import { usePostMessage } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state/hooks';
 import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
+import { useChatMessages } from '@/hooks/useChatMessages';
 
 interface SuggestedPromptProps {
   message: string;
   chatId?: string;
-  isProcessing?: boolean;
 }
 
-export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
-  message,
-  chatId,
-  isProcessing,
-}) => {
+export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ message, chatId }) => {
   const { t } = useTranslation();
   const { enableChartGeneration, enableBusinessInsights, dataSource } = useAppState();
   const { data: dictionaries } = useGeneratedDictionaries();
+  const { hasInProgressMessages, sendMessage } = useChatMessages(chatId);
   const isActionShown = !!dictionaries?.[0];
-  const actionTooltip = isProcessing ? t('Wait for agent to finish responding') : t('Send');
-  const { mutate } = usePostMessage();
+  const actionTooltip = hasInProgressMessages
+    ? t('Wait for agent to finish responding')
+    : t('Send');
+
   return (
     <div className="h-16 p-3 bg-[#22272b] rounded border justify-start items-center gap-2 inline-flex">
       <div className="grow shrink basis-0 text-primary text-sm font-normal leading-tight">
@@ -37,19 +35,17 @@ export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
               <Button
                 variant="ghost"
                 testId="send-suggested-prompt-button"
-                disabled={isProcessing}
+                disabled={hasInProgressMessages}
                 title={actionTooltip}
                 onClick={() => {
-                  mutate({
-                    message,
-                    chatId,
+                  sendMessage(message, {
                     enableChartGeneration,
                     enableBusinessInsights,
                     dataSource,
                   });
                 }}
               >
-                <FontAwesomeIcon icon={isProcessing ? faHourglassHalf : faPaperPlane} />
+                <FontAwesomeIcon icon={hasInProgressMessages ? faHourglassHalf : faPaperPlane} />
               </Button>
             )}
           </div>

@@ -1,29 +1,28 @@
 import { useMemo } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
-import { usePostMessage, useFetchAllChats } from '@/api/chat-messages/hooks';
+import { useFetchAllChats } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state';
 import { useTranslation } from '@/i18n';
 import { DATA_SOURCES } from '@/constants/dataSources';
+import { useChatMessages } from '@/hooks/useChatMessages';
 
 export const UserPrompt = ({
   chatId,
-  isProcessing,
   allowedDataSources,
   testId,
 }: {
   chatId?: string;
-  isProcessing?: boolean;
   allowedDataSources?: string[];
   testId?: string;
 }) => {
   const { t } = useTranslation();
-  const { mutate } = usePostMessage();
   const {
     enableChartGeneration,
     enableBusinessInsights,
     dataSource: globalDataSource,
   } = useAppState();
   const { data: chats } = useFetchAllChats();
+  const { hasInProgressMessages, sendMessage } = useChatMessages(chatId);
   const isDataUploadRequired = !allowedDataSources?.[0];
 
   // Find the active chat to get its data source setting
@@ -36,21 +35,17 @@ export const UserPrompt = ({
       : allowedDataSources?.[0] || DATA_SOURCES.FILE;
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
 
-  const sendMessage = (message: string) => {
-    mutate({
-      message,
-      chatId,
-      enableChartGeneration,
-      enableBusinessInsights,
-      dataSource: chatDataSource,
-    });
-  };
-
   return (
     <PromptInput
       sendButtonArrangement="append"
-      onSend={sendMessage}
-      isProcessing={isProcessing}
+      onSend={(message: string) =>
+        sendMessage(message, {
+          enableChartGeneration,
+          enableBusinessInsights,
+          dataSource: chatDataSource,
+        })
+      }
+      isProcessing={hasInProgressMessages}
       placeholder={
         isDataUploadRequired
           ? t('Please upload and process data using the sidebar before starting the chat')

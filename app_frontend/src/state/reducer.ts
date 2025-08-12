@@ -11,6 +11,7 @@ export const createInitialState = (): AppStateData => {
       getStorageItem(STORAGE_KEYS.COLLAPSIBLE_PANEL_DEFAULT_OPEN) === 'true',
     enableChartGeneration: getStorageItem(STORAGE_KEYS.ENABLE_CHART_GENERATION) !== 'false', // Enable by default
     enableBusinessInsights: getStorageItem(STORAGE_KEYS.ENABLE_BUSINESS_INSIGHTS) !== 'false', // Enable by default
+    includeCsvBom: getStorageItem(STORAGE_KEYS.INCLUDE_CSV_BOM) === 'true',
     dataSource: getStorageItem(STORAGE_KEYS.DATA_SOURCE) || DATA_SOURCES.FILE, // Default to FILE
   };
 };
@@ -44,6 +45,12 @@ export const reducer = (state: AppStateData, action: Action): AppStateData => {
         ...state,
         enableBusinessInsights: action.payload,
       };
+    case ACTION_TYPES.SET_INCLUDE_CSV_BOM:
+      setStorageItem(STORAGE_KEYS.INCLUDE_CSV_BOM, action.payload ? 'true' : 'false');
+      return {
+        ...state,
+        includeCsvBom: action.payload,
+      };
     case ACTION_TYPES.SET_DATA_SOURCE:
       setStorageItem(STORAGE_KEYS.DATA_SOURCE, action.payload);
       return {
@@ -69,6 +76,10 @@ export const actions = {
   }),
   setEnableBusinessInsights: (enabled: boolean): Action => ({
     type: ACTION_TYPES.SET_ENABLE_BUSINESS_INSIGHTS,
+    payload: enabled,
+  }),
+  setIncludeCsvBom: (enabled: boolean): Action => ({
+    type: ACTION_TYPES.SET_INCLUDE_CSV_BOM,
     payload: enabled,
   }),
   setDataSource: (source: string): Action => ({

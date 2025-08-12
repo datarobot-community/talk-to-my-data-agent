@@ -24,6 +24,10 @@ export const AppStateProvider: React.FC<{
     dispatch(actions.setEnableBusinessInsights(enabled));
   };
 
+  const setIncludeCsvBom = (enabled: boolean) => {
+    dispatch(actions.setIncludeCsvBom(enabled));
+  };
+
   const setDataSource = (source: string) => {
     dispatch(actions.setDataSource(source));
   };
@@ -34,6 +38,7 @@ export const AppStateProvider: React.FC<{
     setCollapsiblePanelDefaultOpen,
     setEnableChartGeneration,
     setEnableBusinessInsights,
+    setIncludeCsvBom,
     setDataSource,
   };
 

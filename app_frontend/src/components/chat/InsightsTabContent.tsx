@@ -8,13 +8,11 @@ interface InsightsTabContentProps {
   additionalInsights?: string | null;
   followUpQuestions?: string[] | null;
   chatId?: string;
-  isProcessing?: boolean;
 }
 
 export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
   additionalInsights,
   followUpQuestions,
-  isProcessing,
   chatId,
 }) => {
   const { t } = useTranslation();
@@ -29,11 +27,7 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
           <MarkdownContent content={additionalInsights} />
         </HeaderSection>
       )}
-      <SuggestedQuestionsSection
-        questions={followUpQuestions}
-        chatId={chatId}
-        isProcessing={isProcessing}
-      />
+      <SuggestedQuestionsSection questions={followUpQuestions} chatId={chatId} />
     </>
   );
 };

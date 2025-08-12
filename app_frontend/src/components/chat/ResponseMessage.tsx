@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   IChatMessage,
   IMessageComponent,
@@ -8,7 +8,7 @@ import {
 } from '@/api/chat-messages/types';
 import { MessageContainer } from './MessageContainer';
 import { MessageHeader } from './MessageHeader';
-import { DataRobotAvatar } from './Avatars';
+
 import { Loading } from './Loading';
 import { ResponseTabs } from './ResponseTabs';
 import { SummaryTabContent } from './SummaryTabContent';
@@ -16,14 +16,10 @@ import { InsightsTabContent } from './InsightsTabContent';
 import { CodeTabContent } from './CodeTabContent';
 import { ErrorPanel } from './ErrorPanel';
 import { RESPONSE_TABS } from './constants';
-import { formatMessageDate } from './utils';
-import { useTranslation } from '@/i18n';
+
 interface ResponseMessageProps {
-  chatId?: string;
-  date?: string;
-  message?: IChatMessage;
-  isLoading?: boolean;
-  isProcessing?: boolean;
+  chatId: string;
+  message: IChatMessage;
   testId?: string;
 }
 
@@ -58,18 +54,9 @@ const isAnalysisComponent = (component: unknown): component is IAnalysisComponen
   );
 };
 
-export const ResponseMessage: React.FC<ResponseMessageProps> = ({
-  date,
-  message,
-  chatId,
-  isLoading = false,
-  isProcessing = false,
-  testId,
-}) => {
+export const ResponseMessage: React.FC<ResponseMessageProps> = ({ message, chatId, testId }) => {
   const [activeTab, setActiveTab] = useState(RESPONSE_TABS.SUMMARY);
-  const { t } = useTranslation();
-
-  const displayDate = message?.created_at ? formatMessageDate(message.created_at) : date || '';
+  const isLoading = !!message.in_progress;
 
   const {
     enhancedUserMessage,
@@ -137,7 +124,6 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     };
 
     return {
-      displayDate,
       enhancedUserMessage,
       bottomLine,
       additionalInsights,
@@ -152,11 +138,17 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       businessErrors,
       analysisAttempts,
     };
-  }, [message, displayDate]);
+  }, [message]);
+
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Scroll to loading and to the summary bottom line when ready
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [isLoading, bottomLine]);
 
   return (
-    <MessageContainer testId={testId}>
-      <MessageHeader avatar={DataRobotAvatar} name={t('DataRobot')} date={displayDate} />
+    <MessageContainer testId={testId} ref={ref}>
+      <MessageHeader messageId={message.id} chatId={chatId} />
 
       {isLoading ? (
         <Loading />
@@ -189,7 +181,6 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
               <InsightsTabContent
                 additionalInsights={additionalInsights}
                 followUpQuestions={followUpQuestions}
-                isProcessing={isProcessing}
                 chatId={chatId}
               />
             </>
