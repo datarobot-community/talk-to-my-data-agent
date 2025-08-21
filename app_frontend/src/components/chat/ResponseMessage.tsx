@@ -20,6 +20,8 @@ import { RESPONSE_TABS } from './constants';
 interface ResponseMessageProps {
   chatId: string;
   message: IChatMessage;
+  messages: IChatMessage[];
+  hasInProgressMessages: boolean;
   testId?: string;
 }
 
@@ -54,7 +56,13 @@ const isAnalysisComponent = (component: unknown): component is IAnalysisComponen
   );
 };
 
-export const ResponseMessage: React.FC<ResponseMessageProps> = ({ message, chatId, testId }) => {
+export const ResponseMessage: React.FC<ResponseMessageProps> = ({
+  message,
+  chatId,
+  messages,
+  hasInProgressMessages,
+  testId,
+}) => {
   const [activeTab, setActiveTab] = useState(RESPONSE_TABS.SUMMARY);
   const isLoading = !!message.in_progress;
 
@@ -147,8 +155,8 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({ message, chatI
   }, [isLoading, bottomLine]);
 
   return (
-    <MessageContainer testId={testId} ref={ref}>
-      <MessageHeader messageId={message.id} chatId={chatId} />
+    <MessageContainer testId={testId} ref={ref} key={message.id}>
+      <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
 
       {isLoading ? (
         <Loading />
@@ -182,6 +190,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({ message, chatI
                 additionalInsights={additionalInsights}
                 followUpQuestions={followUpQuestions}
                 chatId={chatId}
+                hasInProgressMessages={hasInProgressMessages}
               />
             </>
           )}

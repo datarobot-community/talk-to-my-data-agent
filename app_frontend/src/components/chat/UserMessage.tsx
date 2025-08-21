@@ -6,10 +6,11 @@ import { Loading } from './Loading';
 interface UserMessageProps {
   message: IChatMessage;
   chatId: string;
+  messages: IChatMessage[];
   testId?: string;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, testId }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, messages, testId }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,8 +23,9 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, testI
       className="p-3 bg-card rounded flex-col justify-start items-start gap-3 flex mb-2.5 mr-2"
       ref={ref}
       data-testid={testId}
+      key={message.id}
     >
-      <MessageHeader messageId={message.id} chatId={chatId} />
+      <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
       <div className="self-stretch text-sm font-normal leading-tight whitespace-pre-line">
         {message.content}
       </div>

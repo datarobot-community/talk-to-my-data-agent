@@ -33,6 +33,7 @@ from infra import (
     settings_app_infra,
     settings_generative,
 )
+from infra.app_frontend import app_frontend
 from infra.components.dr_credential import (
     get_credential_runtime_parameter_values,
     get_database_credentials,
@@ -174,9 +175,11 @@ llm_custom_model = datarobot.CustomModel(
     **settings_generative.custom_model_args.model_dump(exclude_none=True),
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
-    runtime_parameter_values=[]
-    if settings_generative.LLM == LLMs.DEPLOYED_LLM or USE_LLM_GATEWAY
-    else llm_runtime_parameter_values,
+    runtime_parameter_values=(
+        []
+        if settings_generative.LLM == LLMs.DEPLOYED_LLM or USE_LLM_GATEWAY
+        else llm_runtime_parameter_values
+    ),
 )
 
 llm_deployment = CustomModelDeployment(
@@ -215,8 +218,10 @@ if USE_LLM_GATEWAY:
     )
 
 app_source = datarobot.ApplicationSource(
-    files=settings_app_infra.get_app_files(
-        runtime_parameter_values=app_runtime_parameters
+    files=app_frontend.stdout.apply(
+        lambda _: settings_app_infra.get_app_files(
+            runtime_parameter_values=app_runtime_parameters
+        )
     ),
     runtime_parameter_values=app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(

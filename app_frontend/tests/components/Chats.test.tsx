@@ -5,13 +5,13 @@ import { renderWithProviders, mockScrollIntoView } from '../test-utils';
 
 vi.mock('@/api/chat-messages/hooks', () => ({
   useFetchAllChats: vi.fn(),
+  useFetchAllMessages: vi.fn(),
   useDeleteChat: vi.fn(),
+  useDeleteMessage: vi.fn(),
+  usePostMessage: vi.fn(),
   useExport: vi.fn(),
   useRenameChat: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-}));
-
-vi.mock('@/hooks/useChatMessages', () => ({
-  useChatMessages: vi.fn(),
+  usePollInProgressMessage: vi.fn(),
 }));
 
 vi.mock('@/api/dictionaries/hooks', () => ({
@@ -31,34 +31,26 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-import { useFetchAllChats, useDeleteChat, useExport } from '@/api/chat-messages/hooks';
+import {
+  useFetchAllChats,
+  useFetchAllMessages,
+  useDeleteChat,
+  useDeleteMessage,
+  usePostMessage,
+  useExport,
+  usePollInProgressMessage,
+} from '@/api/chat-messages/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useChatMessages } from '@/hooks/useChatMessages';
 
 const mockUseFetchAllChats = vi.mocked(useFetchAllChats);
+const mockUseFetchAllMessages = vi.mocked(useFetchAllMessages);
 const mockUseDeleteChat = vi.mocked(useDeleteChat);
+const mockUseDeleteMessage = vi.mocked(useDeleteMessage);
+const mockUsePostMessage = vi.mocked(usePostMessage);
 const mockUseExport = vi.mocked(useExport);
+const mockUsePollInProgressMessage = vi.mocked(usePollInProgressMessage);
 const mockUseParams = vi.mocked(useParams);
 const mockUseNavigate = vi.mocked(useNavigate);
-const mockUseChatMessages = vi.mocked(useChatMessages);
-
-const defaultChatMessagesReturn = {
-  messages: [],
-  isLoading: false,
-  hasInProgressMessages: false,
-  hasFailedMessages: false,
-  getMessage: vi.fn(),
-  getResponseMessage: vi.fn(),
-  sendMessage: vi.fn(),
-  deleteMessagePair: vi.fn(),
-  exportMessage: vi.fn(),
-  isDeleting: false,
-  isExporting: false,
-  isSending: false,
-  fetchError: null,
-  sendError: null,
-  deleteError: null,
-} as any;
 
 describe('Chats Component', () => {
   let cleanupScrollMock: () => void;
@@ -78,13 +70,26 @@ describe('Chats Component', () => {
     cleanupScrollMock = mockScrollIntoView();
 
     mockUseNavigate.mockReturnValue(mockNavigate);
-    mockUseChatMessages.mockReturnValue(defaultChatMessagesReturn);
+    mockUseFetchAllMessages.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as any);
+    mockUsePollInProgressMessage.mockReturnValue({} as any);
     mockUseExport.mockReturnValue({
       exportChat: mockExportChat,
       isLoading: false,
     });
     mockUseDeleteChat.mockReturnValue({
       mutate: mockDeleteChat,
+      isPending: false,
+    } as any);
+    mockUseDeleteMessage.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as any);
+    mockUsePostMessage.mockReturnValue({
+      mutate: vi.fn(),
       isPending: false,
     } as any);
 
@@ -123,10 +128,11 @@ describe('Chats Component', () => {
       data: [],
       isLoading: false,
     } as any);
-    mockUseChatMessages.mockReturnValue({
-      ...defaultChatMessagesReturn,
+    mockUseFetchAllMessages.mockReturnValue({
+      data: [],
       isLoading: true,
-    });
+      error: null,
+    } as any);
 
     renderWithProviders(<Chats />);
 
@@ -145,10 +151,11 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseChatMessages.mockReturnValue({
-      ...defaultChatMessagesReturn,
-      messages: mockMessages,
-    });
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
 
     renderWithProviders(<Chats />);
 
@@ -198,11 +205,11 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseChatMessages.mockReturnValue({
-      ...defaultChatMessagesReturn,
-      messages: mockMessages,
-      hasFailedMessages: true,
-    });
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
 
     renderWithProviders(<Chats />);
 
@@ -223,11 +230,11 @@ describe('Chats Component', () => {
       },
     ];
 
-    mockUseChatMessages.mockReturnValue({
-      ...defaultChatMessagesReturn,
-      messages: mockMessages,
-      hasInProgressMessages: true,
-    });
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
 
     renderWithProviders(<Chats />);
 

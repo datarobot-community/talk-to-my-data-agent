@@ -893,6 +893,35 @@ async def delete_chat_message(
         return cast(list[AnalystChatMessage], [])
 
 
+@router.get("/chats/{chat_id}/messages/{message_id}")
+async def get_chat_message(
+    chat_id: str,
+    message_id: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> AnalystChatMessage:
+    """Get a specific message by ID from a specific chat"""
+    try:
+        message = await analyst_db.get_chat_message(message_id=message_id)
+        if not message:
+            raise HTTPException(
+                status_code=404, detail=f"Message with ID {message_id} not found"
+            )
+
+        # Verify the message belongs to the specified chat
+        if message.chat_id != chat_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Message with ID {message_id} not found in chat {chat_id}",
+            )
+
+        return message
+    except Exception as e:
+        logger.error(f"Error getting message: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving message: {str(e)}"
+        )
+
+
 @router.post("/chats/messages")
 async def create_new_chat_message(
     request: Request,

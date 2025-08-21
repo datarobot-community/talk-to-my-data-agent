@@ -1,8 +1,8 @@
 # Talk to My Data  
 
-**Talk to My Data** delivers a seamless **talk-to-your-data** experience, transforming files, spreadsheets, and cloud data into actionable insights. Simply upload data, connect to Snowflake or BigQuery, or access datasets from DataRobot's Data Registry. Then, ask a question, and the agent recommends business analyses, generating **charts, tables, and even code** to help you interpret the results.  
+**Talk to My Data** delivers a seamless **talk-to-your-data** experience, transforming files, spreadsheets, and cloud data into actionable insights. Simply upload data, connect to Snowflake or BigQuery, or access datasets from DataRobot's Data Registry. Then, ask a question, and the agent recommends business analyses, generating **charts, tables, and even code** to help you interpret the results.
 
-This intuitive experience is designed for **scalability and flexibility**, ensuring that whether you're working with a few thousand rows or billions, your data analysis remains **fast, efficient, and insightful**.  
+This intuitive experience is designed for **scalability and flexibility**, ensuring that whether you're working with a few thousand rows or billions, your data analysis remains **fast, efficient, and insightful**.
 
 
 > [!WARNING]
@@ -29,18 +29,22 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 9. [Setup for advanced users](#setup-for-advanced-users)
 
 ## Setup
+Please check out this [Talk To My Data walkthrough](https://docs.datarobot.com/en/docs/get-started/gs-dr5/talk-data-walk.html).
 
-Before proceeding, ensure you have access to the required credentials and services. This template is pre-configured to use an Azure OpenAI endpoint and Snowflake Database credentials. To run the template as-is, you will need access to Azure OpenAI (leverages `gpt-4o` by default). 
+Before proceeding, ensure you have access to the required credentials and services. This template is pre-configured to use an Azure OpenAI endpoint and Snowflake Database credentials. To run the template as-is, you will need access to Azure OpenAI (leverages `gpt-4o` by default).
 
-Codespace users can **skip steps 1 and 2**. For local development, follow all of the following steps.
+**DataRobot Codespaces users:** If you opened this template from the [Application Templates gallery](https://docs.datarobot.com/en/docs/workbench/wb-apps/app-templates/index.html#application-templates), you can **skip steps 1 and 2**. If you created a fresh codespace, you can **skip step 1** but still need to **clone the repository (step 2)**.
+
+**For local development,** follow all of the following steps:
 
 1. If `pulumi` is not already installed, install the CLI following instructions [here](https://www.pulumi.com/docs/iac/download-install/).
    After installing for the first time, restart your terminal and run:
+
    ```bash
    pulumi login --local  # omit --local to use Pulumi Cloud (requires separate account)
    ```
 
-2. Clone the template repository.
+2. Clone the template repository
 
    ```bash
    git clone https://github.com/datarobot-community/talk-to-my-data-agent.git
@@ -60,16 +64,31 @@ Codespace users can **skip steps 1 and 2**. For local development, follow all of
    FRONTEND_TYPE=...  # Optional. Default is "react", set to "streamlit" to use Streamlit frontend
    USE_DATAROBOT_LLM_GATEWAY=...  # Optional. Set to "true" to use DataRobot LLM Gateway with consumption based pricing instead of using your own LLM credentials
    ```
+
    Use the following resources to locate the required credentials:
    - **DataRobot API Token**: Refer to the *Create a DataRobot API Key* section of the [DataRobot API Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#create-a-datarobot-api-key).
    - **DataRobot Endpoint**: Refer to the *Retrieve the API Endpoint* section of the same [DataRobot API Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#retrieve-the-api-endpoint).
    - **LLM Endpoint and API Key**: Refer to the [Azure OpenAI documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/chatgpt-quickstart?tabs=command-line%2Cjavascript-keyless%2Ctypescript-keyless%2Cpython-new&pivots=programming-language-python#retrieve-key-and-endpoint).
 
 4. In a terminal, run:
+
    ```bash
    python quickstart.py YOUR_PROJECT_NAME  # Windows users may have to use `py` instead of `python`
    ```
-   Python 3.10 - 12 are supported
+   
+   **What does `quickstart.py` do?**
+   
+   The quickstart script automates the entire setup process for you:
+   - Creates and activates a Python virtual environment
+   - Installs all required dependencies (using `uv` for faster installation, falling back to `pip`)
+   - Loads your `.env` configuration
+   - Sets up the Pulumi stack with your project name
+   - Runs `pulumi up` to deploy your application
+   - Displays your application URL when complete
+   
+   This single command replaces all the manual steps described in the [advanced setup section](#setup-for-advanced-users).
+   
+   Python 3.10 - 3.12 are supported
 
 
 Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
@@ -84,9 +103,9 @@ The Talk to My Data agent supports two frontend options:
 
 To change the frontend:
 1. In `.env`: Set `FRONTEND_TYPE="streamlit"` to use the Streamlit frontend instead of the default React.
-2. Run the following to update your stack (Or rerun your quickstart.py)
+2. Run the following to update your stack (Or run `python quickstart.py` for easier setup)
    ```bash
-   source set_env.sh  # On windows use `set_env.bat`
+   source set_env.sh  # On Windows use `set_env.bat`
    pulumi up
    ```
 
@@ -130,15 +149,15 @@ Your data privacy is important to us. Data handling is governed by the DataRobot
 
 ### Change the LLM
 
-1. Modify the `LLM` setting in `infra/settings_generative.py` by changing `LLM=LLMs.AZURE_OPENAI_GPT_4_O` to any other LLM from the `LLMs` object. 
-     - Trial users: Please set `LLM=LLMs.AZURE_OPENAI_GPT_4_O_MINI` since GPT-4o is not supported in the trial. Use the `OPENAI_API_DEPLOYMENT_ID` in `.env` to override which model is used in your azure organisation. You'll still see GPT 4o-mini in the playground, but the deployed app will use the provided azure deployment.  
+1. Modify the `LLM` setting in `infra/settings_generative.py` by changing `LLM=LLMs.AZURE_OPENAI_GPT_4_O` to any other LLM from the `LLMs` object.
+     - Trial users: Please set `LLM=LLMs.AZURE_OPENAI_GPT_4_O_MINI` since GPT-4o is not supported in the trial. Use the `OPENAI_API_DEPLOYMENT_ID` in `.env` to override which model is used in your Azure organization. You'll still see GPT 4o-mini in the playground, but the deployed app will use the provided Azure deployment.
 2. To use an existing TextGen model or deployment:
       - In `infra/settings_generative.py`: Set `LLM=LLMs.DEPLOYED_LLM`.
       - In `.env`: Set either the `TEXTGEN_REGISTERED_MODEL_ID` or the `TEXTGEN_DEPLOYMENT_ID`
-      - In `.env`: Set `CHAT_MODEL_NAME` to the model name expected by the deployment (e.g. "claude-3-7-sonnet-20250219" for an anthropic deployment, "datarobot-deployed-llm" for NIM models ) 
+      - In `.env`: Set `CHAT_MODEL_NAME` to the model name expected by the deployment (e.g. "claude-3-7-sonnet-20250219" for an anthropic deployment,"datarobot-deployed-llm" for NIM models )
       - (Optional) In `utils/api.py`: `ALTERNATIVE_LLM_BIG` and `ALTERNATIVE_LLM_SMALL` can be used for fine-grained control over which LLM is used for different tasks.
 
-### Use DataRobot LLM Gateway
+### Use [DataRobot LLM Gateway](https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
 
 The application supports using the DataRobot LLM Gateway instead of bringing your own LLM credentials.
 
@@ -151,11 +170,12 @@ The application follows this priority order for LLM selection:
 
 #### **Setup**
 
-1. In `.env`: Set `USE_DATAROBOT_LLM_GATEWAY=true`
-3. **Important**: Remove or comment out `OPENAI_*` environment variables to use LLM Gateway
-4. Run `pulumi up` to update your stack
+**Important**: Remove or comment out `OPENAI_*` environment variables to use DataRobot's LLM Gateway
+
+1. In `.env`: Set `USE_DATAROBOT_LLM_GATEWAY=true` 
+2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
    ```bash
-   source set_env.sh  # On windows use `set_env.bat`
+   source set_env.sh  # On Windows use `set_env.bat`
    pulumi up
    ```
 
@@ -165,16 +185,17 @@ The application follows this priority order for LLM selection:
 - You can pick from the catalog and change the model `LLM` in `infra/settings_generative.py`
 - It will use a DataRobot Guarded RAG Deployment and LLM Blueprint for that selected model
 
-**Note**: LLM Gateway mode requires consumption based pricing is enabled for your DataRobot account as is evidenced by the `ENABLE_LLM_GATEWAY` feature flag. Contact your administrator if this feature is not available.
+**Note**: LLM Gateway mode requires consumption based pricing is enabled for your DataRobot account as is evidenced by the `ENABLE_LLM_GATEWAY` feature flag.
+Contact your administrator if this feature is not available.
 
-3. In `.env`: If not using an existing TextGen model or deployment, provide the required credentials dependent on your choice.
-4. Run `pulumi up` to update your stack (Or rerun your quickstart).
+1. In `.env`: If not using an existing TextGen model or deployment, provide the required credentials dependent on your choice.
+2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
       ```bash
-      source set_env.sh  # On windows use `set_env.bat`
+      source set_env.sh  # On Windows use `set_env.bat`
       pulumi up
       ```
 
-> **⚠️ Availability information:**  
+> **⚠️ Availability information:**
 > Using a NIM model requires custom model GPU inference, a premium feature. You will experience errors by using this type of model without the feature enabled. Contact your DataRobot representative or administrator for information on enabling this feature.
 
 ### Change the database
@@ -186,9 +207,9 @@ To add Snowflake support:
 1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "snowflake"`.
 2. Provide snowflake credentials in `.env` by either setting `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` or by setting `SNOWFLAKE_KEY_PATH` to a file containing the key. The key file should be a `*.p8` private key file. (see [Snowflake Documentation](https://docs.snowflake.com/en/user-guide/key-pair-auth))
 3. Fill out the remaining snowflake connection settings in `.env` (refer to `.env.template` for more details)
-4. Run `pulumi up` to update your stack (Or re-run the quickstart).
+4. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
       ```bash
-      source set_env.sh  # On windows use `set_env.bat`
+      source set_env.sh  # On Windows use `set_env.bat`
       pulumi up
       ```
  
@@ -197,9 +218,9 @@ To add Snowflake support:
 The Talk to my Data Agent supports connecting to BigQuery.
 1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "bigquery"`. 
 2. Provide the required google credentials in `.env` dependent on your choice.  Ensure that GOOGLE_DB_SCHEMA is also populated in `.env`.
-3. Run `pulumi up` to update your stack (Or rerun your quickstart).
+3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
       ```bash
-      source set_env.sh  # On windows use `set_env.bat`
+      source set_env.sh  # On Windows use `set_env.bat`
       pulumi up
       ```
 
@@ -208,9 +229,9 @@ The Talk to my Data Agent supports connecting to BigQuery.
 The Talk to my Data Agent supports connecting to SAP Datasphere.
 1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "sap"`. 
 2. Provide the required SAP credentials in `.env`.
-3. Run `pulumi up` to update your stack (Or rerun your quickstart).
+3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
       ```bash
-      source set_env.sh  # On windows use `set_env.bat`
+      source set_env.sh  # On Windows use `set_env.bat`
       pulumi up
       ```
 

@@ -3,21 +3,26 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
 import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
+import { usePostMessage } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state/hooks';
 import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
-import { useChatMessages } from '@/hooks/useChatMessages';
 
 interface SuggestedPromptProps {
   message: string;
   chatId?: string;
+  hasInProgressMessages: boolean;
 }
 
-export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ message, chatId }) => {
+export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
+  message,
+  chatId,
+  hasInProgressMessages,
+}) => {
   const { t } = useTranslation();
   const { enableChartGeneration, enableBusinessInsights, dataSource } = useAppState();
   const { data: dictionaries } = useGeneratedDictionaries();
-  const { hasInProgressMessages, sendMessage } = useChatMessages(chatId);
+  const { mutate: postMessage } = usePostMessage();
   const isActionShown = !!dictionaries?.[0];
   const actionTooltip = hasInProgressMessages
     ? t('Wait for agent to finish responding')
@@ -38,7 +43,9 @@ export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ message, chatI
                 disabled={hasInProgressMessages}
                 title={actionTooltip}
                 onClick={() => {
-                  sendMessage(message, {
+                  postMessage({
+                    message,
+                    chatId,
                     enableChartGeneration,
                     enableBusinessInsights,
                     dataSource,

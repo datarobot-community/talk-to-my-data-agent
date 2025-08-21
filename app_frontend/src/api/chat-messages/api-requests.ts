@@ -3,7 +3,6 @@ import { IChat, IChatMessage } from './types';
 import { getChatName } from './utils';
 
 export interface IGetMessagesParams {
-  limit: number;
   chatId: string;
   signal?: AbortSignal;
 }
@@ -13,6 +12,24 @@ export const getChatMessages = async ({
   chatId,
 }: IGetMessagesParams): Promise<IChatMessage[]> => {
   const { data } = await apiClient.get<IChatMessage[]>(`/v1/chats/${chatId}/messages`, {
+    signal,
+  });
+
+  return data;
+};
+
+export interface IGetSingleMessageParams {
+  chatId: string;
+  messageId: string;
+  signal?: AbortSignal;
+}
+
+export const getSingleMessage = async ({
+  signal,
+  chatId,
+  messageId,
+}: IGetSingleMessageParams): Promise<IChatMessage> => {
+  const { data } = await apiClient.get<IChatMessage>(`/v1/chats/${chatId}/messages/${messageId}`, {
     signal,
   });
 

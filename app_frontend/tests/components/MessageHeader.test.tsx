@@ -5,10 +5,14 @@ import { MessageHeader } from '@/components/chat/MessageHeader';
 import { IChatMessage } from '@/api/chat-messages/types';
 import { renderWithProviders } from '../test-utils';
 
-vi.mock('@/hooks/useChatMessages', () => ({
-  useChatMessages: vi.fn(),
+vi.mock('@/api/chat-messages/hooks', () => ({
+  useFetchAllMessages: vi.fn(),
+  useDeleteMessage: vi.fn(),
+  usePostMessage: vi.fn(),
+  useExport: vi.fn(),
 }));
-import { useChatMessages } from '@/hooks/useChatMessages';
+
+import { useFetchAllMessages, useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
 
 describe('MessageHeader Component', () => {
   const mockMessage = {
@@ -19,33 +23,32 @@ describe('MessageHeader Component', () => {
     components: [],
   } as IChatMessage;
 
-  const defaultProps = {
-    messageId: 'msg-1',
-    chatId: 'chat-1',
-  } as const;
+  const mockResponseMessage = {
+    id: 'resp-1',
+    role: 'assistant' as const,
+    content: 'Test response',
+    created_at: '2024-01-01T00:01:00Z',
+    components: [],
+  } as IChatMessage;
 
-  // Default mock configuration
-  const createMockChatMessages = (overrides = {}) => ({
-    messages: [],
-    isLoading: false,
-    isSending: false,
-    isDeleting: false,
-    isExporting: false,
-    hasInProgressMessages: false,
-    hasFailedMessages: false,
-    fetchError: null,
-    sendError: null,
-    deleteError: null,
-    getMessage: () => mockMessage,
-    getResponseMessage: () => ({ id: 'resp-1' }) as IChatMessage,
-    sendMessage: vi.fn(),
-    deleteMessagePair: vi.fn(),
-    exportMessage: vi.fn(),
+  const defaultProps = {
+    messageId: 'msg-1' as const,
+    chatId: 'chat-1' as const,
+    messages: [mockMessage, mockResponseMessage],
+  };
+
+  const createMockHooks = (overrides = {}) => ({
+    useFetchAllMessages: { data: [mockMessage, mockResponseMessage] } as any,
+    useDeleteMessage: { mutate: vi.fn(), isPending: false } as any,
+    useExport: { exportChat: vi.fn(), isLoading: false },
     ...overrides,
   });
 
   beforeEach(() => {
-    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages());
+    const mockHooks = createMockHooks();
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+    vi.mocked(useDeleteMessage).mockReturnValue(mockHooks.useDeleteMessage);
+    vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
   });
 
   test('renders basic header information for user message', () => {
@@ -67,15 +70,16 @@ describe('MessageHeader Component', () => {
 
   test('calls export hook when export button clicked', async () => {
     const user = userEvent.setup();
-    const exportMessage = vi.fn();
-    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ exportMessage }));
+    const exportChat = vi.fn();
+    const mockHooks = createMockHooks({ useExport: { exportChat, isLoading: false } });
+    vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
 
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /export chat/i });
     await user.click(exportButton);
 
-    expect(exportMessage).toHaveBeenCalledWith('msg-1');
+    expect(exportChat).toHaveBeenCalledWith({ chatId: 'chat-1', messageId: 'msg-1' });
   });
 
   test('shows confirm dialog when delete button is clicked', async () => {
@@ -91,8 +95,11 @@ describe('MessageHeader Component', () => {
 
   test('calls delete hook when confirm dialog is confirmed', async () => {
     const user = userEvent.setup();
-    const deleteMessagePair = vi.fn();
-    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ deleteMessagePair }));
+    const deleteMutate = vi.fn();
+    const mockHooks = createMockHooks({
+      useDeleteMessage: { mutate: deleteMutate, isPending: false } as any,
+    });
+    vi.mocked(useDeleteMessage).mockReturnValue(mockHooks.useDeleteMessage);
 
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
@@ -102,7 +109,7 @@ describe('MessageHeader Component', () => {
     const confirmButton = screen.getByTestId('confirm-dialog-confirm');
     await user.click(confirmButton);
 
-    expect(deleteMessagePair).toHaveBeenCalledWith('msg-1');
+    expect(deleteMutate).toHaveBeenCalledWith({ messageId: 'msg-1', chatId: 'chat-1' });
   });
 
   test('closes confirm dialog when cancel is clicked', async () => {
@@ -120,7 +127,8 @@ describe('MessageHeader Component', () => {
   });
 
   test('disables export button when isExporting is true', () => {
-    vi.mocked(useChatMessages).mockReturnValue(createMockChatMessages({ isExporting: true }));
+    const mockHooks = createMockHooks({ useExport: { exportChat: vi.fn(), isLoading: true } });
+    vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', { name: /exporting/i });
@@ -128,56 +136,87 @@ describe('MessageHeader Component', () => {
   });
 
   test('disables export button when response is in progress', () => {
-    vi.mocked(useChatMessages).mockReturnValue(
-      createMockChatMessages({
-        getResponseMessage: () => ({ id: 'resp-1', in_progress: true }) as IChatMessage,
-      })
+    const inProgressResponseMessage = {
+      id: 'resp-1',
+      role: 'assistant' as const,
+      content: 'Response in progress...',
+      created_at: '2024-01-01T00:01:00Z',
+      components: [],
+      in_progress: true,
+    } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [mockMessage, inProgressResponseMessage] } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+
+    renderWithProviders(
+      <MessageHeader {...defaultProps} messages={[mockMessage, inProgressResponseMessage]} />
     );
-    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', {
-      name: /Wait for agent to finish responding/i,
+      name: 'Wait for agent to finish responding',
     });
     expect(exportButton).toBeDisabled();
+    expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
   });
 
   test('disables export button when response is failing', () => {
-    vi.mocked(useChatMessages).mockReturnValue(
-      createMockChatMessages({
-        getResponseMessage: () => ({ id: 'resp-1', error: 'boom' }) as IChatMessage,
-      })
-    );
-    renderWithProviders(<MessageHeader {...defaultProps} />);
+    const erroredResponseMessage = {
+      id: 'resp-1',
+      role: 'assistant' as const,
+      content: 'Error occurred',
+      created_at: '2024-01-01T00:01:00Z',
+      components: [],
+      error: 'boom',
+    } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [mockMessage, erroredResponseMessage] } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
 
-    const exportButton = screen.getByRole('button', { name: /cannot export chat with errors/i });
+    renderWithProviders(
+      <MessageHeader {...defaultProps} messages={[mockMessage, erroredResponseMessage]} />
+    );
+
+    const exportButton = screen.getByRole('button', { name: 'Cannot export chat with errors' });
     expect(exportButton).toBeDisabled();
     expect(exportButton).toHaveAttribute('title', 'Cannot export chat with errors');
   });
 
   test('shows correct tooltip when response is in progress', () => {
-    vi.mocked(useChatMessages).mockReturnValue(
-      createMockChatMessages({
-        getResponseMessage: () => ({ id: 'resp-1', in_progress: true }) as IChatMessage,
-      })
+    const inProgressResponseMessage = {
+      id: 'resp-1',
+      role: 'assistant' as const,
+      content: 'Response in progress...',
+      created_at: '2024-01-01T00:01:00Z',
+      components: [],
+      in_progress: true,
+    } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [mockMessage, inProgressResponseMessage] } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+
+    renderWithProviders(
+      <MessageHeader {...defaultProps} messages={[mockMessage, inProgressResponseMessage]} />
     );
-    renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const exportButton = screen.getByRole('button', {
-      name: /Wait for agent to finish responding/i,
+      name: 'Wait for agent to finish responding',
     });
     expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
   });
 
   test('does not render action buttons for assistant message', () => {
     const assistantMessage = { ...mockMessage, role: 'assistant' as const };
-    vi.mocked(useChatMessages).mockReturnValue(
-      createMockChatMessages({
-        getMessage: () => assistantMessage,
-        getResponseMessage: () => assistantMessage,
-      })
+    const mockHooksWithAssistantMessage = createMockHooks({
+      useFetchAllMessages: { data: [assistantMessage] } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(
+      mockHooksWithAssistantMessage.useFetchAllMessages
     );
 
-    renderWithProviders(<MessageHeader {...defaultProps} />);
+    renderWithProviders(<MessageHeader {...defaultProps} messages={[assistantMessage]} />);
 
     expect(screen.getByText('DataRobot')).toBeInTheDocument();
     expect(

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '@/i18n';
@@ -9,6 +9,7 @@ import {
   exportChatMessages,
   getChatMessages,
   getChats,
+  getSingleMessage,
   IChatCreated,
   postMessage,
   renameChat,
@@ -19,25 +20,49 @@ import { IChat, IChatMessage, IPostMessageContext, IUserMessage } from './types'
 import { useNavigate } from 'react-router-dom';
 import { generateChatRoute } from '@/pages/routes';
 
+const POLL_INTERVAL = 1000;
+
 export interface IFetchMessagesParams {
-  limit?: number;
   chatId?: string;
 }
 
-export const useFetchAllMessages = ({ chatId, limit = 100 }: IFetchMessagesParams) => {
+export const useFetchAllMessages = ({ chatId }: IFetchMessagesParams) => {
   const queryResult = useQuery<IChatMessage[]>({
     queryKey: messageKeys.messages(chatId),
-    queryFn: ({ signal }) =>
-      chatId ? getChatMessages({ signal, limit, chatId }) : Promise.resolve([]),
-    refetchInterval: query =>
-      !query ||
-      // query.state?.data?.length === 0 ||
-      query.state?.data?.some(d => d.in_progress)
-        ? 5000
-        : false,
+    queryFn: ({ signal }) => (chatId ? getChatMessages({ signal, chatId }) : Promise.resolve([])),
+    enabled: !!chatId,
   });
 
   return queryResult;
+};
+
+export const usePollInProgressMessage = ({ chatId }: { chatId?: string }) => {
+  const queryClient = useQueryClient();
+  const currentMessages = queryClient.getQueryData<IChatMessage[]>(messageKeys.messages(chatId));
+  const inProgressMessageId = (currentMessages || []).find(msg => msg.in_progress)?.id;
+
+  // Poll for single in-progress message
+  const { data: polledMessage } = useQuery<IChatMessage | null>({
+    queryKey: messageKeys.singleMessage(chatId, inProgressMessageId),
+    queryFn: ({ signal }) =>
+      getSingleMessage({ signal, chatId: chatId!, messageId: inProgressMessageId! }),
+    enabled: !!inProgressMessageId && !!chatId,
+    refetchInterval: query => (query.state?.data?.in_progress ? POLL_INTERVAL : false),
+  });
+
+  useEffect(() => {
+    if (polledMessage && chatId) {
+      // Update the specific message in cache
+      queryClient.setQueryData<IChatMessage[]>(messageKeys.messages(chatId), cachedMessages =>
+        (cachedMessages || []).map(msg => (msg.id === polledMessage.id ? polledMessage : msg))
+      );
+
+      // If just completed, trigger refresh for list
+      if (!polledMessage.in_progress) {
+        queryClient.invalidateQueries({ queryKey: messageKeys.messages(chatId) });
+      }
+    }
+  }, [polledMessage, queryClient, chatId]);
 };
 
 export const usePostMessage = () => {
@@ -54,29 +79,22 @@ export const usePostMessage = () => {
       }),
     onMutate: async ({ message, chatId }) => {
       const messagesKey = messageKeys.messages(chatId);
-      await queryClient.cancelQueries({ queryKey: messagesKey });
-
-      // If this is a new chat, also cancel chats query
-      if (!chatId) {
-        await queryClient.cancelQueries({ queryKey: messageKeys.chats });
-      }
-
-      const previousMessages = queryClient.getQueryData<IChatMessage[]>(messagesKey) || [];
 
       // Save previous chats data for rollback if needed
+      const previousMessages = queryClient.getQueryData<IChatMessage[]>(messagesKey) || [];
       const previousChats = !chatId
         ? queryClient.getQueryData<IChat[]>(messageKeys.chats) || []
         : undefined;
 
-      const newUserMessage: IChatMessage = {
+      // Optimistically update the UI by adding the new message
+      const optimisticUpdateMessage: IChatMessage = {
         role: 'user',
         content: message,
         components: [],
         in_progress: true,
         created_at: new Date().toISOString(),
       };
-
-      queryClient.setQueryData(messagesKey, [...previousMessages, newUserMessage]);
+      queryClient.setQueryData(messagesKey, [...previousMessages, optimisticUpdateMessage]);
 
       return { previousMessages, messagesKey, previousChats };
     },
@@ -92,21 +110,15 @@ export const usePostMessage = () => {
       }
     },
     onSuccess: (data, variables) => {
-      // When redirecting from InitialPrompt (no chatId), don't invalidate queries
-      // as we'll navigate to the new chat which will fetch the messages
-      if (!variables.chatId) {
-        // Set the chat messages data directly in the cache to avoid loading state
-        queryClient.setQueryData<IChatMessage[]>(messageKeys.messages(data.id), (oldData = []) => [
-          ...oldData,
-          {
-            role: 'user',
-            content: variables.message,
-            components: [],
-            in_progress: true,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+      const messages = data?.messages;
+      const chatId = data?.id;
 
+      // Update messages to include the optimistically created one with the fresh list from server
+      queryClient.setQueryData(messageKeys.messages(chatId), messages);
+
+      // When redirecting from InitialPrompt(no chatId)
+      if (!variables.chatId) {
+        // Optimistically add newly created chat to the chats list
         queryClient.setQueryData<IChat[]>(messageKeys.chats, (oldData = []) => {
           const chatExists = oldData.some(chat => chat.id === data.id);
           if (chatExists) {
@@ -122,15 +134,7 @@ export const usePostMessage = () => {
             ...oldData,
           ];
         });
-
-        // Navigate to the new chat
-        navigate(generateChatRoute(data.id));
-      } else {
-        // For existing chats, invalidate as usual
-        queryClient.invalidateQueries({
-          queryKey: messageKeys.messages(variables.chatId),
-        });
-        queryClient.invalidateQueries({ queryKey: messageKeys.chats });
+        navigate(generateChatRoute(chatId));
       }
     },
   });
@@ -169,18 +173,9 @@ export const useDeleteMessage = () => {
       const previousMessages = queryClient.getQueryData<IChatMessage[]>(messagesKey) || [];
 
       // Optimistically update the UI by removing the message
-      queryClient.setQueryData<IChatMessage[]>(messagesKey, oldData => {
-        if (!oldData) return [];
-
-        // Create a copy to avoid mutating the original
-        const newData = [...oldData];
-
-        // Find the target message
-        const targetMessage = newData.find(m => m.id === messageId);
-        if (!targetMessage) return newData;
-
-        return newData.filter(m => m.id !== messageId);
-      });
+      queryClient.setQueryData<IChatMessage[]>(messagesKey, oldData =>
+        (oldData || []).filter(m => m.id !== messageId)
+      );
 
       return { previousMessages, messagesKey };
     },

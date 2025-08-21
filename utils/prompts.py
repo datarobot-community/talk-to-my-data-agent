@@ -32,6 +32,9 @@ Respond with a JSON object containing the following fields:
 1) columns: A list of all of the columns in the dataset
 2) descriptions: A list of descriptions for each column.
 
+LANGUAGE POLICY:
+Always respond in English for consistency and persistence. Do not translate.
+
 EXAMPLE OUTPUT:
 {
     columns: [a,taco,mpg],
@@ -58,12 +61,18 @@ Format your response as a JSON object with the following fields:
 2) question2: A second, totally different business question that might be answered by the data.
 3) question3: A third business question that touches on a different aspect of the data.
 
+LANGUAGE POLICY:
+Respond in the same language as the user's latest message. Do not translate. If the language cannot be determined, default to English.
+
 NECESSARY CONSIDERATIONS:
 Do not refer to specific column names or tables in the data. Just use common language when suggesting a question. Let the next analyst figure out which columns and tables they'll need to use.
 """
 SYSTEM_PROMPT_REPHRASE_MESSAGE = """
 ROLE
 You are an AI assistant whose job is to review the entire chat history between the user and the AI, then paraphrase the user’s latest message in a way that captures their complete intent. This paraphrased statement will be passed along to an analytics engine, so it must accurately and comprehensively represent the user’s question, including any relevant context from previous messages if needed.
+
+LANGUAGE POLICY
+Detect the language of the latest user message and paraphrase STRICTLY in that same language. Do not translate to another language. If the conversation uses multiple languages, ALWAYS use the latest user message’s language regardless of any earlier messages or examples. Output only the paraphrase.
 
 DECISION LOGIC
 Check if this is the very first user message
@@ -88,6 +97,12 @@ User: “Show me the sales by store, aggregated by year.”
 Assistant (Paraphrased Response):
 Understood. Let’s get the sales by store, aggregated by year.
 
+Non‑English (Japanese) Example
+
+User: 「年別に店舗別売上を集計して見せてください。」
+Assistant (Paraphrased Response):
+年別に店舗別売上を集計して表示してください。
+
 Follow-Up / Revision
 
 User (first message): “Show me the sales by store, aggregated by year.”
@@ -110,6 +125,10 @@ Avoid changing the user’s intent; simply clarify or reorganize it.
 Speak in first-person and be concise, yet thorough.
 Do not add extra data or assumptions that the user did not request.
 If the user explicitly references the entire conversation (“like we did before,” “use that same chart but change X,” etc.), make sure to incorporate that historical context into your paraphrase.
+
+LANGUAGE
+Paraphrase strictly in the language of the latest user message. Do not translate to another language. If the language cannot be determined, default to the language used by the latest user message; only if truly unclear, default to English.
+
 YOUR RESPONSE:
 Based on these guidelines, provide a single paraphrased statement that captures the user’s most recent request and any necessary context.
 """
@@ -167,6 +186,9 @@ NECESSARY CONSIDERATIONS:
 - Please try to be memory efficient if the data is large (more than 1M rows)
 - polars DataFrame use `group_by` instead of `groupby`
 
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. Code remains code.
+
 REATTEMPT:
 It's possible that your code will fail due to a python error or return an empty result set.
 If this happens, you will be provided the failed code and the error message.
@@ -217,6 +239,9 @@ To ensure case sensitivity of column names, use quotes around column names.
 This query will be executed using the Snowflake Python Connector. Make sure the query will be compatible with the Snowflake Python Connector.
 Always reference tables fully quoted and qualified, as in '{database}.{schema}."TABLE_NAME"' and quote any column names in the query.
 
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
+
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
@@ -266,6 +291,9 @@ Carefully consider the metadata and the sample data when constructing your query
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
 When performing date operations on a date column, consider using SAFE_CAST, PARSE_DATE, or the appropriate BigQuery date functions for error redundancy.
 This query will be executed using the BigQuery Python client library. Make sure the query is compatible with standard SQL in BigQuery.
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
@@ -326,6 +354,9 @@ When referring to columns in your code, spell them EXACTLY as they appear in the
 For example, if the question asks "What is the total amount paid ("AMTPAID") for each type of order?" but the metadata does not contain "AMTPAID" but rather "TOTAL_AMTPAID", you should use "TOTAL_AMTPAID" in your code because that's the column name in the data.
 Data Availability: If some data is missing, plot what you can in the most sensible way.
 Package Imports: If your code requires a package to run, such as statsmodels, numpy, scipy, etc, you must import the package within your function.
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. Code remains code.
 
 Data Handling:
 If there are more than 100 rows, consider grouping or aggregating data for clarity.
@@ -454,6 +485,9 @@ Your response should be output as a JSON object with the following fields:
 2) additional_insights: A discussion of the underlying reasons or causes for the answer in "The Bottom Line" section. This section, while still business focused, should go a level deeper to help the user understand a possible root cause. Formatted in markdown.
 3) follow_up_questions: A list of 3 helpful follow up questions that would lead to deeper insight into the issue in another round of analysis. When you word these questions, do not use pronouns to refer to the data - always use specific column names. Only refer to data that actually exists in the provided dataset. For example, don't refer to "sales volume" if there is no "sales volume" column.
 
+LANGUAGE:
+Write all three sections in the same language as the user's question. If the language cannot be determined, default to English.
+
 """
 SYSTEM_PROMPT_SAP_DATASPHERE = """
 ROLE:
@@ -507,6 +541,9 @@ Common HANA SQL syntax differences:
 - For timestamp operations use: 'ADD_SECONDS', 'ADD_DAYS', 'ADD_MONTHS', 'ADD_YEARS'
 - For string concatenation use: '||' operator
 - Date formatting: 'TO_VARCHAR(date_column, 'YYYY-MM-DD')'
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.

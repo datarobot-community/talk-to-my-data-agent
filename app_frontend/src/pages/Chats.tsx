@@ -7,8 +7,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
 import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
 import { useTranslation } from '@/i18n';
-import { useDeleteChat, useFetchAllChats, useExport } from '@/api/chat-messages/hooks';
-import { useChatMessages } from '@/hooks/useChatMessages';
+import {
+  useDeleteChat,
+  useFetchAllChats,
+  useFetchAllMessages,
+  useExport,
+  usePollInProgressMessage,
+} from '@/api/chat-messages/hooks';
 import { InitialPrompt, UserPrompt, UserMessage } from '@/components/chat';
 import { ROUTES } from './routes';
 import { Loading } from '@/components/ui-custom/loading';
@@ -40,15 +45,15 @@ export const Chats: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // API data hooks
-  const {
-    messages,
-    isLoading: messagesLoading,
-    hasInProgressMessages,
-    hasFailedMessages,
-  } = useChatMessages(chatId);
   const { data: chats } = useFetchAllChats();
   // Find the active chat based on chatId param
   const activeChat = chats ? chats.find(chat => chat.id === chatId) : undefined;
+
+  const { data: messages = [], isLoading: messagesLoading } = useFetchAllMessages({ chatId });
+  const hasInProgressMessages = messages.some(m => m.in_progress);
+  const hasFailedMessages = messages.some(m => m.error);
+  usePollInProgressMessage({ chatId });
+
   const { mutate: deleteChat, isPending: isDeleting } = useDeleteChat({
     onSuccess: () => {
       const otherChats = chats?.filter(chat => chat.id !== activeChat?.id) || [];
@@ -169,10 +174,11 @@ export const Chats: React.FC = () => {
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loading />
         </div>
-      ) : messages?.length === 0 ? (
+      ) : !chatId || messages?.length === 0 ? (
         <InitialPrompt
           allowedDataSources={allowedDataSources}
           chatId={activeChat?.id}
+          activeChat={activeChat}
           testId="initial-prompt"
         />
       ) : (
@@ -185,6 +191,7 @@ export const Chats: React.FC = () => {
                     <UserMessage
                       message={message}
                       chatId={activeChat.id}
+                      messages={messages}
                       testId={`user-message-${message.id}`}
                     />
                   )}
@@ -194,6 +201,8 @@ export const Chats: React.FC = () => {
                       <ResponseMessage
                         message={message}
                         chatId={activeChat.id}
+                        messages={messages}
+                        hasInProgressMessages={hasInProgressMessages}
                         testId={`response-message-${message.id}`}
                       />
                     </Suspense>
@@ -206,6 +215,8 @@ export const Chats: React.FC = () => {
             <UserPrompt
               allowedDataSources={allowedDataSources}
               chatId={activeChat?.id}
+              activeChat={activeChat}
+              hasInProgressMessages={hasInProgressMessages}
               testId="user-prompt"
             />
           </div>

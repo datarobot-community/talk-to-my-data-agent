@@ -54,6 +54,7 @@ describe('InsightsTabContent', () => {
         additionalInsights={additionalInsights}
         followUpQuestions={followUpQuestions}
         chatId="test-chat"
+        hasInProgressMessages={false}
       />
     );
 
@@ -85,7 +86,11 @@ describe('InsightsTabContent', () => {
     });
 
     renderWithProviders(
-      <InsightsTabContent followUpQuestions={['Question 1']} chatId="test-chat" />
+      <InsightsTabContent
+        followUpQuestions={['Question 1']}
+        chatId="test-chat"
+        hasInProgressMessages={true}
+      />
     );
 
     expect(screen.queryByText('Data insights')).not.toBeInTheDocument();
@@ -100,7 +105,11 @@ describe('InsightsTabContent', () => {
     mockUseGeneratedDictionaries.mockReturnValue({ data: [] });
 
     renderWithProviders(
-      <InsightsTabContent followUpQuestions={['Question 1']} chatId="test-chat" />
+      <InsightsTabContent
+        followUpQuestions={['Question 1']}
+        chatId="test-chat"
+        hasInProgressMessages={false}
+      />
     );
 
     expect(screen.getByText('Question 1')).toBeInTheDocument();

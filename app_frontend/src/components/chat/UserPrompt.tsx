@@ -1,19 +1,23 @@
 import { useMemo } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
-import { useFetchAllChats } from '@/api/chat-messages/hooks';
+import { usePostMessage } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state';
 import { useTranslation } from '@/i18n';
 import { DATA_SOURCES } from '@/constants/dataSources';
-import { useChatMessages } from '@/hooks/useChatMessages';
+import type { IChat } from '@/api/chat-messages/types';
 
 export const UserPrompt = ({
   chatId,
   allowedDataSources,
+  hasInProgressMessages,
   testId,
+  activeChat,
 }: {
   chatId?: string;
   allowedDataSources?: string[];
+  hasInProgressMessages: boolean;
   testId?: string;
+  activeChat?: IChat;
 }) => {
   const { t } = useTranslation();
   const {
@@ -21,12 +25,8 @@ export const UserPrompt = ({
     enableBusinessInsights,
     dataSource: globalDataSource,
   } = useAppState();
-  const { data: chats } = useFetchAllChats();
-  const { hasInProgressMessages, sendMessage } = useChatMessages(chatId);
+  const { mutate: postMessage } = usePostMessage();
   const isDataUploadRequired = !allowedDataSources?.[0];
-
-  // Find the active chat to get its data source setting
-  const activeChat = chatId ? chats?.find(chat => chat.id === chatId) : undefined;
   const chatDataSource = useMemo(() => {
     const dataSource = activeChat?.data_source || globalDataSource;
     // User can only select from the allowed data sources
@@ -39,7 +39,9 @@ export const UserPrompt = ({
     <PromptInput
       sendButtonArrangement="append"
       onSend={(message: string) =>
-        sendMessage(message, {
+        postMessage({
+          message,
+          chatId,
           enableChartGeneration,
           enableBusinessInsights,
           dataSource: chatDataSource,
