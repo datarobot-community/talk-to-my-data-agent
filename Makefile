@@ -32,10 +32,16 @@ lint: ## Lint the code
 
 check-all: check-licenses lint ## Run all checks
 
-run-local-dev-backend:
+install-frontend:
+	cd app_frontend && npm install
+
+build-frontend:
+	cd app_frontend && npm run build
+
+run-local-dev-backend: install-frontend build-frontend
 	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=False DEV_MODE=True ./app_backend/start-app.sh
 
-run-local-static-backend:
+run-local-static-backend: install-frontend build-frontend
 	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend DEV_MODE=True ./app_backend/start-app.sh

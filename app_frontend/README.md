@@ -27,7 +27,6 @@ This application provides a modern React-based frontend for the **Talk to My Dat
 - `src/state`: Application state management
 - `src/assets`: Static assets like images and icons
 
-
 <a id="react-local-dev"></a>
 
 ## Development
@@ -35,12 +34,13 @@ This application provides a modern React-based frontend for the **Talk to My Dat
 **Prerequisites:** Start [backend first](../app_backend/README.md#backend-local-dev)
 
 From the `app_frontend` directory:
+
 ```bash
 npm i
 npm run dev
 ```
 
-Open http://localhost:5173 (frontend) not the backend URL. 
+Open http://localhost:5173 (frontend) not the backend URL.
 The dev server proxies `/api` calls to the backend on port 8080.
 
 ### Known issue with Apple Silicon (arm64)
@@ -60,23 +60,19 @@ To run the test suite:
 npm run test
 ```
 
-## Building
+## Production build testing
 
-To build the application for production:
+Test application build for production:
 
 ```bash
 npm run build
 ```
 
-The build output will be placed in the `../app_backend/static/` directory, which is then used by the Python backend to serve the application. 
-
-You can run it locally using the static files by starting it from project root with:
+The build output will be placed in the `../app_backend/static/` directory, which is then could be used by the Python backend to serve the application, by runnning from project root:
 
 ```bash
 make run-local-static-backend
 ```
-
-> ⚠️ Note: Rebuild the React frontend code before deploying changes.
 
 ## Linting
 
@@ -113,15 +109,15 @@ export default tseslint.config({
       tsconfigRootDir: import.meta.dirname,
     },
   },
-})
+});
 ```
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
 // eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+import reactX from 'eslint-plugin-react-x';
+import reactDom from 'eslint-plugin-react-dom';
 
 export default tseslint.config({
   plugins: {
@@ -135,5 +131,5 @@ export default tseslint.config({
     ...reactX.configs['recommended-typescript'].rules,
     ...reactDom.configs.recommended.rules,
   },
-})
+});
 ```

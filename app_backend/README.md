@@ -9,7 +9,6 @@
 
 ## Local Development
 
-
 Start the backend from the project root:
 
 ```bash
@@ -18,17 +17,15 @@ make run-local-dev-backend
 
 Now run the [local React Frontend](../app_frontend/README.md#react-local-dev)
 
-## Building frontend for production
+## Production build testing
 
-To build the frontend part of the application for production:
+Test application build for production:
 
 ```bash
 npm run build
 ```
 
-The build output will be placed in the `../app_backend/static/` directory, which is then used by the Python backend to serve the application.
-
-You can run it locally using the static files by starting it from project root with:
+The build output will be placed in the `../app_backend/static/` directory, which is then could be used by the Python backend to serve the application, by runnning from project root:
 
 ```bash
 make run-local-static-backend
@@ -42,7 +39,6 @@ From the repo root, use Makefile targets:
 make lint      # check formatting, style, and types
 make fix-lint  # auto-format and fix issues
 ```
-
 
 ## Codespaces
 
@@ -68,13 +64,6 @@ To run the app with prebuilt frontend in a codespace, first open a terminal and 
 cd ~/storage/app_frontend
 npm install
 npm run build:codespace
-```
-
-#### _Note:_ When you're ready to publish a new version of the application using Pulumi, make sure to build the static/assets by running this command:
-
-```bash
-cd ~/storage/app_frontend
-npm run build
 ```
 
 Next install the necessary python dependencies:
@@ -120,7 +109,6 @@ npm run dev
 ```
 
 Navigate to `Session environment` and find the frontend app link on port 5173 in the exposed ports section.
-
 
 ## Testing
 

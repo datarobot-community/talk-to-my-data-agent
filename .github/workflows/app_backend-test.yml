@@ -40,6 +40,14 @@ jobs:
         working-directory: app_backend
         run: uv sync --all-extras --dev
 
+      - name: Install Frontend Dependencies
+        working-directory: app_frontend
+        run: npm install
+
+      - name: Build static Frontend files
+        working-directory: app_frontend
+        run: npm run build
+
       - name: Run Static Checks
         working-directory: app_backend
         run: |

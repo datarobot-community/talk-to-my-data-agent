@@ -98,7 +98,7 @@ and `pulumi` invocation see [here](#setup-for-advanced-users).
 ## Template development
 
 The Talk to My Data agent supports two frontend options:
-- **React** (default): a modern JavaScript-based frontend with enhanced UI features which uses FastAPI Backend. See the [React Frontend Development Guide](app_frontend/README.md)
+- **React** (default): a modern JavaScript-based frontend with enhanced UI features which uses [FastAPI Backend](app_backend/README.md). See the [React Frontend Development Guide](app_frontend/README.md)
 - **Streamlit:** A Python-based frontend with a simple interface. See the [Streamlit Frontend Development Guide](frontend/README.md)
 
 To change the frontend:
