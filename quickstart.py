@@ -126,6 +126,15 @@ def parse_args():
 def get_python_executable():
     if is_conda_environment():
         return shutil.which("python")
+    
+    # Try to use Python 3.12 or lower versions if available
+    # Check for Python 3.12, 3.11, 3.10, 3.9 in order of preference
+    for version in ["3.12", "3.11", "3.10", "3.9"]:
+        python_cmd = shutil.which(f"python{version}")
+        if python_cmd:
+            return python_cmd
+    
+    # Fall back to current Python executable
     return sys.executable
 
 
