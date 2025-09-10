@@ -4,7 +4,7 @@ import { getCleansedDataset, getDatasetMetadata } from './api-requests';
 
 export const useInfiniteCleansedDataset = (name: string, limit = 100, search?: string) => {
   return useInfiniteQuery({
-    queryKey: cleansedDatasetKeys.detail(name, search),
+    queryKey: cleansedDatasetKeys.detail(name, { search, limit }),
     initialPageParam: 0,
     queryFn: ({ pageParam = 0, signal }) =>
       getCleansedDataset({

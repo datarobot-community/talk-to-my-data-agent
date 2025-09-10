@@ -2,7 +2,7 @@ import axios from 'axios';
 import { isDev, isServedStatic } from '@/lib/utils';
 import { VITE_DEFAULT_PORT } from '@/constants/dev';
 
-export const getApiUrl = () => {
+const getApiUrl = () => {
   // Adjust API URL based on the environment
   let apiBaseURL: string = window.location.origin;
   if (window.ENV?.APP_BASE_URL) {

@@ -4,7 +4,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { RESPONSE_TABS } from './constants';
 import { useTranslation } from '@/i18n';
 
-export interface TabState {
+interface TabState {
   isLoading?: boolean;
   hasError: boolean;
 }

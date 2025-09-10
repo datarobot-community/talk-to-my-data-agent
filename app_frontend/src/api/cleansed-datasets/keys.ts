@@ -1,6 +1,7 @@
 export const cleansedDatasetKeys = {
   all: ['cleansed_datasets'] as const,
-  detail: (name: string, search?: string) => [...cleansedDatasetKeys.all, name, search] as const,
+  detail: (name: string, params: { search?: string; limit: number }) =>
+    [...cleansedDatasetKeys.all, name, params] as const,
 };
 
 export const datasetMetadataKeys = {

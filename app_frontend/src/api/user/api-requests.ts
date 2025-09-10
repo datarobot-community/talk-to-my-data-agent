@@ -1,6 +1,6 @@
 import { apiClient, drClient } from '../apiClient';
 
-export interface DataRobotInfoResponse {
+interface DataRobotInfoResponse {
   datarobot_account_info: {
     uid: string;
     username: string;
@@ -10,23 +10,6 @@ export interface DataRobotInfoResponse {
   } | null;
   datarobot_api_token: string | null;
   datarobot_api_skoped_token: string | null;
-}
-
-export interface DataRobotAccount {
-  uid: string;
-  username: string;
-  email: string;
-  [key: string]: string | number | boolean | null | undefined;
-}
-
-export interface DataRobotStoreInfoRequest {
-  account_info?: {
-    uid: string;
-    username: string;
-    email: string;
-    [key: string]: string | number | boolean | null | undefined;
-  } | null;
-  api_token?: string | null;
 }
 
 export const getDataRobotInfo = async (): Promise<DataRobotInfoResponse> => {

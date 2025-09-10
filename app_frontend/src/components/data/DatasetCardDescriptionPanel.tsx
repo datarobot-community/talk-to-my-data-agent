@@ -27,12 +27,13 @@ interface DatasetCardDescriptionPanelProps {
   dictionary: DT;
   isProcessing?: boolean;
   viewMode: ValueOf<typeof DATA_TABS>;
+  fullHeight?: boolean;
 }
 
 export const DatasetCardDescriptionPanel = forwardRef<
   HTMLDivElement,
   DatasetCardDescriptionPanelProps
->(({ dictionary, isProcessing = true, viewMode = 'description' }, ref) => {
+>(({ dictionary, isProcessing = true, viewMode = 'description', fullHeight = false }, ref) => {
   const { t } = useTranslation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { searchText, setSearchText, filteredDictionary, getOriginalRowIndex } =
@@ -65,6 +66,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
       ref={ref}
       className={cn('flex flex-col w-full bg-card p-4', {
         'h-[400px]': isProcessing,
+        'h-full': fullHeight,
       })}
     >
       <ConfirmDialog
@@ -127,13 +129,17 @@ export const DatasetCardDescriptionPanel = forwardRef<
           />
         </div>
       </div>
-      <div className="flex flex-col flex-1 text-lg">
+      <div
+        className={cn('flex flex-col flex-1 text-lg', {
+          'h-full': fullHeight,
+        })}
+      >
         {isProcessing ? (
           <div className="flex flex-col flex-1 items-center justify-center">
             {t('Processing the dataset may take a few minutes...')}
           </div>
         ) : (
-          <ScrollArea className="mt-4 h-96">
+          <ScrollArea className={cn('mt-4', fullHeight ? 'h-full' : 'h-96')}>
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <DictionaryTable
                 data={filteredDictionary}

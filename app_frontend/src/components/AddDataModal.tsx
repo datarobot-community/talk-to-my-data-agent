@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 
@@ -18,7 +19,7 @@ import { DATA_SOURCES } from '@/constants/dataSources';
 import { MultiSelect } from '@/components/ui-custom/multi-select';
 import { useState } from 'react';
 import { FileUploader } from './ui-custom/file-uploader';
-import { useFetchAllDatasets } from '@/api/datasets/hooks';
+import { useFetchDatasets } from '@/api/datasets/hooks';
 import { useGetDatabaseTables, useLoadFromDatabaseMutation } from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
@@ -27,9 +28,10 @@ import { useAppState } from '@/state/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AxiosError } from 'axios';
 import { TruncatedText } from './ui-custom/truncated-text';
+import { localizeException } from '@/api/exceptions';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
-  const { data } = useFetchAllDatasets();
+  const { data } = useFetchDatasets();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const { data: dbTables } = useGetDatabaseTables();
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -40,6 +42,10 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
 
+  useEffect(() => {
+    setSelectedDatasets([]);
+  }, [isOpen]);
+
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
       setIsPending(false);
@@ -49,7 +55,10 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     onError: (error: UploadError | AxiosError) => {
       setIsPending(false);
       console.error(error);
-      setError(error.message || t('An error occurred while uploading files'));
+
+      setError(
+        localizeException(t, error) || error.message || t('An error occurred while uploading files')
+      );
     },
   });
 
@@ -106,8 +115,8 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <h6>{t('Select one or more catalog items')}</h6>
             <MultiSelect
               options={
-                data
-                  ? data.map(i => ({
+                data && data.local
+                  ? data.local.map(i => ({
                       label: i.name,
                       value: i.id,
                       postfix: i.size,
@@ -156,6 +165,38 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             />
           </>
         )}
+
+        {dataSource == DATA_SOURCES.REMOTE_CATALOG && (
+          <>
+            <h4>{t('Data Registry')}</h4>
+            <h6>{t('Select one or more catalog items')}</h6>
+            <MultiSelect
+              options={
+                data && data.remote
+                  ? data.remote.map(i => ({
+                      label: i.name,
+                      value: i.id,
+                      postfix: i.size,
+                    }))
+                  : []
+              }
+              onValueChange={setSelectedDatasets}
+              defaultValue={selectedDatasets}
+              placeholder={t('Select one or more items.')}
+              variant="inverted"
+              modalPopover
+              animation={2}
+              maxCount={3}
+            />
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <TruncatedText maxLength={100}>{error}</TruncatedText>
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
+        )}
         <Separator className="border-t mt-6" />
         <DialogFooter>
           <div className="flex gap-2 w-full items-center">
@@ -176,7 +217,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                     loadFromDatabase({ tableNames: selectedTables });
                   }
                 } else {
-                  mutate({ files, catalogIds: selectedDatasets });
+                  mutate({ files, catalogIds: selectedDatasets, dataSource: dataSource });
                 }
               }}
             >

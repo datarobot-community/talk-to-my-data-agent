@@ -21,9 +21,6 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
 
   return (
     <>
-      {/* <InfoText>
-        DataRobot generates additional content based on your original question.
-      </InfoText> */}
       {additionalInsights && (
         <HeaderSection title={t('Data insights')}>
           <MarkdownContent content={additionalInsights} />

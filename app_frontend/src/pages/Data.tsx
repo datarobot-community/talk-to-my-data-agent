@@ -90,6 +90,7 @@ export const Data: React.FC = () => {
                   ref.current[dictionary.name] = element;
                 }
               }}
+              fullHeight={data?.length === 1}
               key={dictionary.name}
               isProcessing={dictionary.in_progress || false}
               dictionary={dictionary}

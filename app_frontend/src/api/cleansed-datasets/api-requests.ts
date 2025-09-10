@@ -1,6 +1,6 @@
 import apiClient from '../apiClient';
 
-export type CleansedColumnReport = {
+type CleansedColumnReport = {
   new_column_name: string;
   original_column_name: string | null;
   errors: string[];
@@ -10,7 +10,7 @@ export type CleansedColumnReport = {
   conversion_type: string | null;
 };
 
-export type CleansedDataset = {
+type CleansedDataset = {
   dataset: {
     name: string;
     data_records: Record<string, never>[];

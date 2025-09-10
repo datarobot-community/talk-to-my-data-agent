@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/knip/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/lib/utils.ts",
+    "src/components/ui/**/*.{ts,tsx}"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": [ ],
+  "ignoreBinaries": [ ],
+  "ignoreDependencies": [ ]
+}

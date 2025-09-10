@@ -93,14 +93,15 @@ export const Chats: React.FC = () => {
         dataSourcesSet.add(DATA_SOURCES.FILE);
       } else if (data_source === DATA_SOURCES.DATABASE) {
         dataSourcesSet.add(DATA_SOURCES.DATABASE);
+      } else if (data_source === DATA_SOURCES.REMOTE_CATALOG) {
+        dataSourcesSet.add(DATA_SOURCES.REMOTE_CATALOG);
       }
     });
 
     return {
       // Users can only select data sources that are present in the metadata
       allowedDataSources: Array.from(dataSourcesSet),
-      hasMixedSources:
-        dataSourcesSet.has(DATA_SOURCES.FILE) && dataSourcesSet.has(DATA_SOURCES.DATABASE),
+      hasMixedSources: dataSourcesSet.size > 1,
     };
   }, [multipleMetadata]);
 
@@ -142,7 +143,14 @@ export const Chats: React.FC = () => {
           <strong>{activeChat.name || t('New Chat')}</strong>
           <RenameChatModal chatId={activeChat.id} currentName={activeChat.name} />
         </h2>
-        <div>{hasMixedSources && <DataSourceToggle multipleMetadata={multipleMetadata} />}</div>
+        <div>
+          {hasMixedSources && (
+            <DataSourceToggle
+              multipleMetadata={multipleMetadata}
+              allowedDataSources={allowedDataSources}
+            />
+          )}
+        </div>
         <Button
           variant="ghost"
           onClick={() => exportChat({ chatId: activeChat.id })}

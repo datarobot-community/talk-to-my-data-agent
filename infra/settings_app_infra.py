@@ -113,7 +113,17 @@ def get_app_files(
                     (str(snowflake_file), credentials.snowflake_key_path)
                 )
 
-    EXCLUDE_PATTERNS = [re.compile(pattern) for pattern in [r".*\.pyc"]]
+    EXCLUDE_PATTERNS = [
+        re.compile(pattern)
+        for pattern in [
+            r".*\.pyc",
+            r".*\.so",
+            r".*\.dylib",
+            r"\.venv/.*",
+            r"__pycache__/.*",
+            r"\.DS_Store",
+        ]
+    ]
     source_files = [
         (file_path, file_name)
         for file_path, file_name in source_files

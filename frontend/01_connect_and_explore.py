@@ -33,8 +33,8 @@ from helpers import state_empty, state_init
 
 from utils.analyst_db import AnalystDB, DataSourceType
 from utils.api import (
-    download_registry_datasets,
     list_registry_datasets,
+    load_registry_datasets,
     log_memory,
     process_data_and_update_state,
 )
@@ -129,7 +129,7 @@ async def registry_download_callback() -> None:
                     ds["id"] for ds in st.session_state.selected_registry_datasets
                 ]
                 with st.session_state.datarobot_connect.use_user_token():
-                    dataframes = await download_registry_datasets(
+                    dataframes = await load_registry_datasets(
                         selected_ids, st.session_state.analyst_db
                     )
                 dataset_names = [

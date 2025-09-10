@@ -61,10 +61,11 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from utils.api import (
     AnalysisGenerationError,
-    download_registry_datasets,
     list_registry_datasets,
+    load_registry_datasets,
     log_memory,
     process_data_and_update_state,
+    register_remote_registry_datasets,
     run_complete_analysis,
 )
 from utils.schema import (
@@ -352,7 +353,7 @@ async def _initialize_session(
 
 
 async def _initialize_database(request: Request, user_id: str) -> None:
-    """Initialize the database in the session if not already initialized."""
+    """Initialize per-user database in the session if not already initialized."""
     if (
         not hasattr(request.state.session, "analyst_db")
         or request.state.session.analyst_db is None
@@ -377,10 +378,20 @@ def _set_session_cookie(
 
 @router.get("/registry/datasets")
 async def get_registry_datasets(
-    request: Request, limit: int = 100
+    request: Request, remote: bool = False, limit: int = 100
 ) -> list[DataRegistryDataset]:
+    """Return all registry datasets
+
+    Args:
+        request (Request): _description_
+        filter_downloadable (bool, optional): _description_. Defaults to False.
+        limit (int, optional): _description_. Defaults to 100.
+
+    Returns:
+        list[DataRegistryDataset]: _description_
+    """
     with use_user_token(request):
-        return list_registry_datasets(limit)
+        return list_registry_datasets(remote=remote, limit=limit)
 
 
 @router.get("/database/tables")
@@ -401,10 +412,18 @@ async def process_and_update(
 async def upload_files(
     request: Request,
     background_tasks: BackgroundTasks,
+    data_source: str | DataSourceType | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
     files: List[UploadFile] | None = None,
     registry_ids: str | None = Form(None),
 ) -> list[FileUploadResponse]:
+    normalized_data_source: DataSourceType = (
+        DataSourceType.FILE
+        if data_source is None
+        else DataSourceType(data_source)
+        if isinstance(data_source, str)
+        else data_source
+    )
     dataset_names = []
     response: list[FileUploadResponse] = []
     if files:
@@ -503,7 +522,15 @@ async def upload_files(
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
             with use_user_token(request):
-                dataframes = await download_registry_datasets(id_list, analyst_db)
+                if normalized_data_source == DataSourceType.REMOTE_REGISTRY:
+                    dataframes, tasks = await register_remote_registry_datasets(
+                        id_list, analyst_db
+                    )
+                else:
+                    dataframes = await load_registry_datasets(id_list, analyst_db)
+                    tasks = []
+                for func, args, kwargs in tasks:
+                    background_tasks.add_task(func, *args, **kwargs)
                 dataset_names = [
                     dataset.name for dataset in dataframes if not dataset.error
                 ]
@@ -511,7 +538,9 @@ async def upload_files(
                     process_and_update,
                     dataset_names,
                     analyst_db,
-                    DataSourceType.REGISTRY,
+                    DataSourceType.REMOTE_REGISTRY
+                    if normalized_data_source == DataSourceType.REMOTE_REGISTRY
+                    else DataSourceType.REGISTRY,
                 )
                 for dts in dataframes:
                     dts_response: FileUploadResponse = {
@@ -1288,18 +1317,22 @@ async def run_complete_analysis_task(
 ) -> None:
     """Run the complete analysis pipeline"""
     source = DataSourceType(data_source)
-    datasets_names = []
+    dataset_metadata = []
     if source == DataSourceType.DATABASE:
-        datasets_names = await analyst_db.list_analyst_datasets(source)
+        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(source)
+    elif source == DataSourceType.REMOTE_REGISTRY:
+        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(
+            DataSourceType.REMOTE_REGISTRY
+        )
     else:
-        datasets_names = (
-            await analyst_db.list_analyst_datasets(DataSourceType.REGISTRY)
-        ) + (await analyst_db.list_analyst_datasets(DataSourceType.FILE))
+        dataset_metadata = (
+            await analyst_db.list_analyst_dataset_metadata(DataSourceType.REGISTRY)
+        ) + (await analyst_db.list_analyst_dataset_metadata(DataSourceType.FILE))
 
     run_analysis_iterator = run_complete_analysis(
         chat_request=chat_request,
         data_source=source,
-        datasets_names=datasets_names,
+        dataset_metadata=dataset_metadata,
         analyst_db=analyst_db,
         chat_id=chat_id,
         message_id=message_id,

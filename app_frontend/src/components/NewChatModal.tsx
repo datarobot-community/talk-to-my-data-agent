@@ -21,7 +21,7 @@ import { useAppState } from '@/state/hooks';
 import { cn } from '@/lib/utils';
 import { getChatName } from '@/api/chat-messages/utils';
 
-export type NewChatModalType = {
+type NewChatModalType = {
   highlight: boolean;
 };
 

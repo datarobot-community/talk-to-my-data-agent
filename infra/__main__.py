@@ -237,7 +237,6 @@ app = datarobot.CustomApplication(
     allow_auto_stopping=True,
 )
 
-
 pulumi.export(llm_deployment_env_name, llm_deployment.id)
 pulumi.export(
     settings_generative.deployment_args.resource_name,

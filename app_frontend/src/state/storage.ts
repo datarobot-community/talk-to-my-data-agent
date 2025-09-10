@@ -25,11 +25,3 @@ export const setStorageItem = (key: string, value: string): void => {
 export const isWelcomeModalHidden = (): boolean => {
   return getStorageItem(STORAGE_KEYS.HIDE_WELCOME_MODAL) === 'true';
 };
-
-export const isCollapsiblePanelDefaultOpen = (): boolean => {
-  return getStorageItem(STORAGE_KEYS.COLLAPSIBLE_PANEL_DEFAULT_OPEN) === 'true';
-};
-
-export const setCollapsiblePanelDefaultOpen = (isOpen: boolean): void => {
-  setStorageItem(STORAGE_KEYS.COLLAPSIBLE_PANEL_DEFAULT_OPEN, isOpen ? 'true' : 'false');
-};

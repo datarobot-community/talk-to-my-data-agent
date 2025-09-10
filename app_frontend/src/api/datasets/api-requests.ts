@@ -1,7 +1,7 @@
 import { AxiosProgressEvent } from 'axios';
 import apiClient from '../apiClient';
 
-export type Dataset = {
+type Dataset = {
   id: string;
   name: string;
   created: string;
@@ -11,14 +11,19 @@ export type Dataset = {
 
 export const getDatasets = async ({
   limit,
+  remote,
   signal,
 }: {
   limit: number;
+  remote: boolean;
   signal?: AbortSignal;
 }): Promise<Dataset[]> => {
-  const { data } = await apiClient.get<Dataset[]>(`/v1/registry/datasets?limit=${limit}`, {
-    signal,
-  });
+  const { data } = await apiClient.get<Dataset[]>(
+    `/v1/registry/datasets?limit=${limit}&remote=${remote}`,
+    {
+      signal,
+    }
+  );
   return data;
 };
 
@@ -26,14 +31,18 @@ export async function uploadDataset({
   files,
   onUploadProgress,
   catalogIds,
+  dataSource,
   signal,
 }: {
   files?: File[];
   catalogIds?: string[];
+  dataSource?: string;
   onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
   signal?: AbortSignal;
 }) {
   const formData = new FormData();
+
+  dataSource ??= 'catalog';
 
   if (files && files.length > 0) {
     files.forEach(file => formData.append('files', file));
@@ -41,7 +50,7 @@ export async function uploadDataset({
 
   formData.append('registry_ids', JSON.stringify(catalogIds || []));
 
-  const response = await apiClient.post('/v1/datasets/upload', formData, {
+  const response = await apiClient.post(`/v1/datasets/upload?data_source=${dataSource}`, formData, {
     headers: {
       'content-type': 'multipart/form-data',
     },

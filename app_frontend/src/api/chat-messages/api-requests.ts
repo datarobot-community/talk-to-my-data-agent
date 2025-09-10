@@ -2,7 +2,7 @@ import apiClient from '../apiClient';
 import { IChat, IChatMessage } from './types';
 import { getChatName } from './utils';
 
-export interface IGetMessagesParams {
+interface IGetMessagesParams {
   chatId: string;
   signal?: AbortSignal;
 }
@@ -18,7 +18,7 @@ export const getChatMessages = async ({
   return data;
 };
 
-export interface IGetSingleMessageParams {
+interface IGetSingleMessageParams {
   chatId: string;
   messageId: string;
   signal?: AbortSignal;
@@ -36,7 +36,7 @@ export const getSingleMessage = async ({
   return data;
 };
 
-export interface IPostMessageParams {
+interface IPostMessageParams {
   message: string;
   chatId?: string;
   enableChartGeneration?: boolean;
@@ -86,7 +86,7 @@ export async function postMessage({
   return data;
 }
 
-export interface IDeleteMessageParams {
+interface IDeleteMessageParams {
   messageId: string;
   signal?: AbortSignal;
 }
@@ -103,7 +103,7 @@ export const deleteMessage = async ({
   return data;
 };
 
-export interface IDeleteChatParams {
+interface IDeleteChatParams {
   chatId: string;
   signal?: AbortSignal;
 }
@@ -113,7 +113,7 @@ export const deleteChat = async ({ chatId, signal }: IDeleteChatParams): Promise
   return;
 };
 
-export interface IGetChatsParams {
+interface IGetChatsParams {
   limit?: number;
   signal?: AbortSignal;
 }
@@ -125,7 +125,7 @@ export const getChats = async ({ signal }: IGetChatsParams): Promise<IChat[]> =>
   return data;
 };
 
-export interface ICreateChatParams {
+interface ICreateChatParams {
   name: string;
   dataSource: string;
   signal?: AbortSignal;
@@ -144,7 +144,7 @@ export const createChat = async ({
   return data;
 };
 
-export interface IUpdateChatParams {
+interface IUpdateChatParams {
   chatId: string;
   name?: string;
   dataSource?: string;
@@ -174,13 +174,13 @@ export const renameChat = async ({
   return updateChat({ chatId, name, signal });
 };
 
-export interface IExportChatMessagesParams {
+interface IExportChatMessagesParams {
   chatId: string;
   messageId?: string | null;
   signal?: AbortSignal;
 }
 
-export interface IExportResponse {
+interface IExportResponse {
   data: Blob;
   headers: Record<string, string | undefined>;
 }

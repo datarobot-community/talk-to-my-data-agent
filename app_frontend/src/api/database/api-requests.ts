@@ -1,6 +1,6 @@
 import apiClient from '../apiClient';
 
-export type DatabaseTables = Array<string>;
+type DatabaseTables = Array<string>;
 
 export const getDatabaseTables = async ({
   signal,

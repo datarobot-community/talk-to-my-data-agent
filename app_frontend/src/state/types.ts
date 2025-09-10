@@ -9,7 +9,7 @@ export interface AppStateData {
   dataSource: string;
 }
 
-export interface AppStateActions {
+interface AppStateActions {
   hideWelcomeModal: () => void;
   setCollapsiblePanelDefaultOpen: (isOpen: boolean) => void;
   setEnableChartGeneration: (enabled: boolean) => void;

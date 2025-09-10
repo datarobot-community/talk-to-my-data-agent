@@ -5,22 +5,28 @@ import { DatasetMetadata } from '@/api/cleansed-datasets/api-requests';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { useFetchAllChats, useUpdateChatDataSource } from '@/api/chat-messages/hooks';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from '@/i18n';
 
 interface IDataSourceToggleProps {
   multipleMetadata?: {
     name: string;
     metadata: DatasetMetadata;
   }[];
+  allowedDataSources?: string[];
 }
 
 /**
  * Toggle component for switching between database and catalog data sources
  */
-export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({ multipleMetadata }) => {
+export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
+  multipleMetadata,
+  allowedDataSources,
+}) => {
   const { chatId } = useParams<{ chatId?: string }>();
   const { dataSource, setDataSource } = useAppState();
   const { data: chats } = useFetchAllChats();
   const { mutate: updateChatDataSource } = useUpdateChatDataSource();
+  const { t } = useTranslation();
 
   const handleValueChange = (value: string) => {
     if (value) {
@@ -49,6 +55,13 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({ multipleMet
       if (currentValue === DATA_SOURCES.DATABASE && data_source === DATA_SOURCES.DATABASE) {
         acc.push(name);
       }
+
+      if (
+        currentValue === DATA_SOURCES.REMOTE_CATALOG &&
+        data_source === DATA_SOURCES.REMOTE_CATALOG
+      ) {
+        acc.push(name);
+      }
       return acc;
     }, [] as string[]);
   }, [multipleMetadata, currentValue]);
@@ -56,7 +69,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({ multipleMet
   const getTooltip = () => {
     return (
       <div className="absolute min-w-[270px] max-w-[600px] left-1/2 -translate-x-1/2 top-full mb-2 hidden bg-secondary text-secondary-foreground group-hover:block text-xs rounded px-2 py-1 shadow z-10">
-        Selected data sources:
+        {t('Selected data sources:')}
         {dataByDataSource && dataByDataSource?.length > 0 ? (
           <ul className="list-disc pl-5">
             {dataByDataSource.map(item => (
@@ -66,7 +79,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({ multipleMet
             ))}
           </ul>
         ) : (
-          <div className="text-sm">No data sources selected.</div>
+          <div className="text-sm">{t('No data sources selected.')}</div>
         )}
       </div>
     );
@@ -80,12 +93,21 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({ multipleMet
       className="bg-muted rounded-md p-1 shadow-sm group relative"
     >
       {getTooltip()}
-      <ToggleGroupItem value={DATA_SOURCES.DATABASE} className="text-sm">
-        <div className="m-2">Database</div>
-      </ToggleGroupItem>
-      <ToggleGroupItem value={DATA_SOURCES.FILE} className="text-sm">
-        <div className="m-2">Registry / File</div>
-      </ToggleGroupItem>
+      {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.DATABASE) && (
+        <ToggleGroupItem value={DATA_SOURCES.DATABASE} className="text-sm">
+          <div className="m-2">{t('Database')}</div>
+        </ToggleGroupItem>
+      )}
+      {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.REMOTE_CATALOG) && (
+        <ToggleGroupItem value={DATA_SOURCES.REMOTE_CATALOG} className="text-sm">
+          <div className="m-2">{t('Remote Registry')}</div>
+        </ToggleGroupItem>
+      )}
+      {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.FILE) && (
+        <ToggleGroupItem value={DATA_SOURCES.FILE} className="text-sm">
+          <div className="m-2">{t('Local Registry / File')}</div>
+        </ToggleGroupItem>
+      )}
     </ToggleGroup>
   );
 };

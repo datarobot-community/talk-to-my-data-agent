@@ -18,9 +18,6 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ dataset, code })
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2.5">
-      {/* <InfoText>
-        DataRobot generates additional content based on your original question.
-      </InfoText> */}
       {dataset && (
         <CollapsiblePanel header={t('Dataset')}>
           <AnalystDatasetTable records={dataset?.data_records} />

@@ -1,4 +1,4 @@
-export interface IMetadata {
+interface IMetadata {
   duration?: number | null;
   attempts?: number | null;
   datasets_analyzed?: number | null;
@@ -50,7 +50,7 @@ export interface IBusinessComponent extends IComponent {
   follow_up_questions?: string[] | null;
 }
 
-export interface IComponent {
+interface IComponent {
   status?: 'success' | 'error';
   metadata?: IMetadata;
 }

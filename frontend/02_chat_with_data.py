@@ -314,14 +314,14 @@ async def run_complete_analysis_st(
 
         try:
             selected_datasets = [
-                dataset_name
+                st.session_state.analyst_db.get_dataset_metadata(dataset_name)
                 for dataset_name in st.session_state.datasets_names
                 if st.session_state[f"dataset_{dataset_name}"]
             ]
             run_analysis_iterator = run_complete_analysis(
                 chat_request=chat_request,
                 data_source=st.session_state.data_source,
-                datasets_names=selected_datasets,
+                dataset_metadata=selected_datasets,
                 analyst_db=st.session_state.analyst_db,
                 chat_id=st.session_state.current_chat_id,
                 message_id=st.session_state.chat_messages[-1].id,

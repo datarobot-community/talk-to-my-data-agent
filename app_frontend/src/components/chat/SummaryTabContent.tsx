@@ -17,10 +17,6 @@ export const SummaryTabContent: React.FC<SummaryTabContentProps> = ({ bottomLine
 
   return (
     <div>
-      {/* <InfoText>
-        DataRobot writes as short an answer to your question as possible,
-        illustrated with supporting charts.
-      </InfoText> */}
       {bottomLine && <HeaderSection title={t('Bottom line')}>{bottomLine}</HeaderSection>}
       <div className="flex flex-col gap-2.5">
         {plot1 && <PlotPanel plotData={plot1} />}

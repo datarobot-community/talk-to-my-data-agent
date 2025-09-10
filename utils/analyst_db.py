@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
@@ -54,12 +56,14 @@ class DataSourceType(Enum):
     FILE = "file"
     DATABASE = "database"
     REGISTRY = "catalog"
+    REMOTE_REGISTRY = "remote_catalog"
     GENERATED = "generated"
 
 
 @dataclass
 class DatasetMetadata:
     name: str
+    dataset_id: str | None
     dataset_type: DatasetType
     original_name: (
         str  # For cleansed/dictionary datasets, links to their original dataset
@@ -227,6 +231,27 @@ class DatasetHandler(BaseDuckDBHandler):
                 )
                 """,
             )
+            # For backwards compatibility, add new columns.
+            additional_columns = [("dataset_id", "VARCHAR")]
+            columns = await self.execute_query(
+                conn,
+                """
+                DESCRIBE dataset_metadata
+                """,
+            )
+            existing_columns = set()
+            for row in await asyncio.get_running_loop().run_in_executor(
+                None, columns.fetchall
+            ):
+                existing_columns.add(row[0])
+
+            for column_name, column_type in additional_columns:
+                if column_name not in existing_columns:
+                    await self.execute_query(
+                        conn,
+                        f"ALTER TABLE dataset_metadata ADD COLUMN {column_name} {column_type}",
+                    )
+
             # Create cleansing reports table
             await self.execute_query(
                 conn,
@@ -245,6 +270,7 @@ class DatasetHandler(BaseDuckDBHandler):
         name: str,
         dataset_type: DatasetType,
         data_source: DataSourceType,
+        dataset_id: str | None = None,
         original_name: str | None = None,
         file_size: int = 0,
     ) -> None:
@@ -288,6 +314,7 @@ class DatasetHandler(BaseDuckDBHandler):
             metadata = DatasetMetadata(
                 name=name,
                 dataset_type=dataset_type,
+                dataset_id=dataset_id,
                 original_name=original_name or name,
                 created_at=datetime.now(timezone.utc),
                 columns=list(df.columns),
@@ -300,8 +327,8 @@ class DatasetHandler(BaseDuckDBHandler):
                 conn,
                 """
                 INSERT INTO dataset_metadata
-                (table_name, dataset_type, original_name, created_at, columns, row_count, data_source, file_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (table_name, dataset_type, original_name, created_at, columns, row_count, data_source, file_size, dataset_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     metadata.name,
@@ -312,6 +339,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     metadata.row_count,
                     metadata.data_source.value,
                     metadata.file_size,
+                    metadata.dataset_id,
                 ],
             )
 
@@ -334,7 +362,8 @@ class DatasetHandler(BaseDuckDBHandler):
             query = """
                 SELECT
                     table_name, dataset_type, original_name,
-                    created_at, columns, row_count, data_source, file_size
+                    created_at, columns, row_count, data_source, file_size,
+                    dataset_id
                 FROM dataset_metadata
             """
             params = []
@@ -366,6 +395,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     row_count=row[5],
                     data_source=DataSourceType(row[6]),
                     file_size=row[7],
+                    dataset_id=row[8],
                 )
                 for row in rows
             ]
@@ -443,7 +473,8 @@ class DatasetHandler(BaseDuckDBHandler):
                     """
                     SELECT
                         table_name, dataset_type, original_name,
-                        created_at, columns, row_count, data_source, file_size
+                        created_at, columns, row_count, data_source, file_size,
+                        dataset_id
                     FROM dataset_metadata
                     WHERE table_name = ?
                     """,
@@ -466,6 +497,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     row_count=row[5],
                     data_source=DataSourceType(row[6]),
                     file_size=row[7],
+                    dataset_id=row[8],
                 )
 
                 return metadata
@@ -1335,14 +1367,95 @@ class ChatHandler(BaseDuckDBHandler):
             )
 
 
+@dataclass
+class UserRecipe:
+    user_id: str
+    recipe_id: str
+
+
+class RecipeHandler(BaseDuckDBHandler):
+    """Async handler for managing user's recipe."""
+
+    async def _initialize_database(self) -> None:
+        await super()._initialize_database()
+
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                    CREATE TABLE IF NOT EXISTS user_recipe (
+                        user_id VARCHAR PRIMARY KEY,
+                        recipe_id VARCHAR NULL
+                    )
+                """,
+            )
+
+    async def register_recipe(self, user_recipe: UserRecipe) -> None:
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                    DELETE FROM user_recipe WHERE user_id = ?
+                """,
+                [user_recipe.user_id],
+            )
+            await self.execute_query(
+                conn,
+                """
+                    INSERT INTO user_recipe
+                        (user_id, recipe_id) 
+                    VALUES
+                        (?, ?)
+                """,
+                [user_recipe.user_id, user_recipe.recipe_id],
+            )
+
+    async def get_user_recipe(self, user_id: str) -> UserRecipe | None:
+        async with self._get_connection() as conn:
+            user_recipe_results = await self.execute_query(
+                conn,
+                """
+                SELECT user_id, recipe_id FROM user_recipe WHERE user_id = ?
+                """,
+                [user_id],
+            )
+
+            row = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: user_recipe_results.fetchone()
+            )
+
+            if row:
+                user_id, recipe_id = row
+                return UserRecipe(user_id=user_id, recipe_id=recipe_id)
+            return None
+
+
 class AnalystDB:
     dataset_handler: DatasetHandler
     chat_handler: ChatHandler
+    user_recipe_handler: RecipeHandler
     user_id: str
     db_path: Path
     dataset_db_name: str
     chat_db_name: str
+    user_recipe_db_name: str
     db_version: int
+
+    @property
+    def _eq_token(self) -> tuple[str, str, str, str, int]:
+        return (
+            self.user_id,
+            self.dataset_db_name,
+            self.chat_db_name,
+            self.user_recipe_db_name,
+            self.db_version,
+        )
+
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, AnalystDB) and self._eq_token == value._eq_token
+
+    def __hash__(self) -> int:
+        return hash(self._eq_token)
 
     @classmethod
     async def create(
@@ -1351,6 +1464,7 @@ class AnalystDB:
         db_path: Path,
         dataset_db_name: str = "dataset",
         chat_db_name: str = "chat",
+        user_recipe_db_name: str = "recipe",
         db_version: int | None = ANALYST_DATABASE_VERSION,
         use_persistent_storage: bool = False,
     ) -> "AnalystDB":
@@ -1369,17 +1483,27 @@ class AnalystDB:
             db_version=db_version,
             use_persistent_storage=use_persistent_storage,
         )
+        self.user_recipe_handler = RecipeHandler(
+            user_id=user_id,
+            db_path=db_path,
+            name=user_recipe_db_name,
+            db_version=db_version,
+            use_persistent_storage=use_persistent_storage,
+        )
         self.user_id = user_id
         self.db_path = db_path
         self.dataset_db_name = dataset_db_name
         self.chat_db_name = chat_db_name
+        self.user_recipe_db_name = user_recipe_db_name
+        self.db_version = db_version or 0
         await self.initialize()
         return self
 
     async def initialize(self) -> None:
-        """Initialize both database handlers."""
+        """Initialize all database handlers."""
         await self.dataset_handler._initialize_database()
         await self.chat_handler._initialize_database()
+        await self.user_recipe_handler._initialize_database()
 
     # Dataset operations
     async def register_dataset(
@@ -1387,6 +1511,7 @@ class AnalystDB:
         df: AnalystDataset | CleansedDataset,
         data_source: DataSourceType,
         file_size: int = 0,
+        dataset_id: str | None = None,
     ) -> None:
         if isinstance(df, CleansedDataset):
             is_cleansed = True
@@ -1405,6 +1530,7 @@ class AnalystDB:
                 data_source=data_source,
                 original_name=df.name,
                 file_size=file_size,
+                dataset_id=dataset_id,
             )
         except Exception as e:
             logger.warning(f"Error registering dataset: {e}")
@@ -1471,7 +1597,7 @@ class AnalystDB:
         self, data_source: DataSourceType | None = None
     ) -> list[str]:
         """
-        List all standard datasets, optionally filtered by data source.
+        List all standard datasets names, optionally filtered by data source.
 
         Args:
             data_source: Optional filter by data source (FILE, DATABASE, REGISTRY)
@@ -1483,6 +1609,22 @@ class AnalystDB:
             dataset_type=DatasetType.STANDARD, data_source=data_source
         )
         return [dataset.name for dataset in datasets]
+
+    async def list_analyst_dataset_metadata(
+        self, data_source: DataSourceType | None = None
+    ) -> list[DatasetMetadata]:
+        """
+        List all standard datasets, optionally filtered by data source.
+
+        Args:
+            data_source: Optional filter by data source (FILE, DATABASE, REGISTRY)
+
+        Returns:
+            List of dataset metadata
+        """
+        return await self.dataset_handler.list_datasets(
+            dataset_type=DatasetType.STANDARD, data_source=data_source
+        )
 
     async def delete_table(self, table_name: str) -> None:
         logger.info(f"Deleting table: {table_name} and related datasets")
@@ -1650,3 +1792,15 @@ class AnalystDB:
             data_source: The new data source setting
         """
         return await self.chat_handler.update_chat_data_source(chat_id, data_source)
+
+    async def get_user_recipe(self) -> UserRecipe | None:
+        """
+        Lookup the recipe assigned to the user of this DB, if set.
+        """
+        return await self.user_recipe_handler.get_user_recipe(self.user_id)
+
+    async def set_user_recipe(self, recipe: UserRecipe) -> None:
+        """
+        Assign the given recipe to this user.
+        """
+        await self.user_recipe_handler.register_recipe(recipe)

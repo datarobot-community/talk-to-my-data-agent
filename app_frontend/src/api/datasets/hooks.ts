@@ -6,7 +6,7 @@ import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
 import { AxiosError } from 'axios';
 
-export interface FileUploadResponse {
+interface FileUploadResponse {
   filename?: string;
   content_type?: string;
   size?: number;
@@ -22,10 +22,16 @@ export interface UploadError extends Error {
   isAxiosError?: boolean;
 }
 
-export const useFetchAllDatasets = ({ limit = 100 } = {}) => {
+export const useFetchDatasets = ({ limit = 100 } = {}) => {
   const queryResult = useQuery({
-    queryKey: datasetKeys.all,
-    queryFn: ({ signal }) => getDatasets({ signal, limit }),
+    queryKey: datasetKeys.list(limit),
+    queryFn: async ({ signal }) => {
+      const [local, remote] = await Promise.all([
+        getDatasets({ signal, limit, remote: false }),
+        getDatasets({ signal, limit, remote: true }),
+      ]);
+      return { local: local, remote: remote };
+    },
   });
 
   return queryResult;
@@ -42,10 +48,19 @@ export const useFileUploadMutation = ({
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ files, catalogIds }: { files: File[]; catalogIds: string[] }) => {
+    mutationFn: async ({
+      files,
+      catalogIds,
+      dataSource,
+    }: {
+      files: File[];
+      catalogIds: string[];
+      dataSource: string;
+    }) => {
       const response = await uploadDataset({
         files,
         catalogIds,
+        dataSource,
         onUploadProgress: progressEvent => {
           if (progressEvent.total) {
             const prg = Math.round((progressEvent.loaded * 100) / progressEvent.total);

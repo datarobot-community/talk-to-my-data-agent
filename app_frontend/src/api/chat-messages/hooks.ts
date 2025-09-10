@@ -22,7 +22,7 @@ import { generateChatRoute } from '@/pages/routes';
 
 const POLL_INTERVAL = 1000;
 
-export interface IFetchMessagesParams {
+interface IFetchMessagesParams {
   chatId?: string;
 }
 
@@ -142,11 +142,7 @@ export const usePostMessage = () => {
   return mutation;
 };
 
-export interface IDeleteMessagesResult {
-  success: boolean;
-}
-
-export interface IDeleteMessageParams {
+interface IDeleteMessageParams {
   messageId: string;
   chatId?: string;
 }
@@ -208,7 +204,7 @@ export const useFetchAllChats = <TData = IChat[]>(options = {}) => {
   return queryResult;
 };
 
-export interface ICreateChatParams {
+interface ICreateChatParams {
   name: string;
   dataSource: string;
 }
@@ -228,7 +224,7 @@ export const useCreateChat = () => {
   return mutation;
 };
 
-export interface IDeleteChatParams {
+interface IDeleteChatParams {
   chatId: string;
 }
 
@@ -266,7 +262,7 @@ export const useDeleteChat = ({ onSuccess }: { onSuccess?: () => void }) => {
   return mutation;
 };
 
-export interface IRenameChatParams {
+interface IRenameChatParams {
   chatId: string;
   name: string;
 }
@@ -301,7 +297,7 @@ export const useRenameChat = () => {
   return mutation;
 };
 
-export interface IUpdateChatDataSourceParams {
+interface IUpdateChatDataSourceParams {
   chatId: string;
   dataSource: string;
 }
@@ -348,7 +344,7 @@ export const useUpdateChatDataSource = () => {
   return mutation;
 };
 
-export interface IExportChatParams {
+interface IExportChatParams {
   chatId: string;
   messageId?: string | null;
 }

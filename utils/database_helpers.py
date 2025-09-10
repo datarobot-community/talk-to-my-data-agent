@@ -95,6 +95,7 @@ class DatabaseOperator(ABC, Generic[T]):
     def get_tables(self, timeout: int | None = None) -> list[str]:
         return []
 
+    @functools.lru_cache(maxsize=8)
     @abstractmethod
     async def get_data(
         self,
@@ -132,6 +133,7 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
     def get_tables(self, timeout: int | None = 300) -> list[str]:
         return []
 
+    @functools.lru_cache(8)
     async def get_data(
         self,
         *table_names: str,
@@ -796,27 +798,22 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
 
 
 def load_app_infra() -> AppInfra:
-    try:
-        with open("app_infra.json", "r") as infra_selection:
-            app_infra = AppInfra(**json.load(infra_selection))
-        return app_infra
-    except (FileNotFoundError, ValidationError):
+    directories = [".", "frontend", "app_backend"]
+    error = None
+    for directory in directories:
+        path = Path(directory).joinpath("app_infra.json")
         try:
-            with open("frontend/app_infra.json", "r") as infra_selection:
-                app_infra = AppInfra(**json.load(infra_selection))
-            return app_infra
-        except (FileNotFoundError, ValidationError):
-            try:
-                with open("app_backend/app_infra.json", "r") as infra_selection:
-                    app_infra = AppInfra(**json.load(infra_selection))
-                return app_infra
-            except (FileNotFoundError, ValidationError) as e:
-                raise ValueError(
-                    "Failed to read app_infra.json.\n"
-                    "If running locally, verify you have selected the correct "
-                    "stack and that it is active using `pulumi stack output`.\n"
-                    f"Ensure file is created by running `pulumi up`: {str(e)}"
-                ) from e
+            with open(path) as infra_selection:
+                app_json = json.load(infra_selection)
+                return AppInfra(**app_json)
+        except (FileNotFoundError, ValidationError) as e:
+            error = e
+    raise ValueError(
+        "Failed to read app_infra.json.\n"
+        "If running locally, verify you have selected the correct "
+        "stack and that it is active using `pulumi stack output`.\n"
+        f"Ensure file is created by running `pulumi up`: {str(error)}"
+    ) from error
 
 
 def get_external_database() -> DatabaseOperator[Any]:

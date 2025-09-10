@@ -7,9 +7,9 @@ import { useTranslation } from '@/i18n';
 import { cn } from '~/lib/utils';
 import { Button } from '@/components/ui/button';
 
-export type SendButtonArrangement = 'prepend' | 'append';
+type SendButtonArrangement = 'prepend' | 'append';
 
-export type PromptInputProps = Omit<
+type PromptInputProps = Omit<
   React.TextareaHTMLAttributes<HTMLTextAreaElement>,
   'onChange' | 'value' | 'onSend'
 > & {

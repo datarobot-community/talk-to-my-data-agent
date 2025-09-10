@@ -29,6 +29,8 @@ from types import ModuleType, TracebackType
 from typing import (
     Any,
     AsyncGenerator,
+    Callable,
+    Final,
     Type,
     TypeVar,
     cast,
@@ -45,6 +47,7 @@ import scipy
 import sklearn
 import statsmodels as sm
 from datarobot.client import RESTClientObject
+from datarobot.models.dataset import Dataset
 from joblib import Memory
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -57,9 +60,12 @@ from openai.types.chat.chat_completion_user_message_param import (
 from plotly.subplots import make_subplots
 from pydantic import ValidationError
 
+from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
+from utils.datarobot_dataset_handler import SparkRecipe, load_or_create_spark_recipe
+
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from utils import prompts, tools
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
 from utils.code_execution import (
     InvalidGeneratedCode,
     MaxReflectionAttempts,
@@ -70,7 +76,7 @@ from utils.data_cleansing_helpers import (
     add_summary_statistics,
     process_column,
 )
-from utils.database_helpers import get_external_database
+from utils.database_helpers import DatabaseOperator, get_external_database
 from utils.logging_helper import get_logger, log_api_call
 from utils.resources import LLMDeployment
 from utils.schema import (
@@ -175,6 +181,9 @@ ALTERNATIVE_LLM_BIG = "datarobot-deployed-llm"
 ALTERNATIVE_LLM_SMALL = "datarobot-deployed-llm"
 DICTIONARY_BATCH_SIZE = 10
 MAX_REGISTRY_DATASET_SIZE = 400e6  # aligns to 400MB set in streamlit config.toml
+REGISTRY_DATASET_SIZE_CUTOFF: Final[float] = (
+    200e6  # at 200MB we move from downloading to analyzing remotely with dataset
+)
 DISK_CACHE_LIMIT_BYTES = 512e6
 DICTIONARY_PARALLEL_BATCH_SIZE = 2
 DICTIONARY_TIMEOUT = 45.0
@@ -220,63 +229,172 @@ def cache(f: T) -> T:
 
 
 # This can be large as we are not storing the actual datasets in memory, just metadata
-def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
-    """
-    Fetch datasets from Data Registry with specified limit
+def list_registry_datasets(
+    remote: bool = False, limit: int = 100
+) -> list[DataRegistryDataset]:
+    """Fetch datasets from Data Registry with specified limit
 
     Args:
-        limit: int
-        Datasets to retrieve. Max value: 100
+        filter_downloadable (bool, optional): Include only downloadable datasets. Defaults to False.
+        limit (int, optional): _description_. Defaults to 100.
+
+    Returns:
+        list[DataRegistryDataset]: _description_
     """
 
-    url = f"datasets?limit={limit}"
-
-    # Get all datasets and manually limit the results
-    datasets = dr.client.get_client().get(url).json()["data"]
+    datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
 
     return [
         DataRegistryDataset(
-            id=ds["datasetId"],
-            name=ds["name"],
-            created=(
-                ds["creationDate"][:10] if "creationDate" in ds else "N/A"  # %Y-%m-%d
-            ),
-            size=(
-                f"{ds['datasetSize'] / (1024 * 1024):.1f} MB"
-                if "datasetSize" in ds
-                else "N/A"
-            ),
+            id=ds.id,
+            name=ds.name,
+            created=(_year_month_day(ds.created_at) if ds.created_at else "N/A"),
+            size=(f"{ds.size / (1024 * 1024):.1f} MB" if ds.size else "N/A"),
         )
         for ds in datasets
+        if (remote and ds.is_data_engine_eligible and ds.is_snapshot)
+        or (
+            not remote
+            and ds.size
+            and ds.size <= REGISTRY_DATASET_SIZE_CUTOFF
+            and ds.is_snapshot
+        )
     ]
 
 
-async def download_registry_datasets(
+def _year_month_day(date: datetime | str) -> str:
+    if isinstance(date, str):
+        date = datetime.fromisoformat(date)
+    return date.strftime("%Y-%m-%d")
+
+
+async def register_remote_registry_datasets(
     dataset_ids: list[str], analyst_db: AnalystDB
-) -> list[DownloadedRegistryDataset]:
-    """Load selected datasets as pandas DataFrames
+) -> tuple[
+    list[DownloadedRegistryDataset],
+    list[tuple[Callable[..., Any], list[Any], dict[str, Any]]],
+]:
+    """Load selected datasets into the application, downloading the entire datasets.
 
     Args:
-        *args: list of dataset IDs to download
+        dataset_ids (list[str]): The list of dataset IDs to load.
+        analyst_db (AnalystDB): The database to register into
 
     Returns:
-        list[AnalystDataset]: Dictionary of dataset names and data
-    """
+        tuple[list[AnalystDataset], list[tuple[Callable, list, dict]]: A tuple of
+            1. a dictionary of dataset names and data and
+            2. a list of callbacks + arguments to that callback to be run in the background
+               to pull datasets.
+
+    Raises:
+        ValueError: If the loading cannot be performed. This can be either (a) the small datasets exceed
+                    our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)"""
+    if not SparkRecipe.should_use_spark_recipe():
+        raise ValueError("")
+
+    datasets = [Dataset.get(d_id) for d_id in dataset_ids]
+
+    # Dynamic datasets cannot be used with data wrangling.
+    invalid_remote_datasets = [ds for ds in datasets if not ds.is_data_engine_eligible]
+
+    if invalid_remote_datasets:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASETS_INVALID,
+            f"Cannot register remote, dynamic datasets: {[ds.name for ds in invalid_remote_datasets]}.",
+        )
+
+    existing_dataset_names = await find_existing_dataset_names(analyst_db, datasets)
+
+    if existing_dataset_names:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASET_ALREADY_USED,
+            f"Cannot register already registered datasets: {existing_dataset_names}.",
+        )
+
+    background_tasks: list[tuple[Callable[..., Any], list[Any], dict[str, Any]]] = []
+
     downloaded_datasets = []
-    datasets = [dr.Dataset.get(id_) for id_ in dataset_ids]
+
+    if dataset_ids:
+        recipe = await load_or_create_spark_recipe(analyst_db)
+
+        recipe.add_datasets([ds.id for ds in datasets])
+
+        background_tasks.append(
+            (register_remote_datasets, [recipe, analyst_db, datasets], {})
+        )
+
+        for ds in datasets:
+            downloaded_datasets.append(DownloadedRegistryDataset(name=ds.name))
+
+    return downloaded_datasets, background_tasks
+
+
+async def find_existing_dataset_names(
+    analyst_db: AnalystDB, datasets: list[Dataset]
+) -> list[str]:
+    dataset_names = {ds.name for ds in datasets}
+    existing_names = set(await analyst_db.list_analyst_datasets())
+    return list(dataset_names & existing_names)
+
+
+async def register_remote_datasets(
+    recipe: SparkRecipe, analyst_db: AnalystDB, datasets: list[Dataset]
+) -> None:
+    for dataset in datasets:
+        preview = recipe.preview_dataset(dataset)
+        analyst_dataset = AnalystDataset(name=dataset.name, data=preview)
+
+        await analyst_db.register_dataset(
+            analyst_dataset,
+            DataSourceType.REMOTE_REGISTRY,
+            file_size=0,
+            dataset_id=dataset.id,
+        )
+
+
+async def load_registry_datasets(
+    dataset_ids: list[str],
+    analyst_db: AnalystDB,
+) -> list[DownloadedRegistryDataset]:
+    """Load selected datasets into the application, downloading the entire datasets.
+
+    Args:
+        dataset_ids (list[str]): The list of dataset IDs to load.
+        analyst_db (AnalystDB): The database to register into
+
+    Returns:
+        list[DownloadedRegistryDataset]: A list of dictionary of dataset names and data.
+
+    Raises:
+        ApplicationUsageException: If the loading cannot be performed. This can be either (a) the small datasets exceed
+                                   our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)
+    """
+
+    downloaded_datasets = []
+    datasets = [Dataset.get(id_) for id_ in dataset_ids]
+
     if (
         sum([ds.size for ds in datasets if ds.size is not None])
         > MAX_REGISTRY_DATASET_SIZE
     ):
-        raise ValueError(
-            f"The requested Data Registry datasets must total <= {int(MAX_REGISTRY_DATASET_SIZE)} bytes"
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASETS_TOO_LARGE,
+            f"The requested Data Registry datasets must total <= {int(MAX_REGISTRY_DATASET_SIZE)} bytes",
         )
 
-    result_datasets: list[AnalystDataset] = []
+    existing_datasets = await find_existing_dataset_names(analyst_db, datasets)
+
+    if existing_datasets:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASET_ALREADY_USED,
+            f"Some requested datasets are already present {existing_datasets}.",
+        )
+
     for dataset in datasets:
         try:
             df = dataset.get_as_dataframe()
-            result_datasets.append(AnalystDataset(name=dataset.name, data=df))
+            result_dataset = AnalystDataset(name=dataset.name, data=df)
             logger.info(f"Successfully downloaded {dataset.name}")
         except Exception as e:
             logger.error(f"Failed to read dataset {dataset.name}: {str(e)}")
@@ -284,11 +402,12 @@ async def download_registry_datasets(
                 DownloadedRegistryDataset(name=dataset.name, error=str(e))
             )
             continue
-    for result_dataset in result_datasets:
+
         await analyst_db.register_dataset(
             result_dataset, DataSourceType.REGISTRY, dataset.size or 0
         )
         downloaded_datasets.append(DownloadedRegistryDataset(name=result_dataset.name))
+
     return downloaded_datasets
 
 
@@ -1207,6 +1326,7 @@ async def run_analysis(
 
 
 async def _generate_database_analysis_code(
+    database: DatabaseOperator[Any],
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
     validation_error: InvalidGeneratedCode | None = None,
@@ -1238,7 +1358,7 @@ async def _generate_database_analysis_code(
 
     # Create messages for OpenAI
     messages: list[ChatCompletionMessageParam] = [
-        get_external_database().get_system_prompt(),
+        database.get_system_prompt(),
         ChatCompletionUserMessageParam(
             content=f"Business Question: {request.question}",
             role="user",
@@ -1285,6 +1405,7 @@ async def _generate_database_analysis_code(
 async def _run_database_analysis(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
+    database_override: DatabaseOperator[Any] | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
 ) -> RunDatabaseAnalysisResult:
     start_time = datetime.now()
@@ -1294,11 +1415,15 @@ async def _run_database_analysis(
     if exception_history is None:
         exception_history = []
 
+    database = (
+        get_external_database() if database_override is None else database_override
+    )
+
     sql_code = await _generate_database_analysis_code(
-        request, analyst_db, next(iter(exception_history[::-1]), None)
+        database, request, analyst_db, next(iter(exception_history[::-1]), None)
     )
     try:
-        results = get_external_database().execute_query(query=sql_code)
+        results = database.execute_query(query=sql_code)
         results = cast(list[dict[str, Any]], results)
         duration = datetime.now() - start_time
 
@@ -1323,11 +1448,15 @@ async def _run_database_analysis(
 
 @log_api_call
 async def run_database_analysis(
-    request: RunDatabaseAnalysisRequest, analyst_db: AnalystDB
+    request: RunDatabaseAnalysisRequest,
+    analyst_db: AnalystDB,
+    database_override: DatabaseOperator[Any] | None = None,
 ) -> RunDatabaseAnalysisResult:
     """Execute analysis workflow on datasets."""
     try:
-        return await _run_database_analysis(request, analyst_db)
+        return await _run_database_analysis(
+            request, analyst_db, database_override=database_override
+        )
     except MaxReflectionAttempts as e:
         return RunDatabaseAnalysisResult(
             status="error",
@@ -1397,13 +1526,15 @@ async def execute_business_analysis_and_charts(
 async def run_complete_analysis(
     chat_request: ChatRequest,
     data_source: DataSourceType,
-    datasets_names: list[str],
+    dataset_metadata: list[DatasetMetadata],
     analyst_db: AnalystDB,
     chat_id: str,
     message_id: str,
     enable_chart_generation: bool = True,
     enable_business_insights: bool = True,
 ) -> AsyncGenerator[Component | AnalysisGenerationError, None]:
+    datasets_names = [ds.name for ds in dataset_metadata]
+
     user_message = await analyst_db.get_chat_message(message_id=message_id)
     if user_message is None or user_message.role != "user":
         yield AnalysisGenerationError("Message not found")
@@ -1447,10 +1578,11 @@ async def run_complete_analysis(
         logger.info("Getting analysis result...")
         log_memory()
 
+        analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult
+
         if is_database:
-            analysis_result: (
-                RunAnalysisResult | RunDatabaseAnalysisResult
-            ) = await run_database_analysis(
+            logging.info("Running database analysis")
+            analysis_result = await run_database_analysis(
                 RunDatabaseAnalysisRequest(
                     dataset_names=datasets_names,
                     question=enhanced_message,
@@ -1458,13 +1590,47 @@ async def run_complete_analysis(
                 analyst_db,
             )
         else:
-            analysis_result = await run_analysis(
-                RunAnalysisRequest(
-                    dataset_names=datasets_names,
-                    question=enhanced_message,
-                ),
-                analyst_db,
-            )
+            if all(m.dataset_id is not None for m in dataset_metadata):
+                if not SparkRecipe.should_use_spark_recipe():
+                    raise RuntimeError(
+                        "Should be unreachable. Ended up with remote datasets while remote datasets is disallowed."
+                    )
+                logging.info("Running DataWrangling analysis")
+
+                recipe = await load_or_create_spark_recipe(analyst_db=analyst_db)
+
+                if await recipe.refresh():
+                    assistant_message.in_progress = False
+                    assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
+                    await analyst_db.update_chat_message(
+                        assistant_message.id, assistant_message
+                    )
+
+                    yield AnalysisGenerationError(assistant_message.error)
+
+                    return
+
+                analysis_result = await run_database_analysis(
+                    RunDatabaseAnalysisRequest(
+                        dataset_names=datasets_names,
+                        question=enhanced_message,
+                    ),
+                    analyst_db,
+                    database_override=recipe.as_database_operator(),
+                )
+            elif all(m.dataset_id is None for m in dataset_metadata):
+                logging.info("Running local analysis")
+                analysis_result = await run_analysis(
+                    RunAnalysisRequest(
+                        dataset_names=datasets_names,
+                        question=enhanced_message,
+                    ),
+                    analyst_db,
+                )
+            else:
+                raise ValueError(
+                    "Cannot run analysis on a mix of local and remote datasets."
+                )
 
         log_memory()
         logger.info("Getting analysis result done")
@@ -1593,9 +1759,15 @@ async def process_data_and_update_state(
             logger.info("Cleansing datasets")
             yield "Cleansing datasets"
             for analysis_dataset_name in new_dataset_names:
+                metadata = await analyst_db.get_dataset_metadata(analysis_dataset_name)
+                if metadata.data_source == DataSourceType.REMOTE_REGISTRY:
+                    # Skip remote datasets.
+                    continue
+
                 analysis_dataset = await analyst_db.get_dataset(
                     analysis_dataset_name, max_rows=None
                 )
+
                 cleansed_dataset = await cleanse_dataframe(analysis_dataset)
                 await analyst_db.register_dataset(
                     cleansed_dataset, data_source=DataSourceType.GENERATED
