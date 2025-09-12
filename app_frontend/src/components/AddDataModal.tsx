@@ -27,7 +27,6 @@ import loader from '@/assets/loader.svg';
 import { useAppState } from '@/state/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AxiosError } from 'axios';
-import { TruncatedText } from './ui-custom/truncated-text';
 import { localizeException } from '@/api/exceptions';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
@@ -45,6 +44,11 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   useEffect(() => {
     setSelectedDatasets([]);
   }, [isOpen]);
+
+  // Reset error when selected items change, new revalidation will occure on 'Save selections' button click
+  useEffect(() => {
+    setError(null);
+  }, [files, selectedDatasets, selectedTables]);
 
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
@@ -133,9 +137,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             />
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>
-                  <TruncatedText maxLength={100}>{error}</TruncatedText>
-                </AlertDescription>
+                <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
               </Alert>
             )}
           </>
@@ -190,9 +192,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             />
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>
-                  <TruncatedText maxLength={100}>{error}</TruncatedText>
-                </AlertDescription>
+                <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
               </Alert>
             )}
           </>

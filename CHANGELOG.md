@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10] - 2025-09-12
+
+### Fixes
+
+- Register remote datasets before data is fetched so they appear in UI in loading.
+- Fixed an issue with spark recipes being created with invalid datasets.
+- Corrected API version needed for spark recipes.
+- Remove the remote data registry UI in cases where the DR version is too old.
+
 ## [0.3.9] - 2025-09-10
 
 ### Features

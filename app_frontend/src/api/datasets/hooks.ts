@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { datasetKeys } from './keys';
-import { getDatasets, uploadDataset, deleteAllDatasets } from './api-requests';
+import {
+  getDatasets,
+  uploadDataset,
+  deleteAllDatasets,
+  getSupportedDataSourceTypes,
+} from './api-requests';
 import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
@@ -32,6 +37,16 @@ export const useFetchDatasets = ({ limit = 100 } = {}) => {
       ]);
       return { local: local, remote: remote };
     },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  return queryResult;
+};
+
+export const useGetSupportedDataSourceTypes = () => {
+  const queryResult = useQuery({
+    queryKey: datasetKeys.supportedDataSourceTypes,
+    queryFn: getSupportedDataSourceTypes,
   });
 
   return queryResult;

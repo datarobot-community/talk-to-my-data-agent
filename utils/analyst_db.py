@@ -273,6 +273,7 @@ class DatasetHandler(BaseDuckDBHandler):
         dataset_id: str | None = None,
         original_name: str | None = None,
         file_size: int = 0,
+        clobber: bool = False,
     ) -> None:
         """
         Register a Polars DataFrame with explicit dataset type tracking.
@@ -287,7 +288,7 @@ class DatasetHandler(BaseDuckDBHandler):
         """
         logger.info(f"Registering dataframe {name} as {dataset_type.value}")
 
-        if await self.table_exists(name):
+        if await self.table_exists(name) and not clobber:
             raise ValueError(f"Table '{name}' already exists in the database")
 
         # For cleansed/dictionary datasets, verify original exists
@@ -305,10 +306,13 @@ class DatasetHandler(BaseDuckDBHandler):
 
             def create_table() -> None:
                 conn.register("temp_view", arrow_table)
-                conn.execute(f"CREATE TABLE '{name}' AS SELECT * FROM temp_view")
+                conn.execute(
+                    f"CREATE OR REPLACE TABLE '{name}' AS SELECT * FROM temp_view"
+                )
                 conn.unregister("temp_view")
 
-            await asyncio.get_running_loop().run_in_executor(None, create_table)
+            if len(df):
+                await asyncio.get_running_loop().run_in_executor(None, create_table)
 
             # Store metadata
             metadata = DatasetMetadata(
@@ -329,6 +333,15 @@ class DatasetHandler(BaseDuckDBHandler):
                 INSERT INTO dataset_metadata
                 (table_name, dataset_type, original_name, created_at, columns, row_count, data_source, file_size, dataset_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (table_name) DO UPDATE SET
+                  dataset_type = EXCLUDED.dataset_type,
+                  original_name = EXCLUDED.original_name,
+                  created_at = EXCLUDED.created_at,
+                  columns = EXCLUDED.columns,
+                  row_count = EXCLUDED.row_count,
+                  data_source = EXCLUDED.data_source,
+                  file_size = EXCLUDED.file_size,
+                  dataset_id = EXCLUDED.dataset_id;
                 """,
                 [
                     metadata.name,
@@ -1512,6 +1525,7 @@ class AnalystDB:
         data_source: DataSourceType,
         file_size: int = 0,
         dataset_id: str | None = None,
+        clobber: bool = False,
     ) -> None:
         if isinstance(df, CleansedDataset):
             is_cleansed = True
@@ -1531,6 +1545,7 @@ class AnalystDB:
                 original_name=df.name,
                 file_size=file_size,
                 dataset_id=dataset_id,
+                clobber=clobber,
             )
         except Exception as e:
             logger.warning(f"Error registering dataset: {e}")
@@ -1564,7 +1579,9 @@ class AnalystDB:
         cleansing_report = await self.dataset_handler.get_cleansing_report(name)
         return CleansedDataset(dataset=data, cleaning_report=cleansing_report)
 
-    async def register_data_dictionary(self, data_dictionary: DataDictionary) -> None:
+    async def register_data_dictionary(
+        self, data_dictionary: DataDictionary, clobber: bool = False
+    ) -> None:
         try:
             return await self.dataset_handler.register_dataframe(
                 data_dictionary.to_application_df(),
@@ -1572,6 +1589,7 @@ class AnalystDB:
                 dataset_type=DatasetType.DICTIONARY,
                 data_source=DataSourceType.GENERATED,
                 original_name=data_dictionary.name,
+                clobber=clobber,
             )
         except Exception as e:
             logger.warning(

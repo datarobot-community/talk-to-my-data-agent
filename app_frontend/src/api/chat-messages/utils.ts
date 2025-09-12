@@ -1,7 +1,5 @@
 import i18n from '@/i18n';
 
-const now = new Date();
-
 const languageMap = {
   es_419: 'es',
   pt_BR: 'pt',
@@ -12,6 +10,7 @@ const getLanguageByLanguageCode = (languageCode: string) => {
 };
 
 const configureChatName = (language: string) => {
+  const now = new Date();
   const formattedDate = new Intl.DateTimeFormat(language, {
     month: 'long',
     day: 'numeric',

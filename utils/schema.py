@@ -680,3 +680,7 @@ class ChatMessagePayload(BaseModel):
 class DownloadedRegistryDataset(BaseModel):
     name: str = ""
     error: Optional[str] = None
+
+
+class SupportedDataSourceTypes(BaseModel):
+    supported_types: list[str]

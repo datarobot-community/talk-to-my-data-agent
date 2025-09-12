@@ -54,7 +54,8 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
 from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
-from utils.database_helpers import get_external_database
+from utils.database_helpers import NoDatabaseOperator, get_external_database
+from utils.datarobot_dataset_handler import SparkRecipe
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -86,6 +87,7 @@ from utils.schema import (
     LoadDatabaseRequest,
     RunAnalysisResult,
     RunChartsResult,
+    SupportedDataSourceTypes,
 )
 
 logger = get_logger()
@@ -1345,6 +1347,16 @@ async def run_complete_analysis_task(
             break
         else:
             pass
+
+
+@router.get("/supported-data-source-types")
+async def get_supported_datasource_types(request: Request) -> SupportedDataSourceTypes:
+    types: list[DataSourceType] = [DataSourceType.FILE, DataSourceType.REGISTRY]
+    if not isinstance(get_external_database(), NoDatabaseOperator):
+        types.append(DataSourceType.DATABASE)
+    if SparkRecipe.should_use_spark_recipe():
+        types.append(DataSourceType.REMOTE_REGISTRY)
+    return SupportedDataSourceTypes(supported_types=[t.value for t in types])
 
 
 @router.get("/user/datarobot-account")

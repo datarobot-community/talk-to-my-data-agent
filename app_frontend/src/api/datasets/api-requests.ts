@@ -68,3 +68,11 @@ export const deleteAllDatasets = async (): Promise<unknown> => {
 
   return data;
 };
+
+export async function getSupportedDataSourceTypes(): Promise<string[]> {
+  const response = await apiClient.get('/v1/supported-data-source-types');
+
+  const { data } = response;
+
+  return data.supported_types;
+}

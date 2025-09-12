@@ -159,11 +159,23 @@ def default_retry(func: Callable[P, T]) -> Callable[P, T]:
 
 
 @default_retry
-async def load_or_create_spark_recipe(analyst_db: AnalystDB) -> SparkRecipe:
+async def load_or_create_spark_recipe(
+    analyst_db: AnalystDB, initial_dataset_ids: list[str] = []
+) -> SparkRecipe:
     """
     Load the recipe created for the user, if it has been persisted and is valid.
     Otherwise, create a recipe for the user and persist it.
     """
+    key = analyst_db.user_id
+
+    if result := load_or_create_spark_recipe.__dict__.setdefault("__cache__", {}).get(
+        key
+    ):
+        return cast(SparkRecipe, result)
+
+    # user id is a uuid, not anything identifiable.
+    logger.debug("Looking up / creating recipe for user.", extra={"user": key})
+
     user_recipe = await analyst_db.get_user_recipe()
 
     recipe_exists = bool(user_recipe and user_recipe.recipe_id)
@@ -171,31 +183,48 @@ async def load_or_create_spark_recipe(analyst_db: AnalystDB) -> SparkRecipe:
     recipe: Recipe
 
     if recipe_exists:
+        logger.debug(
+            "Recipe saved for user, checking that it exists.",
+            extra={"user": key, "recipe": user_recipe and user_recipe.recipe_id},
+        )
         with handle_datarobot_error(f"Recipe({user_recipe.recipe_id})"):  # type:ignore[union-attr]
             try:
                 recipe = Recipe.get(user_recipe.recipe_id)  # type:ignore[union-attr]
             except ClientError as e:
                 if e.status_code // 100 == 4:
+                    logger.debug(
+                        "Saved recipe is no longer valid.",
+                        extra={
+                            "user": key,
+                            "recipe": user_recipe and user_recipe.recipe_id,
+                        },
+                        exc_info=True,
+                    )
                     recipe_exists = False
                 else:
                     raise
 
     if not recipe_exists:
-        recipe = await create_new_recipe(analyst_db)
+        logger.debug("Creating recipe.", extra={"user": key})
+        recipe = await create_new_recipe(analyst_db, initial_dataset_ids)
 
-    return SparkRecipe(recipe=recipe, analyst_db=analyst_db)
+    spark_recipe = SparkRecipe(recipe=recipe, analyst_db=analyst_db)
+
+    load_or_create_spark_recipe.__cache__[key] = spark_recipe  # type:ignore[attr-defined]
+
+    return spark_recipe
 
 
-async def create_new_recipe(analyst_db: AnalystDB) -> Recipe:
-    with handle_datarobot_error("Dataset.list()"):
-        dataset = next(Dataset.iterate(limit=1), None)
+async def create_new_recipe(
+    analyst_db: AnalystDB, initial_dataset_ids: list[str]
+) -> Recipe:
+    if not initial_dataset_ids:
+        raise RuntimeError("Cannot create a recipe from no datasets")
 
-    if not dataset:
-        message = (
-            "Could not initialize recipe as user has no datasets to use as a basis."
-        )
-        logger.error(message)
-        raise SparkRecipeError(message)
+    dataset_id = initial_dataset_ids[0]
+
+    with handle_datarobot_error(f"Dataset.get({dataset_id})"):
+        dataset = Dataset.get(dataset_id)
 
     use_case_name = f"TalkToMyData Data Wrangling {analyst_db.user_id}"
 
@@ -208,6 +237,10 @@ async def create_new_recipe(analyst_db: AnalystDB) -> Recipe:
         use_cases.sort(key=lambda u: u.created_at, reverse=True)
         use_case = use_cases[0]
     else:
+        logger.debug(
+            "Use case for recipe not created, creating.",
+            extra={"user": analyst_db.user_id, "use_case_name": use_case_name},
+        )
         with handle_datarobot_error(f"UseCase.create({use_case_name})"):
             use_case = UseCase.create(
                 use_case_name, "Recipe container for Talk To My Data user."
@@ -221,6 +254,20 @@ async def create_new_recipe(analyst_db: AnalystDB) -> Recipe:
             dialect=DataWranglingDialect.SPARK,
             recipe_type=RecipeType.SQL,
         )
+
+    with handle_datarobot_error("Recipe.set_inputs(...)"):
+        Recipe.set_inputs(
+            recipe.id,
+            [
+                RecipeDatasetInput(input_type=RecipeInputType.DATASET, dataset_id=ds)
+                for ds in initial_dataset_ids
+            ],
+        )
+
+    logger.debug(
+        "Persisting created recipe for user.",
+        extra={"user": analyst_db.user_id, "recipe": recipe.id},
+    )
     await analyst_db.set_user_recipe(
         UserRecipe(user_id=analyst_db.user_id, recipe_id=recipe.id)
     )
@@ -258,7 +305,12 @@ class SparkRecipe:
         """Check if the API version is compatible with our usage."""
         version_response: str = dr.client.get_client().get("version/").content.decode()
         version = json.loads(version_response)["versionString"]
-        return Version(version) >= Version("2.37")
+        logger.debug(
+            "Checked if version is recent enough to have spark instance size configuration.",
+            extra={"version": version, "expected_version": "2.38"},
+        )
+
+        return Version(version) >= Version("2.38")
 
     @default_retry
     async def refresh(self) -> bool:
@@ -267,6 +319,7 @@ class SparkRecipe:
         Returns:
             (bool) True if any dataset in the app were deleted.
         """
+        logger.debug("Refreshing recipe %s.", self._recipe.id)
         async with self._lock:
             expected_datasets = await self._analyst_db.list_analyst_dataset_metadata(
                 DataSourceType.REMOTE_REGISTRY
@@ -275,19 +328,11 @@ class SparkRecipe:
             if not expected_datasets:
                 return False
 
-            try:
-                self._recipe = Recipe.get(self._recipe.id)
-            except ClientError as e:
-                # 410 gone is raised if any inputs are deleted - the recipe is then in an inconsistent state and must be recreated.
-                if e.status_code // 100 == 4:
-                    raise
-                self._recipe = await create_new_recipe(analyst_db=self._analyst_db)
-
             expected_dataset_ids = {
                 ds.dataset_id for ds in expected_datasets if ds.dataset_id
             }
 
-            removed_datasets = False
+            deleted_datasets = False
 
             for d in expected_datasets:
                 d_id = d.dataset_id
@@ -301,18 +346,49 @@ class SparkRecipe:
                         if e.status_code not in [404, 410]:
                             raise
                         expected_dataset_ids.remove(d_id)
-                        removed_datasets = True
+                        deleted_datasets = True
                         await self._analyst_db.delete_table(d.name)
+
+            recipe_missing = False
+
+            try:
+                self._recipe = Recipe.get(self._recipe.id)
+            except ClientError as e:
+                # 410 gone is raised if any inputs are deleted - the recipe is then in an inconsistent state and must be recreated.
+                if e.status_code // 100 == 4:
+                    raise
+                recipe_missing = True
 
             recipe_inputs: list[RecipeDatasetInput] = [
                 i for i in self._recipe.inputs if isinstance(i, RecipeDatasetInput)
             ]
             recipe_dataset_ids: set[str] = {i.dataset_id for i in recipe_inputs}
 
-            if recipe_dataset_ids != expected_dataset_ids:
+            if recipe_missing:
+                self._recipe = await create_new_recipe(
+                    analyst_db=self._analyst_db,
+                    initial_dataset_ids=list(expected_dataset_ids),
+                )
+            # In order to ensure we keep the recipe's inputs in line with the user's selected datasets, we're here recreating the recipe
+            # when a dataset is deselected. (You cannot remove the dataset the recipe was created from as an input, so simplest to recreate.)
+            # This is not usually strictly necessary, but should prevent weird errors from cropping up, e.g. if the user adds a datset,
+            # removes it, and then adds a different dataset with identical name.
+            elif recipe_dataset_ids - expected_dataset_ids:
+                # Just a basic effort on the delete, they're already siloed in their own use case, so this is more hygeine.
+                try:
+                    dr.client.get_client().delete(f"recipes/{self._recipe.id}")
+                except ClientError:
+                    logger.warning(
+                        "Failed to delete %s", self._recipe.id, exc_info=True
+                    )
+                self._recipe = await create_new_recipe(
+                    analyst_db=self._analyst_db,
+                    initial_dataset_ids=list(expected_dataset_ids),
+                )
+            elif recipe_dataset_ids != expected_dataset_ids:
                 self._set_inputs(expected_dataset_ids)
 
-            return removed_datasets
+            return deleted_datasets
 
     def _set_inputs(self, expected_dataset_ids: Iterable[str]) -> None:
         with handle_datarobot_error(f"Recipe.set_inputs({self._recipe.id})"):
@@ -335,6 +411,9 @@ class SparkRecipe:
         Args:
             dataset_ids (list[str]): The ids of the datasets to add.
         """
+        logger.debug(
+            "Adding datasets to recipe's input.", extra={"recipe_id": self._recipe.id}
+        )
         recipe_inputs: list[RecipeDatasetInput] = [
             i for i in self._recipe.inputs if isinstance(i, RecipeDatasetInput)
         ]
@@ -366,6 +445,10 @@ class SparkRecipe:
         Update the recipe to use a large data size
         """
         # A new feature that hasn't been ported to SDK yet.
+        logger.debug(
+            "Setting recipe to large spark instance size.",
+            extra={"recipe_id": self._recipe.id},
+        )
         with handle_datarobot_error(f"PATCH recipes/{self._recipe.id}/settings"):
             dr.client.get_client().patch(
                 f"recipes/{self._recipe.id}/settings", {"sparkInstanceSize": "large"}
@@ -377,6 +460,9 @@ class SparkRecipe:
         Update the recipe to use the given SQL query
         """
         self._set_large_spark_instance_size()
+        logger.debug(
+            "Setting recipe query.", extra={"recipe_id": self._recipe.id, "sql": query}
+        )
         with handle_datarobot_error(f"Recipe.set_recipe_metadata({self._recipe.id})"):
             Recipe.set_recipe_metadata(self._recipe.id, {"sql": query})
 
@@ -396,6 +482,9 @@ class SparkRecipe:
         after=after_log(logger, logging.DEBUG),
     )
     def _retrieve_preview(self, timeout_seconds: int = 300) -> DataFrameWrapper:
+        logger.debug(
+            "Retrieving preview of recipe.", extra={"recipe_id": self._recipe.id}
+        )
         preview = self._recipe.retrieve_preview(timeout_seconds)
         schema = preview["resultSchema"]
 
@@ -403,6 +492,10 @@ class SparkRecipe:
         all_rows: list[Any] = preview["data"]
 
         if preview.get("next"):
+            logger.debug(
+                "Fetching additional pages of preview.",
+                extra={"recipe_id": self._recipe.id},
+            )
             for row in unpaginate(
                 preview["next"],
                 initial_params=None,

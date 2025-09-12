@@ -290,7 +290,13 @@ async def register_remote_registry_datasets(
         ValueError: If the loading cannot be performed. This can be either (a) the small datasets exceed
                     our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)"""
     if not SparkRecipe.should_use_spark_recipe():
-        raise ValueError("")
+        logger.warning(
+            "Attempted to register remote datasets in an unsupported feature (should be unreachable through UI)."
+        )
+        raise ApplicationUsageException(
+            UsageExceptionType.FEATURE_NOT_SUPPORTED,
+            "Cannot use remote datasets with an unsupported DataRobot API version.",
+        )
 
     datasets = [Dataset.get(d_id) for d_id in dataset_ids]
 
@@ -316,9 +322,20 @@ async def register_remote_registry_datasets(
     downloaded_datasets = []
 
     if dataset_ids:
-        recipe = await load_or_create_spark_recipe(analyst_db)
+        recipe = await load_or_create_spark_recipe(analyst_db, dataset_ids)
+
+        await recipe.refresh()  # Clear out any removed datasets.
 
         recipe.add_datasets([ds.id for ds in datasets])
+
+        for ds in datasets:
+            await analyst_db.register_dataset(
+                AnalystDataset(name=ds.name),
+                DataSourceType.REMOTE_REGISTRY,
+                file_size=0,
+                dataset_id=ds.id,
+                clobber=False,
+            )
 
         background_tasks.append(
             (register_remote_datasets, [recipe, analyst_db, datasets], {})
@@ -350,6 +367,7 @@ async def register_remote_datasets(
             DataSourceType.REMOTE_REGISTRY,
             file_size=0,
             dataset_id=dataset.id,
+            clobber=True,
         )
 
 

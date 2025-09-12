@@ -20,6 +20,7 @@ class UsageExceptionType(Enum):
     DATASET_ALREADY_USED = (400, "DATASET_USED")
     DATASETS_TOO_LARGE = (400, "DATASET_TOO_LARGE")
     DATASETS_INVALID = (400, "DATASET_INVALID")
+    FEATURE_NOT_SUPPORTED = (400, "FEATURE_NOT_SUPPORTED")
 
 
 class ApplicationUsageException(HTTPException):

@@ -13,7 +13,7 @@ export const useGeneratedDictionaries = <TData = DictionaryTable[]>(options = {}
     queryKey: dictionaryKeys.all,
     queryFn: ({ signal }) => getGeneratedDictionaries({ signal }),
     refetchInterval: query =>
-      !query || query.state?.data?.some(d => d.in_progress) ? 5000 : false,
+      !query || query.state?.data?.some(d => d.in_progress) ? 1000 : 30 * 1000, // Still want to occasionally request if there's another tab
     ...options,
   });
 
