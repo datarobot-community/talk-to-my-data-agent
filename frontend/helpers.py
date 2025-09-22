@@ -15,7 +15,6 @@
 import json
 import logging
 import os
-import sys
 import traceback
 import uuid
 from datetime import datetime
@@ -26,7 +25,6 @@ from typing import (
 
 import streamlit as st
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from utils.analyst_db import AnalystDB, DataSourceType
 
 logger = logging.getLogger("DataAnalyst")

@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import asyncio
-import os
-import sys
 import time
 import uuid
 import warnings
@@ -23,13 +21,7 @@ from datetime import datetime
 from typing import Any, cast
 
 import streamlit as st
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_user_message_param import (
-    ChatCompletionUserMessageParam,
-)
-from streamlit.delta_generator import DeltaGenerator
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # Import FastAPI functions directly
 from app_settings import (
     apply_custom_css,
@@ -37,6 +29,11 @@ from app_settings import (
 )
 from datarobot_connect import DataRobotTokenManager
 from helpers import log_error_details, state_init
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_user_message_param import (
+    ChatCompletionUserMessageParam,
+)
+from streamlit.delta_generator import DeltaGenerator
 
 from utils.analyst_db import AnalystDB, DataSourceType
 from utils.api import (

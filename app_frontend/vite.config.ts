@@ -13,7 +13,8 @@ if (process.env.NOTEBOOK_ID && process.env.NODE_ENV === 'development') {
   const defaultPort = process.env.STATIC_CODESPACE ? VITE_STATIC_DEFAULT_PORT : VITE_DEFAULT_PORT;
   base = `/notebook-sessions/${notebookId}/ports/${defaultPort}/`;
 }
-const proxyBase: string = base === '' ? '/' : base;
+// Proxy base for development server (local + codespaces)
+const devProxyBase: string = base === '' ? '/' : base;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -52,19 +53,20 @@ export default defineConfig({
       external: ['_dr_env.js'],
     },
   },
+  // this config is for interactive development (local + codespaces)
   server: {
     host: true,
     allowedHosts: ['localhost', '127.0.0.1', '.datarobot.com'],
     proxy: {
-      [`${proxyBase}api/`]: {
+      [`${devProxyBase}api/`]: {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: path => path.replace(new RegExp(`^${proxyBase}`), ''),
+        rewrite: path => path.replace(new RegExp(`^${devProxyBase}`), ''),
       },
-      [`${proxyBase}_dr_env.js`]: {
+      [`${devProxyBase}_dr_env.js`]: {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: path => path.replace(new RegExp(`^${proxyBase}`), ''),
+        rewrite: path => path.replace(new RegExp(`^${devProxyBase}`), ''),
       },
     },
   },

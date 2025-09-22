@@ -13,15 +13,11 @@
 # limitations under the License.
 import asyncio
 import os
-import sys
 import warnings
 from typing import cast
 
 import polars as pl
 import streamlit as st
-from streamlit.runtime.uploaded_file_manager import UploadedFile
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from app_settings import (
     apply_custom_css,
     display_page_logo,
@@ -30,6 +26,7 @@ from app_settings import (
 )
 from datarobot_connect import DataRobotTokenManager
 from helpers import state_empty, state_init
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from utils.analyst_db import AnalystDB, DataSourceType
 from utils.api import (

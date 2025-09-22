@@ -14,7 +14,6 @@
 
 import json
 import os
-import sys
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -25,8 +24,6 @@ import streamlit as st
 from helpers import state_init
 from streamlit.delta_generator import DeltaGenerator
 from streamlit_javascript import st_javascript
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from utils.logging_helper import get_logger
 

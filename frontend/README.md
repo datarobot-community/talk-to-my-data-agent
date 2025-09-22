@@ -10,6 +10,6 @@ cd frontend
 ```
 OR
 ```bash
-streamlit run frontend/app.py
+make run-local-streamlit
 ```
 
