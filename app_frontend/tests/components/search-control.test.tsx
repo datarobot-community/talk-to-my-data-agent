@@ -146,16 +146,16 @@ describe('SearchControl Component', () => {
     expect(screen.queryByTestId('search-control-input')).not.toBeInTheDocument();
   });
 
-  test('uses custom placeholder', async () => {
+  test('uses custom search label', async () => {
     const user = userEvent.setup();
-    render(<SearchControl placeholder="Custom placeholder" />);
+    render(<SearchControl searchLabel="Custom search label" />);
 
     // Expand the search
     const searchButton = screen.getByTestId('search-control-button');
     await user.click(searchButton);
 
     const searchInput = screen.getByTestId('search-control-input');
-    expect(searchInput).toHaveAttribute('placeholder', 'Custom placeholder');
+    expect(searchInput).toHaveAttribute('placeholder', 'Custom search label');
   });
 
   test('does not show clear button when disabled', async () => {
@@ -174,5 +174,28 @@ describe('SearchControl Component', () => {
 
     // The clear button should not be present when disabled
     expect(screen.queryByTestId('search-control-clear')).not.toBeInTheDocument();
+  });
+
+  test('resets when key prop changes', async () => {
+    const user = userEvent.setup();
+    const onSearch = vi.fn();
+
+    const { rerender } = render(<SearchControl key="tab1" onSearch={onSearch} />);
+
+    // Expand and type text
+    const searchButton = screen.getByTestId('search-control-button');
+    await user.click(searchButton);
+
+    const searchInput = screen.getByTestId('search-control-input');
+    await user.type(searchInput, 'test search');
+
+    expect(onSearch).toHaveBeenLastCalledWith('test search');
+
+    // Change key to simulate tab switch
+    rerender(<SearchControl key="tab2" onSearch={onSearch} />);
+
+    // Component should be back to collapsed state
+    expect(screen.getByTestId('search-control-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('search-control-input')).not.toBeInTheDocument();
   });
 });

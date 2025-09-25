@@ -6,19 +6,19 @@ import { Button } from '@/components/ui/button';
 
 interface SearchControlProps {
   onSearch?: (searchText: string) => void;
-  placeholder?: string;
   disabled?: boolean;
   testId?: string;
+  searchLabel?: string;
 }
 
 export const SearchControl: React.FC<SearchControlProps> = ({
   onSearch,
   disabled = false,
-  placeholder,
   testId = 'search-control',
+  searchLabel,
 }) => {
   const { t } = useTranslation();
-  const placeholderText = placeholder || t('Search');
+  const labelText = searchLabel || t('Search');
   const [searchText, setSearchText] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -66,7 +66,7 @@ export const SearchControl: React.FC<SearchControlProps> = ({
         data-testid={`${testId}-button`}
       >
         <FontAwesomeIcon icon={faMagnifyingGlass} className="mr-2 size-4" />
-        <span className="text-sm">{t('Search')}</span>
+        <span className="text-sm">{labelText}</span>
       </Button>
     );
   }
@@ -85,7 +85,7 @@ export const SearchControl: React.FC<SearchControlProps> = ({
           onChange={handleInputChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          placeholder={placeholderText}
+          placeholder={labelText}
           autoFocus
           disabled={disabled}
           className="h-9 w-full border-0 border-b border-border bg-transparent pr-8 text-sm transition-colors placeholder:font-medium placeholder:text-muted-foreground focus:border-primary focus:outline-none"

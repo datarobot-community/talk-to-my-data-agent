@@ -1,4 +1,4 @@
-import { useState, forwardRef } from 'react';
+import { useState, forwardRef, useEffect } from 'react';
 import { DictionaryTable as DT } from '@/api/dictionaries/types';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +38,12 @@ export const DatasetCardDescriptionPanel = forwardRef<
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { searchText, setSearchText, filteredDictionary, getOriginalRowIndex } =
     useDatasetDictionarySearch(dictionary);
+
+  // Reset search text when switching between tabs
+  useEffect(() => {
+    setSearchText('');
+  }, [viewMode, setSearchText]);
+
   const { mutate: deleteDictionary, isPending: isDeleting } = useDeleteGeneratedDictionary({
     onSuccess: () => {
       setIsDeleteDialogOpen(false);
@@ -126,6 +132,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
             onDelete={() => setIsDeleteDialogOpen(true)}
             isDownloading={isDownloading}
             isProcessing={isProcessing}
+            viewMode={viewMode}
           />
         </div>
       </div>
@@ -143,6 +150,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <DictionaryTable
                 data={filteredDictionary}
+                searchText={searchText}
                 onUpdateCell={(rowIndex, field, value) => {
                   const originalRowIndex = getOriginalRowIndex(rowIndex);
                   updateCell(

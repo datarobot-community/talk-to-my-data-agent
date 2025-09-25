@@ -44,7 +44,7 @@ run-local-dev-backend: install-frontend build-frontend
 
 run-local-static-backend: install-frontend build-frontend
 	@$(SET_ENV_SCRIPT) && \
-	PYTHONPATH=app_backend DEV_MODE=True ./app_backend/start-app.sh
+	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=True DEV_MODE=True ./app_backend/start-app.sh
 
 run-local-streamlit:
 	@$(SET_ENV_SCRIPT) && \

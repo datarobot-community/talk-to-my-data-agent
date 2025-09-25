@@ -10,10 +10,12 @@ import {
 import { useTranslation } from '@/i18n';
 import { DictionaryTable as DT, DictionaryRow } from '@/api/dictionaries/types';
 import { Input } from '@/components/ui/input';
+import { HighlightText } from '@/components/ui-custom/highlight-text';
 
 interface DictionaryTableProps {
   data: DT;
   onUpdateCell?: (rowIndex: number, field: keyof DictionaryRow, value: string) => void;
+  searchText?: string;
 }
 
 interface EditableCellProps {
@@ -21,9 +23,16 @@ interface EditableCellProps {
   rowIndex: number;
   field: keyof DictionaryRow;
   onUpdate?: (rowIndex: number, field: keyof DictionaryRow, value: string) => void;
+  searchText?: string;
 }
 
-const EditableCell: React.FC<EditableCellProps> = ({ initialValue, rowIndex, field, onUpdate }) => {
+const EditableCell: React.FC<EditableCellProps> = ({
+  initialValue,
+  rowIndex,
+  field,
+  onUpdate,
+  searchText,
+}) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialValue);
 
@@ -71,12 +80,16 @@ const EditableCell: React.FC<EditableCellProps> = ({ initialValue, rowIndex, fie
       className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px] text-muted-foreground"
       title="Double-click to edit"
     >
-      {value}
+      <HighlightText text={value} searchText={searchText || ''} />
     </div>
   );
 };
 
-export const DictionaryTable: React.FC<DictionaryTableProps> = ({ data, onUpdateCell }) => {
+export const DictionaryTable: React.FC<DictionaryTableProps> = ({
+  data,
+  onUpdateCell,
+  searchText,
+}) => {
   const { t } = useTranslation();
   const handleCellUpdate = (rowIndex: number, field: keyof DictionaryRow, value: string) => {
     if (onUpdateCell) {
@@ -96,13 +109,16 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({ data, onUpdate
       <TableBody>
         {data.column_descriptions?.map((column, index) => (
           <TableRow key={column.column}>
-            <TableCell className="font-medium">{column.column}</TableCell>
+            <TableCell className="font-medium">
+              <HighlightText text={column.column} searchText={searchText || ''} />
+            </TableCell>
             <TableCell>
               <EditableCell
                 initialValue={column.data_type}
                 rowIndex={index}
                 field="data_type"
                 onUpdate={handleCellUpdate}
+                searchText={searchText}
               />
             </TableCell>
             <TableCell>
@@ -111,6 +127,7 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({ data, onUpdate
                 rowIndex={index}
                 field="description"
                 onUpdate={handleCellUpdate}
+                searchText={searchText}
               />
             </TableCell>
           </TableRow>

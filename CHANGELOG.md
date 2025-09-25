@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2025-09-25
+
+### Improvements
+
+- Dataset search UX improvements. Search term highlighting, updated texts, reset when switching views
+- Bump pulumi-datarobot to version 0.10.20
+
 ## [0.3.11] - 2025-09-22
 
 ### Improvements

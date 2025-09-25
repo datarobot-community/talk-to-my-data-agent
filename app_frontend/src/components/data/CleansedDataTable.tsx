@@ -12,6 +12,7 @@ import {
 import loader from '@/assets/loader.svg';
 import { Loading } from '@/components/ui-custom/loading';
 import { useTranslation } from '@/i18n';
+import { HighlightText } from '@/components/ui-custom/highlight-text';
 
 interface CleansedDataTableProps {
   datasetName: string;
@@ -78,7 +79,9 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
         <TableHeader className="bg-background">
           <TableRow>
             {columns.map(column => (
-              <TableHead key={column}>{column}</TableHead>
+              <TableHead key={column}>
+                <HighlightText text={column} searchText={searchText || ''} />
+              </TableHead>
             ))}
           </TableRow>
         </TableHeader>
