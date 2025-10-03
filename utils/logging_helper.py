@@ -17,7 +17,7 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class ExFormatter(logging.Formatter):
@@ -57,7 +57,7 @@ class ExFormatter(logging.Formatter):
 def get_logger(name: str = "DataAnalystBackend") -> logging.Logger:
     formatter = ExFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     consoleHandle = logging.StreamHandler()
-    consoleHandle.setLevel(logging.DEBUG)
+    consoleHandle.setLevel(logging.INFO)
     consoleHandle.setFormatter(formatter)
     logger = logging.getLogger(name)
     logger.propagate = False  # Prevent propagation to root logger

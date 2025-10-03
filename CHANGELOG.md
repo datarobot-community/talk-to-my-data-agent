@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.3.14] - 2025-10-03
 
-### Improvements
+### Fixes
 
-- Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
+- Reset logging level to INFO (accidentally set to DEBUG in prior release).
+- Filled out previous changelog entry.
 
 ## [0.3.13] - 2025-10-03
 
@@ -20,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improvements
 
 - Move some expensive calls into background thread to avoid blocking main event loop.
+- Updated chat UX to progressively load components of chat response.
+- Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
+
 
 ## [0.3.12] - 2025-09-25
 
