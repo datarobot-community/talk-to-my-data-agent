@@ -33,7 +33,7 @@ from openai.types.chat.chat_completion_system_message_param import (
 )
 from pydantic import ValidationError
 
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import AnalystDB, InternalDataSourceType
 from utils.code_execution import InvalidGeneratedCode
 from utils.credentials import (
     GoogleCredentialsBQ,
@@ -87,12 +87,12 @@ class DatabaseOperator(ABC, Generic[T]):
     def create_connection(self) -> Any: ...
 
     @abstractmethod
-    def execute_query(
+    async def execute_query(
         self, query: str, timeout: int | None = None
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]: ...
 
     @abstractmethod
-    def get_tables(self, timeout: int | None = None) -> list[str]:
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
         return []
 
     @functools.lru_cache(maxsize=8)
@@ -110,6 +110,10 @@ class DatabaseOperator(ABC, Generic[T]):
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
         return ChatCompletionSystemMessageParam(role="system", content="")
 
+    def query_friendly_name(self, dataset_name: str) -> str:
+        """Return a query-friendly version of the dataset name (e.g. quoted table name if that's required)."""
+        return dataset_name
+
 
 class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
     def __init__(
@@ -123,14 +127,14 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
     def create_connection(self) -> Generator[None]:
         yield None
 
-    def execute_query(
+    async def execute_query(
         self,
         query: str,
         timeout: int | None = 300,
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
         return []
 
-    def get_tables(self, timeout: int | None = 300) -> list[str]:
+    async def get_tables(self, timeout: int | None = 300) -> list[str]:
         return []
 
     @functools.lru_cache(8)
@@ -184,11 +188,13 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                 "Neither private key nor password authentication configured"
             )
 
+        # In some enviroments, the Snowflake client's platform detection crashes. This patch skips that detection.
+        snowflake.connector.SnowflakeConnection.platform_detection_timeout_seconds = 0.0  # type: ignore[method-assign,assignment]
         connection = snowflake.connector.connect(**connect_params)
         yield connection
         connection.close()
 
-    def execute_query(
+    async def execute_query(
         self, query: str, timeout: int | None = None
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
         """Execute a Snowflake query with timeout and metadata capture
@@ -238,7 +244,7 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                 traceback_str=traceback.format_exc(),
             )
 
-    def get_tables(self, timeout: int | None = None) -> list[str]:
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from Snowflake schema"""
         timeout = timeout if timeout is not None else self.default_timeout
 
@@ -369,7 +375,7 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                 names = []
                 for dataframe in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, DataSourceType.DATABASE
+                        dataframe, InternalDataSourceType.DATABASE
                     )
                     names.append(dataframe.name)
                 return names
@@ -418,7 +424,7 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
 
         client.close()  # type: ignore[no-untyped-call]
 
-    def execute_query(
+    async def execute_query(
         self, query: str, timeout: int | None = None
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
         conn: bigquery.Client
@@ -442,7 +448,7 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
                 traceback_str=traceback.format_exc(),
             )
 
-    def get_tables(self, timeout: int | None = None) -> list[str]:
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from BigQuery schema"""
         timeout = timeout if timeout is not None else self.default_timeout
 
@@ -518,7 +524,7 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
                 names = []
                 for dataframe in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, DataSourceType.DATABASE
+                        dataframe, InternalDataSourceType.DATABASE
                     )
                     names.append(dataframe.name)
 
@@ -573,7 +579,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         finally:
             connection.close()
 
-    def execute_query(
+    async def execute_query(
         self, query: str, timeout: int | None = None
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
         """Execute a SAP Data Sphere query with timeout
@@ -621,7 +627,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                 traceback_str=traceback.format_exc(),
             )
 
-    def get_tables(self, timeout: int | None = None) -> list[str]:
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from SAP Data Sphere schema"""
         timeout = timeout if timeout is not None else self.default_timeout
 
@@ -633,8 +639,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                     # Get all tables and views in the schema
                     cursor.execute(
                         f"""
-                        SELECT TABLE_NAME 
-                        FROM SYS.TABLES 
+                        SELECT TABLE_NAME
+                        FROM SYS.TABLES
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY TABLE_NAME
                         """
@@ -644,8 +650,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                     # Get all views
                     cursor.execute(
                         f"""
-                        SELECT VIEW_NAME 
-                        FROM SYS.VIEWS 
+                        SELECT VIEW_NAME
+                        FROM SYS.VIEWS
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY VIEW_NAME
                         """
@@ -736,7 +742,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                 names = []
                 for dataframe in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, DataSourceType.DATABASE
+                        dataframe, InternalDataSourceType.DATABASE
                     )
                     names.append(dataframe.name)
                 return names

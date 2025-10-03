@@ -14,13 +14,25 @@
 from enum import Enum
 
 from fastapi import HTTPException
+from pydantic import BaseModel
 
 
 class UsageExceptionType(Enum):
     DATASET_ALREADY_USED = (400, "DATASET_USED")
     DATASETS_TOO_LARGE = (400, "DATASET_TOO_LARGE")
     DATASETS_INVALID = (400, "DATASET_INVALID")
+    DRIVER_CLASS_NOT_SUPPORTED = (400, "DRIVER_CLASS_NOT_SUPPORTED")
+    DATA_SOURCE_INVALID = (400, "DATA_SOURCE_INVALID")
+    RECIPE_NOT_INITIALIZED = (400, "RECIPE_NOT_INITIALIZED")
     FEATURE_NOT_SUPPORTED = (400, "FEATURE_NOT_SUPPORTED")
+    # Generic "operating on invalid targets".
+    NO_SUCH_TARGET = (400, "NO_SUCH_TARGET")
+    NOT_FOUND = (404, "NOT_FOUND")
+
+
+class ExceptionBody(BaseModel):
+    code: str
+    message: str | None
 
 
 class ApplicationUsageException(HTTPException):

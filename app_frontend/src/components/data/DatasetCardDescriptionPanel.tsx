@@ -22,6 +22,7 @@ import { useDatasetDictionarySearch } from '@/hooks/useDatasetSearch';
 import { useAppState } from '@/state';
 
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
+import { friendlySourceName } from '@/api/datasources/utils';
 
 interface DatasetCardDescriptionPanelProps {
   dictionary: DT;
@@ -52,7 +53,20 @@ export const DatasetCardDescriptionPanel = forwardRef<
   const { mutate: updateCell } = useUpdateDictionaryCell();
   const { mutate: downloadDictionary, isPending: isDownloading } = useDownloadDictionary();
   const { includeCsvBom } = useAppState();
-  const { data: metadata, isLoading: isLoadingMetadata } = useDatasetMetadata(dictionary.name);
+  const {
+    refetch,
+    data: metadata,
+    isLoading: isLoadingMetadata,
+  } = useDatasetMetadata(dictionary.name);
+
+  // There's a brief period during registration for remote/data store dependencies where the dataset will be added
+  // initially as 0 rows before being updated after the data is fetched. This will be updated before the dictionary
+  // is generated, so we can just refetch once the dictionary is updated.
+  useEffect(() => {
+    if (isProcessing === false && refetch !== undefined) {
+      refetch();
+    }
+  }, [isProcessing, refetch]);
 
   // Format file size from bytes to KB/MB/GB as appropriate
   const formatFileSize = (bytes: number): string => {
@@ -106,7 +120,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
               {isLoadingMetadata ? t('Loading...') : size}
             </Badge>
             <Badge variant="secondary" className="leading-tight text-sm">
-              {metadata?.data_source || t('file')}
+              {metadata?.data_source ? friendlySourceName(metadata.data_source) : t('file')}
             </Badge>
             {isProcessing ? (
               <Badge variant="outline" className="leading-tight text-sm">

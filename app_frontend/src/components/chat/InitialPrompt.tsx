@@ -63,6 +63,7 @@ export const InitialPrompt = ({
             isDisabled={isDisabled}
             testId="initial-prompt-input"
             placeholder={t('Ask another question about your datasets.')}
+            autoFocus
           />
         </div>
       </div>

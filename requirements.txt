@@ -3,6 +3,14 @@ pulumi==3.153.0
 pulumi-command<1.1.0
 pulumi-datarobot==0.10.20
 datarobot-pulumi-utils>=0.0.2.post8,<0.1
+# OpenTelemetry dependencies for telemetry (compatible with protobuf <5.0)
+opentelemetry-api>=1.20.0,<1.30.0
+opentelemetry-sdk>=1.20.0,<1.30.0
+opentelemetry-exporter-otlp-proto-http>=1.20.0,<1.30.0
+# OpenTelemetry auto-instrumentation (uses beta versioning scheme)
+opentelemetry-instrumentation>=0.45b0,<0.59b0
+opentelemetry-instrumentation-fastapi>=0.45b0,<0.59b0
+opentelemetry-instrumentation-requests>=0.45b0,<0.59b0
 jinja2>=3.1.5,<4.0
 PyYAML>=6.0.2,<7.0
 

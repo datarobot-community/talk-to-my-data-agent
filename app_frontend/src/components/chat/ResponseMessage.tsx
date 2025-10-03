@@ -9,7 +9,6 @@ import {
 import { MessageContainer } from './MessageContainer';
 import { MessageHeader } from './MessageHeader';
 
-import { Loading } from './Loading';
 import { ResponseTabs } from './ResponseTabs';
 import { SummaryTabContent } from './SummaryTabContent';
 import { InsightsTabContent } from './InsightsTabContent';
@@ -157,58 +156,53 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   return (
     <MessageContainer testId={testId} ref={ref} key={message.id}>
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
+      <div className="self-stretch text-sm font-normal leading-tight">
+        {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
 
-      {isLoading ? (
-        <Loading />
-      ) : (
-        <div className="self-stretch text-sm font-normal leading-tight">
-          {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
+        {message?.error && (
+          <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">
+            <span className="text-destructive text-sm">{message?.error}</span>
+          </div>
+        )}
 
-          {message?.error && (
-            <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">
-              <span className="text-destructive text-sm">{message?.error}</span>
-            </div>
-          )}
+        <ResponseTabs value={activeTab} onValueChange={setActiveTab} tabStates={tabStates} />
 
-          <ResponseTabs value={activeTab} onValueChange={setActiveTab} tabStates={tabStates} />
+        {activeTab === RESPONSE_TABS.SUMMARY && (
+          <>
+            {chartsErrors && !analysisErrors && (
+              <ErrorPanel errors={chartsErrors} componentType="Charts" />
+            )}
+            <SummaryTabContent bottomLine={bottomLine} fig1={fig1_json} fig2={fig2_json} />
+          </>
+        )}
 
-          {activeTab === RESPONSE_TABS.SUMMARY && (
-            <>
-              {chartsErrors && !analysisErrors && (
-                <ErrorPanel errors={chartsErrors} componentType="Charts" />
-              )}
-              <SummaryTabContent bottomLine={bottomLine} fig1={fig1_json} fig2={fig2_json} />
-            </>
-          )}
+        {activeTab === RESPONSE_TABS.INSIGHTS && (
+          <>
+            {businessErrors && (
+              <ErrorPanel errors={businessErrors} componentType="Business Insights" />
+            )}
+            <InsightsTabContent
+              additionalInsights={additionalInsights}
+              followUpQuestions={followUpQuestions}
+              chatId={chatId}
+              hasInProgressMessages={hasInProgressMessages}
+            />
+          </>
+        )}
 
-          {activeTab === RESPONSE_TABS.INSIGHTS && (
-            <>
-              {businessErrors && (
-                <ErrorPanel errors={businessErrors} componentType="Business Insights" />
-              )}
-              <InsightsTabContent
-                additionalInsights={additionalInsights}
-                followUpQuestions={followUpQuestions}
-                chatId={chatId}
-                hasInProgressMessages={hasInProgressMessages}
+        {activeTab === RESPONSE_TABS.CODE && (
+          <>
+            {analysisErrors && (
+              <ErrorPanel
+                attempts={analysisAttempts}
+                errors={analysisErrors}
+                componentType="Analysis"
               />
-            </>
-          )}
-
-          {activeTab === RESPONSE_TABS.CODE && (
-            <>
-              {analysisErrors && (
-                <ErrorPanel
-                  attempts={analysisAttempts}
-                  errors={analysisErrors}
-                  componentType="Analysis"
-                />
-              )}
-              <CodeTabContent dataset={dataset} code={code} />
-            </>
-          )}
-        </div>
-      )}
+            )}
+            <CodeTabContent dataset={dataset} code={code} />
+          </>
+        )}
+      </div>
     </MessageContainer>
   );
 };

@@ -21,10 +21,9 @@ import os
 import sys
 import tempfile
 import uuid
-from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator, List, Union, cast
+from typing import Any, List, Union, cast
 
 import datarobot as dr
 import pandas as pd
@@ -53,9 +52,18 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
-from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
+from utils.analyst_db import (
+    AnalystDB,
+    DatasetMetadata,
+    DataSourceType,
+    ExternalDataStoreNameDataSourceType,
+    InternalDataSourceType,
+    get_data_source_type,
+)
+from utils.api_exceptions import ExceptionBody
 from utils.database_helpers import NoDatabaseOperator, get_external_database
-from utils.datarobot_dataset_handler import SparkRecipe
+from utils.datarobot_client import use_user_token
+from utils.datarobot_dataset_handler import DatasetSparkRecipe, DataSourceRecipe
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -68,6 +76,7 @@ from utils.api import (
     process_data_and_update_state,
     register_remote_registry_datasets,
     run_complete_analysis,
+    sync_data_sources_and_datasets,
 )
 from utils.schema import (
     AnalystChatMessage,
@@ -82,6 +91,9 @@ from utils.schema import (
     DataRegistryDataset,
     DatasetCleansedResponse,
     DictionaryCellUpdate,
+    EmptyResponse,
+    ExternalDataSourcesSelection,
+    ExternalDataStore,
     FileUploadResponse,
     GetBusinessAnalysisResult,
     LoadDatabaseRequest,
@@ -101,6 +113,8 @@ async def get_database(user_id: str) -> AnalystDB:
         db_path=Path("/tmp"),
         dataset_db_name="datasets.db",
         chat_db_name="chat.db",
+        data_source_db_name="datasources.db",
+        user_recipe_db_name="recipe.db",
         use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
     )
     return analyst_db
@@ -218,32 +232,6 @@ class SessionState(object):
 
 session_store: dict[str, SessionState] = {}
 session_lock = asyncio.Lock()
-
-
-@contextmanager
-def use_user_token(request: Request) -> Generator[None, None, None]:
-    """Context manager to temporarily use the user's DataRobot token."""
-    if request.state.session.datarobot_api_token:
-        with dr.Client(
-            token=request.state.session.datarobot_api_token,
-            endpoint=request.state.session.datarobot_endpoint,
-        ):
-            yield
-    elif request.state.session.datarobot_api_skoped_token:
-        with dr.Client(
-            token=request.state.session.datarobot_api_skoped_token,
-            endpoint=request.state.session.datarobot_endpoint,
-        ):
-            yield
-    elif not os.environ.get(
-        "DR_CUSTOM_APP_EXTERNAL_URL"
-    ):  # indicates that it's a local environment
-        yield
-    else:
-        raise HTTPException(
-            status_code=401,
-            detail="API token required. Please authenticate with DataRobot.",
-        )
 
 
 @app.middleware("http")
@@ -378,8 +366,9 @@ def _set_session_cookie(
         response.set_cookie(key="session_fastapi", value=session_id, httponly=True)
 
 
+# Make this sync as the DR requests are synchronous, if async this would block.
 @router.get("/registry/datasets")
-async def get_registry_datasets(
+def get_registry_datasets(
     request: Request, remote: bool = False, limit: int = 100
 ) -> list[DataRegistryDataset]:
     """Return all registry datasets
@@ -398,11 +387,13 @@ async def get_registry_datasets(
 
 @router.get("/database/tables")
 async def get_database_tables() -> list[str]:
-    return get_external_database().get_tables()
+    return await get_external_database().get_tables()
 
 
 async def process_and_update(
-    dataset_names: List[str], analyst_db: AnalystDB, datasource_type: DataSourceType
+    dataset_names: List[str],
+    analyst_db: AnalystDB,
+    datasource_type: DataSourceType,
 ) -> None:
     async for _ in process_data_and_update_state(
         dataset_names, analyst_db, datasource_type
@@ -414,15 +405,15 @@ async def process_and_update(
 async def upload_files(
     request: Request,
     background_tasks: BackgroundTasks,
-    data_source: str | DataSourceType | None = None,
+    data_source: str | InternalDataSourceType | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
     files: List[UploadFile] | None = None,
     registry_ids: str | None = Form(None),
 ) -> list[FileUploadResponse]:
-    normalized_data_source: DataSourceType = (
-        DataSourceType.FILE
+    normalized_data_source: InternalDataSourceType = (
+        InternalDataSourceType.FILE
         if data_source is None
-        else DataSourceType(data_source)
+        else InternalDataSourceType(data_source)
         if isinstance(data_source, str)
         else data_source
     )
@@ -452,7 +443,7 @@ async def upload_files(
 
                     # Register dataset with the database
                     await analyst_db.register_dataset(
-                        dataset, DataSourceType.FILE, file_size=file_size
+                        dataset, InternalDataSourceType.FILE, file_size=file_size
                     )
 
                     # Add to processing queue
@@ -476,7 +467,9 @@ async def upload_files(
                             dataset_name = f"{base_name}_{sheet_name}"
                             dataset = AnalystDataset(name=dataset_name, data=data)
                             await analyst_db.register_dataset(
-                                dataset, DataSourceType.FILE, file_size=file_size
+                                dataset,
+                                InternalDataSourceType.FILE,
+                                file_size=file_size,
                             )
                             # Add to processing queue
                             dataset_names.append(dataset.name)
@@ -492,7 +485,7 @@ async def upload_files(
                         dataset_name = base_name
                         dataset = AnalystDataset(name=dataset_name, data=excel_dataset)
                         await analyst_db.register_dataset(
-                            dataset, DataSourceType.FILE, file_size=file_size
+                            dataset, InternalDataSourceType.FILE, file_size=file_size
                         )
                         # Add to processing queue
                         dataset_names.append(dataset.name)
@@ -517,16 +510,16 @@ async def upload_files(
     # Process the data in the background (cleansing and dictionary generation)
     if dataset_names:
         background_tasks.add_task(
-            process_and_update, dataset_names, analyst_db, DataSourceType.FILE
+            process_and_update, dataset_names, analyst_db, InternalDataSourceType.FILE
         )
 
     if registry_ids:
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
             with use_user_token(request):
-                if normalized_data_source == DataSourceType.REMOTE_REGISTRY:
+                if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY:
                     dataframes, tasks = await register_remote_registry_datasets(
-                        id_list, analyst_db
+                        request, id_list, analyst_db
                     )
                 else:
                     dataframes = await load_registry_datasets(id_list, analyst_db)
@@ -540,9 +533,9 @@ async def upload_files(
                     process_and_update,
                     dataset_names,
                     analyst_db,
-                    DataSourceType.REMOTE_REGISTRY
-                    if normalized_data_source == DataSourceType.REMOTE_REGISTRY
-                    else DataSourceType.REGISTRY,
+                    InternalDataSourceType.REMOTE_REGISTRY
+                    if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY
+                    else InternalDataSourceType.REGISTRY,
                 )
                 for dts in dataframes:
                     dts_response: FileUploadResponse = {
@@ -573,7 +566,10 @@ async def load_from_database(
     # Process the data in the background (cleansing and dictionary generation)
     if dataset_names:
         background_tasks.add_task(
-            process_and_update, dataset_names, analyst_db, DataSourceType.DATABASE
+            process_and_update,
+            dataset_names,
+            analyst_db,
+            InternalDataSourceType.DATABASE,
         )
 
     return dataset_names
@@ -723,6 +719,7 @@ async def get_cleansed_dataset(
 
 @router.delete("/datasets", status_code=200)
 async def delete_datasets(
+    request: Request,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> None:
     await analyst_db.delete_all_tables()
@@ -799,8 +796,7 @@ async def update_dictionary_cell(
             detail=f"Field '{update.field}' not found in dictionary row",
         )
 
-    await analyst_db.delete_dictionary(dictionary.name)
-    await analyst_db.register_data_dictionary(dictionary)
+    await analyst_db.register_data_dictionary(dictionary, clobber=True)
 
     return dictionary
 
@@ -992,6 +988,8 @@ async def create_new_chat_message(
     chat_request = ChatRequest(messages=valid_messages)
 
     # Run the analysis in the background
+    # Running the sync version whill get run in a different thread as the async version,
+    # despite the name, blocks for significant period. (When that gets fixed, we can change this.)
     background_tasks.add_task(
         run_complete_analysis_task,
         chat_request,
@@ -1057,6 +1055,8 @@ async def create_chat_message(
         chat_request = ChatRequest(messages=valid_messages)
 
         # Run the analysis in the background
+        # Running the sync version whill get run in a different thread as the async version,
+        # despite the name, blocks for significant period. (When that gets fixed, we can change this.)
         background_tasks.add_task(
             run_complete_analysis_task,
             chat_request,
@@ -1318,18 +1318,25 @@ async def run_complete_analysis_task(
     request: Request,
 ) -> None:
     """Run the complete analysis pipeline"""
-    source = DataSourceType(data_source)
+    source = get_data_source_type(data_source)
+    logger.debug(
+        "Running analysis for user.",
+        extra={
+            "data_source": data_source,
+            "user_id": analyst_db.user_id,
+        },
+    )
     dataset_metadata = []
-    if source == DataSourceType.DATABASE:
-        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(source)
-    elif source == DataSourceType.REMOTE_REGISTRY:
-        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(
-            DataSourceType.REMOTE_REGISTRY
+    if source in [InternalDataSourceType.REGISTRY, InternalDataSourceType.FILE]:
+        dataset_metadata = (
+            await analyst_db.list_analyst_dataset_metadata(
+                InternalDataSourceType.REGISTRY
+            )
+        ) + (
+            await analyst_db.list_analyst_dataset_metadata(InternalDataSourceType.FILE)
         )
     else:
-        dataset_metadata = (
-            await analyst_db.list_analyst_dataset_metadata(DataSourceType.REGISTRY)
-        ) + (await analyst_db.list_analyst_dataset_metadata(DataSourceType.FILE))
+        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(source)
 
     run_analysis_iterator = run_complete_analysis(
         chat_request=chat_request,
@@ -1340,6 +1347,7 @@ async def run_complete_analysis_task(
         message_id=message_id,
         enable_chart_generation=enable_chart_generation,
         enable_business_insights=enable_business_insights,
+        request=request,
     )
 
     async for message in run_analysis_iterator:
@@ -1349,13 +1357,142 @@ async def run_complete_analysis_task(
             pass
 
 
+# Sync as this is a long blocking request
+@router.get("/available-external-data-stores")
+def get_available_external_data_stores(
+    request: Request, analyst_db: AnalystDB = Depends(get_initialized_db)
+) -> list[ExternalDataStore]:
+    """List all available datastores. (An available datastore
+    (a) has datasources configured and (b) has a supported driver.)
+
+    Args:
+        request (Request): HTTP request.
+        limit (int): Maximum entries to retrieve.
+        offset (int): Number of entries to skip.
+
+    Returns:
+        list[ExternalDataStore]: The given page of datastores.
+    """
+    with use_user_token(request):
+        return asyncio.run(
+            DataSourceRecipe.list_available_datastores(analyst_db.user_id)
+        )
+
+
+@router.put(
+    "/external-data-stores/{external_data_store_id}/external-data-sources/",
+    responses={404: {"model": ExceptionBody}},
+)
+def register_external_data_sources(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    background_tasks: BackgroundTasks,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> EmptyResponse:
+    """
+    Add data sources for a datastore, registering them as datasets in the app.
+
+    Args:
+        request (Request): The request
+        selected_datasource_ids (ExternalDataSourcesSelection): Select data sources for a datasource
+        external_data_store_id (str): Select the data store
+        background_tasks (BackgroundTasks): Background tasks
+        analyst_db (AnalystDB, optional): The database. Defaults to Depends(get_initialized_db).
+
+    Returns:
+        ExternalDataStore: The updated data store
+    """
+    return asyncio.run(
+        _register_external_data_sources_async(
+            request,
+            selected_datasource_ids,
+            external_data_store_id,
+            background_tasks,
+            analyst_db,
+        )
+    )
+
+
+async def _register_external_data_sources_async(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    background_tasks: BackgroundTasks,
+    analyst_db: AnalystDB,
+) -> EmptyResponse:
+    logger.debug(
+        "PUT /external-data-stores/%s/external-data-sources/", external_data_store_id
+    )
+    with use_user_token(request):
+        name = DataSourceRecipe.get_canonical_name_for_datastore_id(
+            external_data_store_id
+        )
+        if not name:
+            raise HTTPException(
+                404, f"DataStore {external_data_store_id} does not exist."
+            )
+
+        background_tasks.add_task(
+            update_data_sources_for_data_store,
+            request,
+            selected_datasource_ids,
+            external_data_store_id,
+            analyst_db,
+        )
+
+        logger.debug(
+            "Registering data sources for data store %s (%s).",
+            name,
+            external_data_store_id,
+        )
+        _, tasks = await sync_data_sources_and_datasets(
+            request=request,
+            canonical_name=name,
+            analyst_db=analyst_db,
+            data_store_id=external_data_store_id,
+            selected_datasource_ids=selected_datasource_ids,
+        )
+
+        logger.debug(
+            "Adding background tasks for data store %s.", external_data_store_id
+        )
+        for f, arg, kwargs in tasks:
+            background_tasks.add_task(f, *arg, **kwargs)
+        background_tasks.add_task(
+            process_and_update,
+            [d.path for d in selected_datasource_ids.selected_data_sources],
+            analyst_db,
+            ExternalDataStoreNameDataSourceType.from_name(name),
+        )
+    return EmptyResponse()
+
+
+async def update_data_sources_for_data_store(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    analyst_db: AnalystDB,
+) -> None:
+    with use_user_token(request):
+        logger.debug("Loading recipe for datasources %s.")
+        recipe = await DataSourceRecipe.load_or_create(
+            analyst_db, external_data_store_id
+        )
+        logger.debug("Updating recipe with data sources for %s", external_data_store_id)
+        await recipe.select_data_sources(selected_datasource_ids.selected_data_sources)
+
+
 @router.get("/supported-data-source-types")
 async def get_supported_datasource_types(request: Request) -> SupportedDataSourceTypes:
-    types: list[DataSourceType] = [DataSourceType.FILE, DataSourceType.REGISTRY]
+    types: list[InternalDataSourceType] = [
+        InternalDataSourceType.FILE,
+        InternalDataSourceType.REGISTRY,
+    ]
     if not isinstance(get_external_database(), NoDatabaseOperator):
-        types.append(DataSourceType.DATABASE)
-    if SparkRecipe.should_use_spark_recipe():
-        types.append(DataSourceType.REMOTE_REGISTRY)
+        types.append(InternalDataSourceType.DATABASE)
+    if DatasetSparkRecipe.should_use_spark_recipe():
+        types.append(InternalDataSourceType.REMOTE_REGISTRY)
     return SupportedDataSourceTypes(supported_types=[t.value for t in types])
 
 

@@ -95,6 +95,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
             className
           )}
           rows={1}
+          autoFocus={props.autoFocus}
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           onKeyDown={event => {

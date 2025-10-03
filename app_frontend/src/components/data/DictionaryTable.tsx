@@ -85,6 +85,14 @@ const EditableCell: React.FC<EditableCellProps> = ({
   );
 };
 
+function displayDataType(dataType: string): string {
+  const match = dataType.match(/(\w+)\(/);
+  if (match) {
+    return match[1];
+  }
+  return dataType;
+}
+
 export const DictionaryTable: React.FC<DictionaryTableProps> = ({
   data,
   onUpdateCell,
@@ -114,7 +122,7 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
             </TableCell>
             <TableCell>
               <EditableCell
-                initialValue={column.data_type}
+                initialValue={displayDataType(column.data_type)}
                 rowIndex={index}
                 field="data_type"
                 onUpdate={handleCellUpdate}

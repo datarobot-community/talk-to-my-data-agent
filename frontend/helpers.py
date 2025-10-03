@@ -25,7 +25,7 @@ from typing import (
 
 import streamlit as st
 
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import AnalystDB, InternalDataSourceType
 
 logger = logging.getLogger("DataAnalyst")
 
@@ -56,7 +56,7 @@ empty_session_state = {
     "datasets_names": [],
     "cleansed_data_names": [],
     "selected_registry_datasets": [],
-    "data_source": DataSourceType.FILE,
+    "data_source": InternalDataSourceType.FILE,
     "file_uploader_key": 0,
     "processed_file_ids": [],
     "chat_messages": [],

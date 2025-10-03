@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, Generator, List, Optional, Union, cast
 from urllib.parse import urljoin
 
 import datarobot as dr
 import trafaret as t
+from fastapi import HTTPException, Request
 
 FILE_API_CONNECT_TIMEOUT = os.environ.get("FILE_API_CONNECT_TIMEOUT", 180)
 FILE_API_READ_TIMEOUT = os.environ.get("FILE_API_READ_TIMEOUT", 180)
@@ -163,4 +165,30 @@ class File:
     def delete(cls, catalog_id: str) -> None:
         cls._client.delete(
             urljoin(cls._path, f"{catalog_id}/"),
+        )
+
+
+@contextmanager
+def use_user_token(request: Request) -> Generator[None, None, None]:
+    """Context manager to temporarily use the user's DataRobot token."""
+    if request.state.session.datarobot_api_token:
+        with dr.Client(
+            token=request.state.session.datarobot_api_token,
+            endpoint=request.state.session.datarobot_endpoint,
+        ):
+            yield
+    elif request.state.session.datarobot_api_skoped_token:
+        with dr.Client(
+            token=request.state.session.datarobot_api_skoped_token,
+            endpoint=request.state.session.datarobot_endpoint,
+        ):
+            yield
+    elif not os.environ.get(
+        "DR_CUSTOM_APP_EXTERNAL_URL"
+    ):  # indicates that it's a local environment
+        yield
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="API token required. Please authenticate with DataRobot.",
         )

@@ -20,6 +20,7 @@ from typing import Awaitable, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from utils.data_analyst_telemetry import DataAnalystTelemetry
 from utils.rest_api import app
 
 # Configure logging to filter out the health check logs
@@ -106,3 +107,11 @@ if SERVE_STATIC_FRONTEND:
 
     # Important to be last so that we fall back to the static files if the route is not found
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+
+# Initialize telemetry on application startup
+telemetry = DataAnalystTelemetry()
+telemetry.log_application_start()
+
+# Setup auto-instrumentation for FastAPI
+# This will automatically trace all incoming HTTP requests
+telemetry.instrument_fastapi_app(app)

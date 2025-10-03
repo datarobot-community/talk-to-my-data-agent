@@ -47,6 +47,15 @@ fastexcel>=0.12.1,<1.0
 aiofiles==24.1.0
 types-aiofiles==24.1.0.20241221
 
+# telemetry
+opentelemetry-api>=1.20.0,<1.30.0
+opentelemetry-sdk>=1.20.0,<1.30.0
+opentelemetry-exporter-otlp-proto-http>=1.20.0,<1.30.0
+# OpenTelemetry auto-instrumentation (uses beta versioning scheme)
+opentelemetry-instrumentation>=0.45b0,<0.59b0
+opentelemetry-instrumentation-fastapi>=0.45b0,<0.59b0
+opentelemetry-instrumentation-requests>=0.45b0,<0.59b0
+
 # dev & compatibility
 eval_type_backport>=0.2.2,<1.0
 db-dtypes>=1.3.1,<2.0

@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { useAppState } from '@/state/hooks';
-import { DATA_SOURCES } from '@/constants/dataSources';
+import { DATA_SOURCES, EXTERNAL_DATA_STORE_PREFIX } from '@/constants/dataSources';
 import { DatasetMetadata } from '@/api/cleansed-datasets/api-requests';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { useFetchAllChats, useUpdateChatDataSource } from '@/api/chat-messages/hooks';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '@/i18n';
+import { friendlySourceName } from '@/api/datasources/utils';
 
 interface IDataSourceToggleProps {
   multipleMetadata?: {
@@ -62,6 +63,11 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
       ) {
         acc.push(name);
       }
+
+      if (currentValue.startsWith(EXTERNAL_DATA_STORE_PREFIX) && currentValue === data_source) {
+        acc.push(name);
+      }
+
       return acc;
     }, [] as string[]);
   }, [multipleMetadata, currentValue]);
@@ -108,6 +114,18 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
           <div className="m-2">{t('Local Registry / File')}</div>
         </ToggleGroupItem>
       )}
+      {allowedDataSources
+        ?.filter(ds => ds.startsWith(EXTERNAL_DATA_STORE_PREFIX))
+        .map(ds => {
+          const dsFriendly = friendlySourceName(ds);
+          return (
+            <>
+              <ToggleGroupItem value={ds} className="text-sm">
+                <div className="m-2">{dsFriendly}</div>
+              </ToggleGroupItem>
+            </>
+          );
+        })}
     </ToggleGroup>
   );
 };

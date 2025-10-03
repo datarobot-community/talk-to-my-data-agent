@@ -14,7 +14,7 @@
 import asyncio
 import os
 import warnings
-from typing import cast
+from typing import Any, Optional, cast
 
 import polars as pl
 import streamlit as st
@@ -28,7 +28,7 @@ from datarobot_connect import DataRobotTokenManager
 from helpers import state_empty, state_init
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import AnalystDB, DataSourceType, InternalDataSourceType
 from utils.api import (
     list_registry_datasets,
     load_registry_datasets,
@@ -48,6 +48,26 @@ warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")
 app_infra = load_app_infra()
 Database = get_external_database()
+
+# Initialize telemetry for connect & explore page
+explore_logger: Optional[Any] = None
+
+try:
+    from utils.data_analyst_telemetry import DataAnalystTelemetry
+
+    # Initialize telemetry
+    telemetry = DataAnalystTelemetry()
+
+    # Get basic telemetry components
+    explore_logger = telemetry.get_logger("data_analyst.connect_and_explore")
+
+    # Log page visit
+    explore_logger.info("User navigated to connect_and_explore page")
+
+except Exception as e:
+    # Don't fail if telemetry fails
+    logger.warning(f"Warning: Explore page telemetry initialization failed: {e}")
+    explore_logger = None
 
 
 async def process_uploaded_file(file: UploadedFile) -> list[str]:
@@ -92,7 +112,9 @@ async def process_uploaded_file(file: UploadedFile) -> list[str]:
         analyst_db: AnalystDB = st.session_state.analyst_db
         names = []
         for result in results:
-            await analyst_db.register_dataset(result, DataSourceType.FILE)
+            await analyst_db.register_dataset(
+                result, cast(DataSourceType, InternalDataSourceType.FILE)
+            )
             names.append(result.name)
             del result
         del results
@@ -118,7 +140,7 @@ async def registry_download_callback() -> None:
         "selected_registry_datasets" in st.session_state
         and st.session_state.selected_registry_datasets
     ):
-        st.session_state.data_source = DataSourceType.REGISTRY
+        st.session_state.data_source = InternalDataSourceType.REGISTRY
 
         with st.sidebar:  # Use sidebar context
             with st.spinner("Loading selected datasets..."):
@@ -143,7 +165,7 @@ async def registry_download_callback() -> None:
 async def load_from_database_callback() -> None:
     """Callback function for Database table download"""
     # Set flag to indicate data source is a database
-    st.session_state.data_source = DataSourceType.DATABASE
+    st.session_state.data_source = InternalDataSourceType.DATABASE
     if (
         "selected_schema_tables" in st.session_state
         and st.session_state.selected_schema_tables
@@ -170,7 +192,7 @@ async def load_from_database_callback() -> None:
 async def uploaded_file_callback(uploaded_files: list[UploadedFile]) -> None:
     """Callback function for file uploads"""
     # Set flag to indicate data source is a file
-    st.session_state.data_source = DataSourceType.FILE
+    st.session_state.data_source = InternalDataSourceType.FILE
 
     with st.spinner("Loading and processing files..."):
         # Process uploaded files
@@ -199,7 +221,7 @@ def st_list_registry_datasets() -> list[DataRegistryDataset]:
 
 @st.cache_data(ttl="60s", show_spinner=False)
 def st_list_database_tables() -> list[str]:
-    return Database.get_tables()
+    return asyncio.run(Database.get_tables())
 
 
 # Custom CSS

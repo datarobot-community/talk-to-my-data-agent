@@ -50,7 +50,11 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
           <FontAwesomeIcon icon={faPlus} /> {t('New chat')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[500px]"
+        // prevent focus from returning back to modal trigger, we want it to be autofocused on prompt-input
+        onCloseAutoFocus={e => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{t('Create new chat')}</DialogTitle>
           <DialogDescription>
@@ -69,6 +73,8 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
               className="col-span-3"
               placeholder={t('Enter a name for your chat')}
               disabled={isPending}
+              autoFocus
+              autoComplete="off"
               onKeyDown={event => {
                 if (event.key === 'Enter' && name.trim()) {
                   createChat(

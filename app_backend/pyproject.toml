@@ -27,6 +27,12 @@ dependencies = [
     "numba>=0.61.0,<1.0",
     "numpy>=2.1.3,<3.0",
     "openai>=1.59.9,<2",
+    "opentelemetry-api>=1.20.0,<1.30.0",
+    "opentelemetry-sdk>=1.20.0,<1.30.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0,<1.30.0",
+    "opentelemetry-instrumentation>=0.45b0,<0.59b0",
+    "opentelemetry-instrumentation-fastapi>=0.45b0,<0.59b0",
+    "opentelemetry-instrumentation-requests>=0.45b0,<0.59b0",
     "openpyxl>=3.1.5,<4.0",
     "pandas>=2.2.3,<3.0",
     "plotly>=5.24.1,<6.0",
@@ -72,6 +78,16 @@ include = ["static", "templates"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+norecursedirs = [".venv", "venv", ".git", ".tox", "dist", "build", "*.egg"]
+filterwarnings = [
+    # Ignore DataRobot SDK deprecation warnings about mypy_extensions.TypedDict
+    "ignore:mypy_extensions.TypedDict is deprecated:DeprecationWarning:datarobot.*",
+    # Ignore other common deprecation warnings that clutter CI output
+    "ignore::DeprecationWarning:datarobot.*",
+    # Ignore Pydantic V2 migration warnings
+    "ignore:.*is deprecated and will be removed.*:pydantic.warnings.PydanticDeprecatedSince20",
+    "ignore:.*is deprecated.*:pydantic.warnings.PydanticDeprecatedSince20",
+]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

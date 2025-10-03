@@ -17,15 +17,47 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
+
+class ExFormatter(logging.Formatter):
+    def_keys = [
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "message",
+        "taskName",
+    ]
+
+    def format(self, record: logging.LogRecord) -> str:
+        string = super().format(record)
+        extra = {k: v for k, v in record.__dict__.items() if k not in self.def_keys}
+        if len(extra) > 0:
+            string += " - extra: " + str(extra)
+        return string
 
 
 def get_logger(name: str = "DataAnalystBackend") -> logging.Logger:
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = ExFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     consoleHandle = logging.StreamHandler()
-    consoleHandle.setLevel(logging.INFO)
+    consoleHandle.setLevel(logging.DEBUG)
     consoleHandle.setFormatter(formatter)
     logger = logging.getLogger(name)
     logger.propagate = False  # Prevent propagation to root logger

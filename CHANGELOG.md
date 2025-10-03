@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Improvements
+
+- Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
+
+## [0.3.13] - 2025-10-03
+
+### Features
+
+- Add connection to DataRobot data stores (currently Postgres and Redshift).
+
+### Improvements
+
+- Move some expensive calls into background thread to avoid blocking main event loop.
+
 ## [0.3.12] - 2025-09-25
 
 ### Improvements

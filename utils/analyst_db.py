@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import uuid
 from abc import ABC
 from contextlib import asynccontextmanager
@@ -27,6 +28,12 @@ from typing import Any, AsyncGenerator, List, Optional, cast
 
 import duckdb
 import polars as pl
+from pydantic import (
+    BaseModel,
+    ValidationInfo,
+    field_serializer,
+    field_validator,
+)
 
 from utils.logging_helper import get_logger
 from utils.persistent_storage import PersistentStorage
@@ -37,6 +44,8 @@ from utils.schema import (
     CleansedColumnReport,
     CleansedDataset,
     DataDictionary,
+    ExternalDataSource,
+    ExternalDataStore,
 )
 
 logger = get_logger("ApplicationDB")
@@ -52,7 +61,7 @@ class DatasetType(Enum):
     DICTIONARY = "dictionary"
 
 
-class DataSourceType(Enum):
+class InternalDataSourceType(Enum):
     FILE = "file"
     DATABASE = "database"
     REGISTRY = "catalog"
@@ -60,10 +69,65 @@ class DataSourceType(Enum):
     GENERATED = "generated"
 
 
+DATA_STORE_TYPE_REGEX = re.compile(r"^external_data_store_(.*)$")
+
+
+class ExternalDataStoreNameDataSourceType(BaseModel):
+    name: str
+
+    @classmethod
+    def from_name(cls, name: str) -> ExternalDataStoreNameDataSourceType:
+        return cls(name=f"external_data_store_{name}")
+
+    @field_validator("name")
+    def name_valid(cls, v: str, info: ValidationInfo) -> str:
+        if not DATA_STORE_TYPE_REGEX.match(v):
+            raise ValueError(
+                "External data stores must start with prefix `external_data_store_`"
+            )
+        return v
+
+    @property
+    def friendly_name(self) -> str:
+        if m := DATA_STORE_TYPE_REGEX.match(self.name):
+            return m.group(1)
+        raise RuntimeError("DataStore name invalid. Should be unreachable.")
+
+
+DataSourceType = InternalDataSourceType | ExternalDataStoreNameDataSourceType
+
+
+def get_data_source_type(value: str) -> DataSourceType:
+    """Transform a string to a data source type, raising a value error if it is invalid.
+
+    Args:
+        value (str): The value to interpret.
+
+    Raises:
+        ValueError: If the string does not name a datasource type
+
+    Returns:
+        DataSourceType: The corresponding data source type.
+    """
+    if value in InternalDataSourceType:
+        return InternalDataSourceType(value)
+    elif DATA_STORE_TYPE_REGEX.match(value):
+        return ExternalDataStoreNameDataSourceType(name=value)
+    raise ValueError(f"'{value}' could not be interpreted as a data source.")
+
+
+def display_data_source_type(data_source_type: DataSourceType) -> str:
+    if isinstance(data_source_type, InternalDataSourceType):
+        return data_source_type.value
+    elif isinstance(data_source_type, ExternalDataStoreNameDataSourceType):
+        return data_source_type.name
+    raise RuntimeError(f"Wrong type passed '{data_source_type}'.")
+
+
 @dataclass
 class DatasetMetadata:
     name: str
-    dataset_id: str | None
+    external_id: str | None
     dataset_type: DatasetType
     original_name: (
         str  # For cleansed/dictionary datasets, links to their original dataset
@@ -73,6 +137,19 @@ class DatasetMetadata:
     row_count: int
     data_source: DataSourceType
     file_size: int = 0  # Size of the file in bytes
+
+    @field_serializer("data_source")
+    def serialize_data_source(self, ds: DataSourceType) -> str:
+        return display_data_source_type(ds)
+
+    @field_validator("data_source")
+    @classmethod
+    def data_source_valid(
+        cls, ds: DataSourceType | str, _info: ValidationInfo
+    ) -> DataSourceType:
+        if isinstance(ds, str):
+            return get_data_source_type(ds)
+        return ds
 
 
 class BaseDuckDBHandler(ABC):
@@ -156,6 +233,42 @@ class BaseDuckDBHandler(ABC):
             else:
                 await self._create_db_version_table(conn)
 
+    async def _add_columns(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        additional_columns: list[tuple[str, str]],
+        table: str,
+    ) -> None:
+        """
+        Asynchronously adds new columns to a DuckDB table if they do not already exist.
+
+        Args:
+            conn (duckdb.DuckDBPyConnection): The DuckDB connection object.
+            additional_columns (list[str]): A list of tuples, each containing the column name and column type to be added.
+            table (str): The name of the table to modify.
+
+        Returns:
+            None
+        """
+        columns = await self.execute_query(
+            conn,
+            f"""
+                DESCRIBE {table}
+                """,
+        )
+        existing_columns = set()
+        for row in await asyncio.get_running_loop().run_in_executor(
+            None, columns.fetchall
+        ):
+            existing_columns.add(row[0])
+
+        for column_name, column_type in additional_columns:
+            if column_name not in existing_columns:
+                await self.execute_query(
+                    conn,
+                    f"ALTER TABLE {table} ADD COLUMN {column_name} {column_type}",
+                )
+
     @asynccontextmanager
     async def _get_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
         """Async context manager for database connections."""
@@ -233,24 +346,8 @@ class DatasetHandler(BaseDuckDBHandler):
             )
             # For backwards compatibility, add new columns.
             additional_columns = [("dataset_id", "VARCHAR")]
-            columns = await self.execute_query(
-                conn,
-                """
-                DESCRIBE dataset_metadata
-                """,
-            )
-            existing_columns = set()
-            for row in await asyncio.get_running_loop().run_in_executor(
-                None, columns.fetchall
-            ):
-                existing_columns.add(row[0])
-
-            for column_name, column_type in additional_columns:
-                if column_name not in existing_columns:
-                    await self.execute_query(
-                        conn,
-                        f"ALTER TABLE dataset_metadata ADD COLUMN {column_name} {column_type}",
-                    )
+            table = "dataset_metadata"
+            await self._add_columns(conn, additional_columns, table)
 
             # Create cleansing reports table
             await self.execute_query(
@@ -270,7 +367,7 @@ class DatasetHandler(BaseDuckDBHandler):
         name: str,
         dataset_type: DatasetType,
         data_source: DataSourceType,
-        dataset_id: str | None = None,
+        external_id: str | None = None,
         original_name: str | None = None,
         file_size: int = 0,
         clobber: bool = False,
@@ -318,7 +415,7 @@ class DatasetHandler(BaseDuckDBHandler):
             metadata = DatasetMetadata(
                 name=name,
                 dataset_type=dataset_type,
-                dataset_id=dataset_id,
+                external_id=external_id,
                 original_name=original_name or name,
                 created_at=datetime.now(timezone.utc),
                 columns=list(df.columns),
@@ -350,9 +447,9 @@ class DatasetHandler(BaseDuckDBHandler):
                     metadata.created_at,
                     json.dumps(metadata.columns),
                     metadata.row_count,
-                    metadata.data_source.value,
+                    display_data_source_type(metadata.data_source),
                     metadata.file_size,
-                    metadata.dataset_id,
+                    metadata.external_id,
                 ],
             )
 
@@ -388,7 +485,7 @@ class DatasetHandler(BaseDuckDBHandler):
 
             if data_source:
                 where_clauses.append("data_source = ?")
-                params.append(data_source.value)
+                params.append(display_data_source_type(data_source))
 
             if where_clauses:
                 query += " WHERE " + " AND ".join(where_clauses)
@@ -406,9 +503,9 @@ class DatasetHandler(BaseDuckDBHandler):
                     created_at=row[3],
                     columns=json.loads(row[4]),
                     row_count=row[5],
-                    data_source=DataSourceType(row[6]),
+                    data_source=get_data_source_type(row[6]),
                     file_size=row[7],
-                    dataset_id=row[8],
+                    external_id=row[8],
                 )
                 for row in rows
             ]
@@ -508,9 +605,9 @@ class DatasetHandler(BaseDuckDBHandler):
                     created_at=row[3].isoformat() if row[3] else datetime.min,
                     columns=json.loads(row[4]),
                     row_count=row[5],
-                    data_source=DataSourceType(row[6]),
+                    data_source=get_data_source_type(row[6]),
                     file_size=row[7],
-                    dataset_id=row[8],
+                    external_id=row[8],
                 )
 
                 return metadata
@@ -716,7 +813,9 @@ class ChatHandler(BaseDuckDBHandler):
             )
 
     async def create_chat(
-        self, chat_name: str, data_source: str | None = DataSourceType.FILE.value
+        self,
+        chat_name: str,
+        data_source: str | None = InternalDataSourceType.FILE.value,
     ) -> str:
         """
         Create a new chat with the given name and no messages.
@@ -1384,6 +1483,7 @@ class ChatHandler(BaseDuckDBHandler):
 class UserRecipe:
     user_id: str
     recipe_id: str
+    datastore_id: str | None
 
 
 class RecipeHandler(BaseDuckDBHandler):
@@ -1398,9 +1498,14 @@ class RecipeHandler(BaseDuckDBHandler):
                 """
                     CREATE TABLE IF NOT EXISTS user_recipe (
                         user_id VARCHAR PRIMARY KEY,
-                        recipe_id VARCHAR NULL
+                        recipe_id VARCHAR NULL,
+                        datastore_id VARCHAR NULL
                     )
                 """,
+            )
+
+            await self._add_columns(
+                conn, [("datastore_id", "VARCHAR NULL")], "user_recipe"
             )
 
     async def register_recipe(self, user_recipe: UserRecipe) -> None:
@@ -1408,29 +1513,27 @@ class RecipeHandler(BaseDuckDBHandler):
             await self.execute_query(
                 conn,
                 """
-                    DELETE FROM user_recipe WHERE user_id = ?
-                """,
-                [user_recipe.user_id],
-            )
-            await self.execute_query(
-                conn,
-                """
                     INSERT INTO user_recipe
-                        (user_id, recipe_id) 
+                        (user_id, recipe_id, datastore_id) 
                     VALUES
-                        (?, ?)
+                        (?, ?, ?)
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        recipe_id = EXCLUDED.recipe_id,
+                        datastore_id = EXCLUDED.datastore_id
                 """,
-                [user_recipe.user_id, user_recipe.recipe_id],
+                [user_recipe.user_id, user_recipe.recipe_id, user_recipe.datastore_id],
             )
 
-    async def get_user_recipe(self, user_id: str) -> UserRecipe | None:
+    async def get_user_recipe(
+        self, user_id: str, datastore_id: str | None = None
+    ) -> UserRecipe | None:
         async with self._get_connection() as conn:
             user_recipe_results = await self.execute_query(
                 conn,
                 """
-                SELECT user_id, recipe_id FROM user_recipe WHERE user_id = ?
+                SELECT user_id, recipe_id, datastore_id FROM user_recipe WHERE user_id = ? AND datastore_id = ?
                 """,
-                [user_id],
+                [user_id, datastore_id],
             )
 
             row = await asyncio.get_running_loop().run_in_executor(
@@ -1438,20 +1541,204 @@ class RecipeHandler(BaseDuckDBHandler):
             )
 
             if row:
-                user_id, recipe_id = row
-                return UserRecipe(user_id=user_id, recipe_id=recipe_id)
+                user_id, recipe_id, datastore_id = row
+                return UserRecipe(
+                    user_id=user_id, recipe_id=recipe_id, datastore_id=datastore_id
+                )
             return None
+
+
+class ExternalDataStoreHandler(BaseDuckDBHandler):
+    """Async handler for storing external data stores and sources."""
+
+    async def _initialize_database(self) -> None:
+        await super()._initialize_database()
+
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                    CREATE TABLE IF NOT EXISTS external_data_store (
+                        external_data_store_id VARCHAR PRIMARY KEY,
+                        canonical_name VARCHAR NOT NULL,
+                        driver_class_type VARCHAR NOT NULL
+                    )
+                """,
+            )
+
+            await self.execute_query(
+                conn,
+                """ 
+                    CREATE TABLE IF NOT EXISTS external_data_source (
+                        external_data_store_id VARCHAR REFERENCES external_data_store(external_data_store_id),
+                        path VARCHAR NOT NULL PRIMARY KEY,
+                        database_catalog VARCHAR NULL,
+                        database_schema VARCHAR NULL,
+                        database_table VARCHAR NULL
+                    )
+                """,
+            )
+
+    async def register_external_data_store(self, data_store: ExternalDataStore) -> None:
+        logger.debug(
+            "Registering external datastore",
+            extra={
+                "data_store_id": data_store.id,
+                "canonical_name": data_store.canonical_name,
+                "driver_class_type": data_store.driver_class_type,
+            },
+        )
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """ 
+                    INSERT INTO external_data_store
+                        (external_data_store_id, canonical_name, driver_class_type)
+                    VALUES
+                        (?, ?, ?)
+                    ON CONFLICT (external_data_store_id) DO UPDATE SET
+                        canonical_name = EXCLUDED.canonical_name,
+                        driver_class_type = EXCLUDED.driver_class_type
+                """,
+                [
+                    data_store.id,
+                    data_store.canonical_name,
+                    data_store.driver_class_type,
+                ],
+            )
+
+    async def list_external_data_stores(self) -> list[ExternalDataStore]:
+        logger.debug("Listing external data stores.")
+        async with self._get_connection() as conn:
+            query = await self.execute_query(
+                conn,
+                "SELECT external_data_store_id, canonical_name, driver_class_type "
+                "FROM external_data_store",
+            )
+            rows = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: query.fetchall()
+            )
+
+        logger.debug(
+            "Found %d external data stores.", len(rows), extra={"user_id": self.user_id}
+        )
+
+        external_data_stores: list[ExternalDataStore] = []
+        for external_data_store_id, canonical_name, driver_class_type in rows:
+            data_store = ExternalDataStore(
+                id=external_data_store_id,
+                canonical_name=canonical_name,
+                driver_class_type=driver_class_type,
+                defined_data_sources=[],
+            )
+            data_store.defined_data_sources = await self.list_sources_for_data_store(
+                data_store
+            )
+            external_data_stores.append(data_store)
+
+        return external_data_stores
+
+    async def list_sources_for_data_store(
+        self, external_data_store: ExternalDataStore
+    ) -> list[ExternalDataSource]:
+        logger.debug("Listing data sources for data store %s", external_data_store.id)
+        async with self._get_connection() as conn:
+            query = await self.execute_query(
+                conn,
+                "SELECT external_data_store_id, database_catalog, database_schema, database_table "
+                "FROM external_data_source WHERE external_data_store_id = ?",
+                [external_data_store.id],
+            )
+
+            rows = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: query.fetchall()
+            )
+
+        external_data_sources = []
+        for data_store_id, catalog, schema, table in rows:
+            external_data_sources.append(
+                ExternalDataSource(
+                    data_store_id=data_store_id,
+                    database_catalog=catalog,
+                    database_schema=schema,
+                    database_table=table,
+                )
+            )
+
+        return external_data_sources
+
+    async def delete_external_data_store(self, data_store_id: str) -> None:
+        logger.debug("Deleting data store %s", data_store_id)
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                    DELETE FROM external_data_source WHERE external_data_store_id = ?
+                """,
+                [data_store_id],
+            )
+
+            await self.execute_query(
+                conn,
+                """
+                    DELETE FROM external_data_store WHERE external_data_store_id = ?
+                """,
+                [data_store_id],
+            )
+
+    async def delete_all_external_data_stores(self) -> None:
+        async with self._get_connection() as conn:
+            await self.execute_query(conn, "TRUNCATE TABLE external_data_source")
+
+            await self.execute_query(conn, "TRUNCATE TABLE external_data_stores")
+
+    async def clear_external_data_store_sources(self, data_store_id: str) -> None:
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                    DELETE FROM external_data_source WHERE external_data_store_id = ?
+                """,
+                [data_store_id],
+            )
+
+    async def register_external_data_source(
+        self, data_source: ExternalDataSource
+    ) -> None:
+        async with self._get_connection() as conn:
+            await self.execute_query(
+                conn,
+                """ 
+                    INSERT INTO external_data_source
+                        (external_data_store_id,
+                         path,
+                         database_catalog,
+                         database_schema,
+                         database_table)
+                    VALUES
+                        (?, ?, ?, ?, ?)
+                """,
+                [
+                    data_source.data_store_id,
+                    data_source.path,
+                    data_source.database_catalog,
+                    data_source.database_schema,
+                    data_source.database_table,
+                ],
+            )
 
 
 class AnalystDB:
     dataset_handler: DatasetHandler
     chat_handler: ChatHandler
     user_recipe_handler: RecipeHandler
+    data_source_handler: ExternalDataStoreHandler
     user_id: str
     db_path: Path
     dataset_db_name: str
     chat_db_name: str
     user_recipe_db_name: str
+    data_source_db_name: str
     db_version: int
 
     @property
@@ -1478,6 +1765,7 @@ class AnalystDB:
         dataset_db_name: str = "dataset",
         chat_db_name: str = "chat",
         user_recipe_db_name: str = "recipe",
+        data_source_db_name: str = "datasource",
         db_version: int | None = ANALYST_DATABASE_VERSION,
         use_persistent_storage: bool = False,
     ) -> "AnalystDB":
@@ -1503,11 +1791,19 @@ class AnalystDB:
             db_version=db_version,
             use_persistent_storage=use_persistent_storage,
         )
+        self.data_source_handler = ExternalDataStoreHandler(
+            user_id=user_id,
+            db_path=db_path,
+            name=data_source_db_name,
+            db_version=db_version,
+            use_persistent_storage=use_persistent_storage,
+        )
         self.user_id = user_id
         self.db_path = db_path
         self.dataset_db_name = dataset_db_name
         self.chat_db_name = chat_db_name
         self.user_recipe_db_name = user_recipe_db_name
+        self.data_source_db_name = data_source_db_name
         self.db_version = db_version or 0
         await self.initialize()
         return self
@@ -1517,6 +1813,7 @@ class AnalystDB:
         await self.dataset_handler._initialize_database()
         await self.chat_handler._initialize_database()
         await self.user_recipe_handler._initialize_database()
+        await self.data_source_handler._initialize_database()
 
     # Dataset operations
     async def register_dataset(
@@ -1524,7 +1821,7 @@ class AnalystDB:
         df: AnalystDataset | CleansedDataset,
         data_source: DataSourceType,
         file_size: int = 0,
-        dataset_id: str | None = None,
+        external_id: str | None = None,
         clobber: bool = False,
     ) -> None:
         if isinstance(df, CleansedDataset):
@@ -1544,7 +1841,7 @@ class AnalystDB:
                 data_source=data_source,
                 original_name=df.name,
                 file_size=file_size,
-                dataset_id=dataset_id,
+                external_id=external_id,
                 clobber=clobber,
             )
         except Exception as e:
@@ -1587,7 +1884,7 @@ class AnalystDB:
                 data_dictionary.to_application_df(),
                 name=f"{data_dictionary.name}_dict",
                 dataset_type=DatasetType.DICTIONARY,
-                data_source=DataSourceType.GENERATED,
+                data_source=InternalDataSourceType.GENERATED,
                 original_name=data_dictionary.name,
                 clobber=clobber,
             )
@@ -1612,7 +1909,7 @@ class AnalystDB:
         return await self.dataset_handler.get_cleansing_report(dataset_name)
 
     async def list_analyst_datasets(
-        self, data_source: DataSourceType | None = None
+        self, data_source: InternalDataSourceType | None = None
     ) -> list[str]:
         """
         List all standard datasets names, optionally filtered by data source.
@@ -1659,7 +1956,7 @@ class AnalystDB:
     async def create_chat(
         self,
         chat_name: str | None,
-        data_source: str | None = DataSourceType.FILE.value,
+        data_source: str | None = InternalDataSourceType.FILE.value,
     ) -> str:
         """
         Create a new chat with the given name and no messages.
@@ -1811,14 +2108,74 @@ class AnalystDB:
         """
         return await self.chat_handler.update_chat_data_source(chat_id, data_source)
 
-    async def get_user_recipe(self) -> UserRecipe | None:
+    async def get_user_recipe(
+        self, data_store_id: str | None = None
+    ) -> UserRecipe | None:
         """
         Lookup the recipe assigned to the user of this DB, if set.
         """
-        return await self.user_recipe_handler.get_user_recipe(self.user_id)
+        return await self.user_recipe_handler.get_user_recipe(
+            self.user_id, datastore_id=data_store_id
+        )
 
     async def set_user_recipe(self, recipe: UserRecipe) -> None:
         """
         Assign the given recipe to this user.
         """
         await self.user_recipe_handler.register_recipe(recipe)
+
+    async def list_data_stores(self) -> list[ExternalDataStore]:
+        """
+        Return all data stores registered for a user.
+        """
+        return await self.data_source_handler.list_external_data_stores()
+
+    async def delete_all_data_stores(self) -> None:
+        """
+        Delete all registered data stores for the current user.
+
+        NOTE: Does not delete any datasets registered with datastores.
+        """
+        return await self.data_source_handler.delete_all_external_data_stores()
+
+    async def delete_data_store(self, data_store_id: str) -> None:
+        """
+        Delete the registered data store and associated sources with the given id.
+
+        Args:
+            data_store_id (str): The id of the datastore.
+        """
+        await self.data_source_handler.clear_external_data_store_sources(data_store_id)
+        await self.data_source_handler.delete_external_data_store(data_store_id)
+
+    async def register_data_store(self, data_store: ExternalDataStore) -> None:
+        """
+        Puts the given data store in the database for the current user, also registers all data sources.
+
+        Args:
+            data_store (ExternalDataStore): The data store to register.
+        """
+        await self.data_source_handler.register_external_data_store(data_store)
+        await self.data_source_handler.clear_external_data_store_sources(data_store.id)
+        for data_source in data_store.defined_data_sources:
+            await self.data_source_handler.register_external_data_source(data_source)
+
+    async def clear_data_store_sources(self, data_store: ExternalDataStore) -> None:
+        """
+        Deregisters all sources for this datastore.
+        """
+        await self.data_source_handler.clear_external_data_store_sources(data_store.id)
+
+    async def list_sources_for_data_store(
+        self, data_store: ExternalDataStore
+    ) -> list[ExternalDataSource]:
+        """
+        List the data sources selected for a datastore.
+
+        Args:
+            data_store (ExternalDataStore): _description_
+
+        Returns:
+            list[ExternalDataSource]: _description_
+        """
+        return await self.data_source_handler.list_sources_for_data_store(data_store)

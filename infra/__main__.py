@@ -85,10 +85,14 @@ if USE_LLM_GATEWAY:
 if settings_generative.LLM == LLMs.DEPLOYED_LLM:
     pulumi.info(f"{TEXTGEN_DEPLOYMENT_ID=}")
     pulumi.info(f"{TEXTGEN_REGISTERED_MODEL_ID=}")
-    if (TEXTGEN_DEPLOYMENT_ID is None) == (TEXTGEN_REGISTERED_MODEL_ID is None):  # XOR
-        raise ValueError(
-            "Either TEXTGEN_DEPLOYMENT_ID or TEXTGEN_REGISTERED_MODEL_ID must be set when using a deployed LLM. Plese check your .env file"
-        )
+    if TEXTGEN_DEPLOYMENT_ID is not None:
+        pulumi.info(f"Using existing deployment '{TEXTGEN_DEPLOYMENT_ID}'")
+        if TEXTGEN_REGISTERED_MODEL_ID is not None:
+            pulumi.warn("TEXTGEN_REGISTERED_MODEL_ID will be ignored")
+            TEXTGEN_REGISTERED_MODEL_ID = None
+    if TEXTGEN_REGISTERED_MODEL_ID is not None:
+        pulumi.info(f"Using existing registered model '{TEXTGEN_REGISTERED_MODEL_ID}'")
+
 
 check_feature_flags(PROJECT_ROOT / "infra" / "feature_flag_requirements.yaml")
 

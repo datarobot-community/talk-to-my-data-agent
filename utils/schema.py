@@ -43,7 +43,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from typing_extensions import TypedDict
+from typing_extensions import Self, TypedDict
 
 from .code_execution import MaxReflectionAttempts
 
@@ -58,6 +58,70 @@ class DataRegistryDataset(BaseModel):
     name: str
     created: str
     size: str
+
+
+class EmptyResponse(BaseModel):
+    success: bool = True
+
+
+class ExternalDataStore(BaseModel):
+    id: str
+    canonical_name: str
+    driver_class_type: str
+    defined_data_sources: list[ExternalDataSource]
+
+
+class ExternalDataSource(BaseModel):
+    data_store_id: str
+    database_catalog: str | None
+    database_schema: str | None
+    database_table: str | None
+
+    @property
+    def path(self) -> str:
+        return ".".join(
+            (
+                c
+                for c in (
+                    self.database_catalog,
+                    self.database_schema,
+                    self.database_table,
+                )
+                if c
+            )
+        )
+
+    @classmethod
+    def from_path(cls, path: str, data_store_id: str) -> Self:
+        parts = path.split(".")
+        match len(parts):
+            case 0:
+                cat = schema = table = None
+            case 1:
+                cat = schema = None
+                [table] = parts
+            case 2:
+                cat = None
+                [schema, table] = parts
+            case 3:
+                [cat, schema, table] = parts
+            case _:
+                raise ValueError(f"Path {path} has too many parts.")
+        return cls(
+            data_store_id=data_store_id,
+            database_catalog=cat,
+            database_schema=schema,
+            database_table=table,
+        )
+
+
+class ExternalDataSourcesSelection(BaseModel):
+    selected_data_sources: list[ExternalDataSource]
+
+
+class ExternalDataSourcesSelectionDelta(BaseModel):
+    newly_selected: list[ExternalDataSource]
+    newly_deselected: list[ExternalDataSource]
 
 
 class DataFrameWrapper:
