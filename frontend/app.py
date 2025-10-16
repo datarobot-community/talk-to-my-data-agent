@@ -13,23 +13,12 @@
 # limitations under the License.
 
 import asyncio
-import os
-import sys
 from typing import List
 
 import streamlit as st
 from app_settings import PAGE_ICON, apply_custom_css
 from datarobot_connect import DataRobotTokenManager
 from streamlit.navigation.page import StreamlitPage
-
-# Add utils to path for telemetry
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-
-# Initialize telemetry for Streamlit app
-from utils.data_analyst_telemetry import DataAnalystTelemetry  # noqa: E402
-
-telemetry = DataAnalystTelemetry()
-telemetry.log_application_start()
 
 pages: List[StreamlitPage] = [
     st.Page("01_connect_and_explore.py", title="Connect & Explore"),

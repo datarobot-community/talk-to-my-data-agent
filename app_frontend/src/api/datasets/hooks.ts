@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { datasetKeys } from './keys';
 import {
   getDatasets,
   uploadDataset,
   deleteAllDatasets,
   getSupportedDataSourceTypes,
+  getDatasetById,
 } from './api-requests';
 import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
@@ -52,6 +53,39 @@ export const useGetSupportedDataSourceTypes = () => {
   return queryResult;
 };
 
+export const useInfiniteDatasetById = (
+  datasetId: string | null | undefined,
+  options?: {
+    pageSize?: number;
+    enabled?: boolean;
+  }
+) => {
+  const pageSize = options?.pageSize || 1000;
+  const enabled = options?.enabled !== false && !!datasetId;
+
+  return useInfiniteQuery({
+    queryKey: datasetKeys.byId(datasetId || '', pageSize),
+    queryFn: ({ pageParam = 0 }) =>
+      getDatasetById({
+        datasetId: datasetId!,
+        skip: pageParam,
+        limit: pageSize,
+      }),
+    enabled,
+    getNextPageParam: (lastPage, allPages) => {
+      if (
+        !lastPage ||
+        !lastPage.dataset ||
+        !lastPage.dataset.data_records ||
+        lastPage.dataset.data_records.length < pageSize
+      ) {
+        return undefined;
+      }
+      return allPages.length * pageSize;
+    },
+    initialPageParam: 0,
+  });
+};
 export const useFileUploadMutation = ({
   onSuccess,
   onError,

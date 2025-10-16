@@ -9,6 +9,15 @@ type Dataset = {
   file_size?: number;
 };
 
+type DatasetResponse = {
+  dataset: {
+    name: string;
+    data_records: Record<string, unknown>[];
+  };
+  cleaning_report?: unknown[];
+  dataset_name?: string;
+};
+
 export const getDatasets = async ({
   limit,
   remote,
@@ -20,6 +29,26 @@ export const getDatasets = async ({
 }): Promise<Dataset[]> => {
   const { data } = await apiClient.get<Dataset[]>(
     `/v1/registry/datasets?limit=${limit}&remote=${remote}`,
+    {
+      signal,
+    }
+  );
+  return data;
+};
+
+export const getDatasetById = async ({
+  datasetId,
+  skip = 0,
+  limit = 1000,
+  signal,
+}: {
+  datasetId: string;
+  skip?: number;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<DatasetResponse> => {
+  const { data } = await apiClient.get<DatasetResponse>(
+    `/v1/datasets/${datasetId}?skip=${skip}&limit=${limit}`,
     {
       signal,
     }

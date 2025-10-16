@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 import sys
+from typing import Any, Optional
 
 import datarobot as dr
 import pulumi
@@ -46,6 +47,65 @@ from utils.resources import (
     llm_deployment_env_name,
 )
 from utils.schema import AppInfra
+
+
+def fetch_and_prepare_app_resources(source_id: str) -> Optional[dict[str, Any]]:
+    """
+    Fetch resource configuration from a CustomApplicationSource entity
+    and prepare it for CustomApplication creation.
+
+    Args:
+        source_id: The ID of the CustomApplicationSource to fetch resources from
+
+    Returns:
+        Dictionary containing resource configuration compatible with CustomApplication,
+        or None if not configured
+    """
+    try:
+        source = dr.CustomApplicationSource.get(source_id)
+        pulumi.info(f"Fetched CustomApplicationSource: {source.name} (ID: {source.id})")
+
+        resources = source.get_resources()
+        if resources:
+            pulumi.info(f"Found resources in source: {resources}")
+            # Prepare resources in the format expected by CustomApplication
+            app_resources = {
+                "resource_label": resources.get("resource_label"),
+                "replicas": resources.get("replicas"),
+            }
+            # Optional fields - only include if present
+            if resources.get("session_affinity") is not None:
+                app_resources["session_affinity"] = resources.get("session_affinity")
+            if resources.get("service_web_requests_on_root_path") is not None:
+                app_resources["service_web_requests_on_root_path"] = resources.get(
+                    "service_web_requests_on_root_path"
+                )
+            return app_resources
+        else:
+            pulumi.warn("No resources configured in CustomApplicationSource")
+            return None
+    except Exception as e:
+        pulumi.warn(f"Failed to fetch resources from CustomApplicationSource: {e}")
+        return None
+
+
+def create_resources_args(
+    source_id: str,
+) -> Optional[datarobot.CustomApplicationResourcesArgs]:
+    """
+    Fetch resources from source and convert to Pulumi CustomApplicationResourcesArgs.
+
+    Args:
+        source_id: The ID of the CustomApplicationSource
+
+    Returns:
+        CustomApplicationResourcesArgs if resources exist, None otherwise
+    """
+    resources = fetch_and_prepare_app_resources(source_id)
+    if resources:
+        return datarobot.CustomApplicationResourcesArgs(**resources)
+    return None
+
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
@@ -234,11 +294,14 @@ app_source = datarobot.ApplicationSource(
     **settings_app_infra.app_source_args,
 )
 
+# Create the custom application with resources dynamically fetched from the source
+# Use Pulumi's .apply() to handle the async nature of the source ID
 app = datarobot.CustomApplication(
     resource_name=settings_app_infra.app_resource_name,
     source_version_id=app_source.version_id,
     use_case_ids=[use_case.id],
     allow_auto_stopping=True,
+    resources=app_source.id.apply(create_resources_args),  # type: ignore[arg-type]
 )
 
 pulumi.export(llm_deployment_env_name, llm_deployment.id)

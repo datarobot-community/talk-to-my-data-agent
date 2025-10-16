@@ -10,7 +10,7 @@ import { useTranslation } from '@/i18n';
 import { DATA_TABS } from '@/state/constants';
 import { Loading } from '@/components/ui-custom/loading';
 import { useLocation, useParams } from 'react-router';
-import { useDebounce } from '@/lib/utils';
+import { useDebounce, cn } from '@/lib/utils';
 
 export const Data: React.FC = () => {
   const { t } = useTranslation();
@@ -81,7 +81,10 @@ export const Data: React.FC = () => {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex flex-1 flex-col gap-4 overflow-y-auto pr-6"
+          className={cn('flex flex-1 flex-col gap-4 pr-6', {
+            'overflow-y-auto': data && data.length > 1,
+            'overflow-hidden': data && data.length === 1,
+          })}
         >
           {data?.map(dictionary => (
             <DatasetCardDescriptionPanel

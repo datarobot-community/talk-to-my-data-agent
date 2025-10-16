@@ -20,24 +20,20 @@ import inspect
 import json
 import logging
 import os
-import re
 import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
-from types import ModuleType, TracebackType
+from types import ModuleType
 from typing import (
     Any,
     AsyncGenerator,
     Callable,
-    Final,
-    Type,
     TypeVar,
     cast,
 )
 
 import datarobot as dr
-import instructor
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -50,7 +46,6 @@ from datarobot.client import RESTClientObject
 from datarobot.models.dataset import Dataset
 from fastapi import Request
 from joblib import Memory
-from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
@@ -62,12 +57,31 @@ from plotly.subplots import make_subplots
 from pydantic import ValidationError
 
 from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
+from utils.chat_dataset_helper import extract_and_store_datasets
+from utils.constants import (
+    ALTERNATIVE_LLM_BIG,
+    ALTERNATIVE_LLM_SMALL,
+    DICTIONARY_BATCH_SIZE,
+    DICTIONARY_PARALLEL_BATCH_SIZE,
+    DICTIONARY_TIMEOUT,
+    DISK_CACHE_LIMIT_BYTES,
+    MAX_CSV_TOKENS,
+    MAX_REGISTRY_DATASET_SIZE,
+    REGISTRY_DATASET_SIZE_CUTOFF,
+    VALUE_ERROR_MESSAGE,
+)
 from utils.datarobot_client import use_user_token
 from utils.datarobot_dataset_handler import (
     BaseRecipe,
     DatasetSparkRecipe,
     DataSourceRecipe,
     load_or_create_spark_recipe,
+)
+from utils.llm_client import AsyncLLMClient
+from utils.token_tracking import (
+    TiktokenCountingStrategy,
+    TokenUsageTracker,
+    estimate_csv_rows_for_token_limit,
 )
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -86,6 +100,7 @@ from utils.code_execution import (
     execute_python,
     reflect_code_generation_errors,
 )
+from utils.data_analyst_telemetry import telemetry
 from utils.data_cleansing_helpers import (
     add_summary_statistics,
     process_column,
@@ -115,7 +130,6 @@ from utils.schema import (
     GetBusinessAnalysisMetadata,
     GetBusinessAnalysisRequest,
     GetBusinessAnalysisResult,
-    QuestionListGeneration,
     RunAnalysisRequest,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
@@ -124,17 +138,14 @@ from utils.schema import (
     RunDatabaseAnalysisRequest,
     RunDatabaseAnalysisResult,
     RunDatabaseAnalysisResultMetadata,
+    TokenUsageInfo,
     Tool,
-    ValidatedQuestion,
+    UsageInfoComponent,
 )
 
 logger = get_logger()
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("openai.http_client").setLevel(logging.WARNING)
-
-VALUE_ERROR_MESSAGE = "Input data cannot be empty (no dataset provided)"
-DEFAULT_LLM_GATEWAY_MODEL = "azure/gpt-4o"
-DEFAULT_LLM_GATEWAY_MODEL_SMALL = "azure/gpt-4o-mini"
 
 
 def log_memory() -> None:
@@ -169,40 +180,6 @@ def initialize_deployment() -> tuple[RESTClientObject, str]:
             "If running in DataRobot, verify your runtime parameters have been set correctly."
         ) from e
 
-
-class AsyncLLMClient:
-    async def __aenter__(self) -> instructor.AsyncInstructor:
-        dr_client, deployment_base_url = initialize_deployment()
-        self.openai_client = AsyncOpenAI(
-            api_key=dr_client.token,
-            base_url=deployment_base_url,
-            timeout=90,
-            max_retries=2,
-        )
-        self.client = instructor.from_openai(
-            self.openai_client, mode=instructor.Mode.MD_JSON
-        )
-        return self.client
-
-    async def __aexit__(
-        self,
-        exc_type: Type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        await self.openai_client.close()  # Properly close the client
-
-
-ALTERNATIVE_LLM_BIG = "datarobot-deployed-llm"
-ALTERNATIVE_LLM_SMALL = "datarobot-deployed-llm"
-DICTIONARY_BATCH_SIZE = 10
-MAX_REGISTRY_DATASET_SIZE = 400e6  # aligns to 400MB set in streamlit config.toml
-REGISTRY_DATASET_SIZE_CUTOFF: Final[float] = (
-    200e6  # at 200MB we move from downloading to analyzing remotely with dataset
-)
-DISK_CACHE_LIMIT_BYTES = 512e6
-DICTIONARY_PARALLEL_BATCH_SIZE = 2
-DICTIONARY_TIMEOUT = 45.0
 
 _memory = Memory(tempfile.gettempdir(), verbose=0)
 _memory.clear(warn=False)  # clear cache on startup
@@ -245,6 +222,7 @@ def cache(f: T) -> T:
 
 
 # This can be large as we are not storing the actual datasets in memory, just metadata
+@telemetry.meter_and_trace
 def list_registry_datasets(
     remote: bool = False, limit: int = 100
 ) -> list[DataRegistryDataset]:
@@ -284,6 +262,7 @@ def _year_month_day(date: datetime | str) -> str:
     return date.strftime("%Y-%m-%d")
 
 
+@telemetry.trace
 async def register_remote_registry_datasets(
     request: Request, dataset_ids: list[str], analyst_db: AnalystDB
 ) -> tuple[
@@ -371,6 +350,7 @@ async def find_existing_dataset_names(
     return list(dataset_names & existing_names)
 
 
+@telemetry.trace
 async def register_remote_datasets(
     request: Request,
     recipe: DatasetSparkRecipe,
@@ -391,6 +371,7 @@ async def register_remote_datasets(
         )
 
 
+@telemetry.trace
 async def sync_data_sources_and_datasets(
     request: Request,
     canonical_name: str,
@@ -460,6 +441,7 @@ async def sync_data_sources_and_datasets(
     return downloaded, background_tasks
 
 
+@telemetry.meter_and_trace
 async def register_datasource(
     request: Request,
     analyst_db: AnalystDB,
@@ -483,6 +465,7 @@ async def register_datasource(
             )
 
 
+@telemetry.meter_and_trace
 async def load_registry_datasets(
     dataset_ids: list[str],
     analyst_db: AnalystDB,
@@ -542,7 +525,10 @@ async def load_registry_datasets(
 
 
 async def _get_dictionary_batch(
-    columns: list[str], df: pl.DataFrame, batch_size: int = 5
+    columns: list[str],
+    df: pl.DataFrame,
+    batch_size: int = 5,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> list[DataDictionaryColumn]:
     """Process a batch of columns to get their descriptions"""
 
@@ -618,12 +604,15 @@ async def _get_dictionary_batch(
             f"total_characters: {len(''.join([str(msg) for msg in messages]))}"
         )
         # Get descriptions from OpenAI
-        async with AsyncLLMClient() as client:
-            completion: DictionaryGeneration = await client.chat.completions.create(
-                response_model=DictionaryGeneration,
-                model=ALTERNATIVE_LLM_SMALL,
-                messages=messages,
-            )
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{_get_dictionary_batch.__module__}.{_get_dictionary_batch.__qualname__}.llm_call"
+            ):
+                completion: DictionaryGeneration = await client.chat.completions.create(
+                    response_model=DictionaryGeneration,
+                    model=ALTERNATIVE_LLM_SMALL,
+                    messages=messages,
+                )
 
         # Convert to dictionary format
         descriptions = completion.to_dict()
@@ -651,6 +640,7 @@ async def _get_dictionary_batch(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def get_dictionary(dataset: AnalystDataset) -> DataDictionary:
     """Process a single dataset with parallel column batch processing"""
 
@@ -747,109 +737,7 @@ async def get_dictionary(dataset: AnalystDataset) -> DataDictionary:
         )
 
 
-def _validate_question_feasibility(
-    question: str, available_columns: list[str]
-) -> ValidatedQuestion | None:
-    """Validate if a question can be answered with available data
-
-    Checks if common data elements mentioned in the question exist in columns
-    """
-    # Convert question and columns to lowercase for matching
-    question_lower = question.lower()
-    columns_lower = [col.lower() for col in available_columns]
-
-    # Extract potential column references from question
-    words = set(re.findall(r"\b\w+\b", question_lower))
-
-    # Find matches and missing terms
-    found_columns = [col for col in columns_lower if any(word in col for word in words)]
-
-    is_valid = len(found_columns) > 0
-    if is_valid:
-        return ValidatedQuestion(
-            question=question,
-        )
-    return None
-
-
-@log_api_call
-async def suggest_questions(
-    datasets: list[AnalystDataset], max_columns: int = 40
-) -> list[ValidatedQuestion]:
-    """Generate and validate suggested analysis questions
-
-    Args:
-        dictionary: DataFrame containing data dictionary
-        max_columns: Maximum number of columns to include in prompt
-
-    Returns:
-        Dict containing:
-            - questions: list of validated question objects
-            - metadata: Dictionary of processing information
-    """
-    # Validate input
-    dictionary = sum(
-        [
-            DataDictionary.from_analyst_df(
-                ds.to_df(),
-                column_descriptions=f"Column from dataset {ds.name}",
-            ).column_descriptions
-            for ds in datasets
-        ],
-        [],
-    )
-
-    if len(dictionary) < 1:
-        raise ValueError("Dictionary DataFrame cannot be empty")
-
-    # Limit columns for OpenAI prompt
-    total_columns = len(dictionary)
-    if total_columns > max_columns:
-        # Take first and last 20 columns
-        half_max = max_columns // 2
-        first_half = dictionary[:half_max]
-        last_half = dictionary[-half_max:]
-
-        # Remove any duplicates
-        dictionary = first_half + last_half
-
-        # deduplicate
-        dictionary = list({item.column: item for item in dictionary}.values())
-
-    # Convert dictionary to format expected by OpenAI
-    dict_data = {
-        "columns": [d.column for d in dictionary],
-        "descriptions": [d.description for d in dictionary],
-        "data_types": [d.data_type for d in dictionary],
-    }
-
-    # Create OpenAI messages
-    messages: list[ChatCompletionMessageParam] = [
-        ChatCompletionSystemMessageParam(
-            role="system", content=prompts.SYSTEM_PROMPT_SUGGEST_A_QUESTION
-        ),
-        ChatCompletionUserMessageParam(
-            role="user", content=f"Data Dictionary:\n{json.dumps(dict_data)}"
-        ),
-    ]
-    async with AsyncLLMClient() as client:
-        completion: QuestionListGeneration = await client.chat.completions.create(
-            response_model=QuestionListGeneration,
-            model=ALTERNATIVE_LLM_SMALL,
-            messages=messages,
-        )
-
-    available_columns = dict_data["columns"]
-    validated_questions: list[ValidatedQuestion] = []
-
-    for question in completion.questions:
-        validated_question = _validate_question_feasibility(question, available_columns)
-        if validated_question is not None:
-            validated_questions.append(validated_question)
-
-    return validated_questions
-
-
+@telemetry.trace
 def find_imports(module: ModuleType) -> list[str]:
     """
     Get top-level third-party imports from a Python module.
@@ -893,6 +781,7 @@ def find_imports(module: ModuleType) -> list[str]:
         return []
 
 
+@telemetry.trace
 def get_tools() -> list[Tool]:
     try:
         # find all functions defined in the tools module
@@ -917,9 +806,11 @@ def get_tools() -> list[Tool]:
         return []
 
 
+@telemetry.trace
 async def _generate_run_charts_python_code(
     request: RunChartsRequest,
     validation_error: InvalidGeneratedCode | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> str:
     df = request.dataset.to_df().to_pandas()
     question = request.question
@@ -961,21 +852,26 @@ async def _generate_run_charts_python_code(
         )
 
     # Get response based on model mode
-    async with AsyncLLMClient() as client:
-        response: CodeGeneration = await client.chat.completions.create(
-            response_model=CodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0,
-            messages=messages,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_run_charts_python_code.__module__}.{_generate_run_charts_python_code.__qualname__}.llm_call"
+        ):
+            response: CodeGeneration = await client.chat.completions.create(
+                response_model=CodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0,
+                messages=messages,
+            )
     return response.code
 
 
+@telemetry.trace
 async def _generate_run_analysis_python_code(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
     validation_error: InvalidGeneratedCode | None = None,
     attempt: int = 0,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> str:
     """
     Generate Python analysis code based on JSON data and question.
@@ -1091,18 +987,22 @@ async def _generate_run_analysis_python_code(
             )
     logger.info("Running Code Gen")
     logger.debug(messages)
-    async with AsyncLLMClient() as client:
-        completion: CodeGeneration = await client.chat.completions.create(
-            response_model=CodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0.1,
-            messages=messages,
-            max_retries=10,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_run_analysis_python_code.__module__}.{_generate_run_analysis_python_code.__qualname__}.llm_call"
+        ):
+            completion: CodeGeneration = await client.chat.completions.create(
+                response_model=CodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0.1,
+                messages=messages,
+                max_retries=10,
+            )
     logger.info("Code Gen complete")
     return completion.code
 
 
+@telemetry.meter_and_trace
 async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
     """Clean and standardize multiple pandas DataFrames in parallel.
 
@@ -1145,11 +1045,15 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
 
 
 @log_api_call
-async def rephrase_message(messages: ChatRequest) -> str:
+@telemetry.meter_and_trace
+async def rephrase_message(
+    messages: ChatRequest, token_tracker: TokenUsageTracker | None = None
+) -> str:
     """Process chat messages history and return a new question
 
     Args:
         messages: list of message dictionaries with 'role' and 'content' fields
+        token_tracker: Optional token usage tracker
 
     Returns:
         Dict[str, str]: Dictionary containing response content
@@ -1169,20 +1073,27 @@ async def rephrase_message(messages: ChatRequest) -> str:
             role="user",
         ),
     ]
-    async with AsyncLLMClient() as client:
-        completion: EnhancedQuestionGeneration = await client.chat.completions.create(
-            response_model=EnhancedQuestionGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            messages=prompt_messages,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{rephrase_message.__module__}.{rephrase_message.__qualname__}.llm_call"
+        ):
+            completion: EnhancedQuestionGeneration = (
+                await client.chat.completions.create(
+                    response_model=EnhancedQuestionGeneration,
+                    model=ALTERNATIVE_LLM_BIG,
+                    messages=prompt_messages,
+                )
+            )
 
     return completion.enhanced_user_message
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_charts(
     request: RunChartsRequest,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> RunChartsResult:
     """Generate and validate chart code with retry logic"""
     # Create messages for OpenAI
@@ -1196,7 +1107,7 @@ async def _run_charts(
         exception_history = []
 
     code = await _generate_run_charts_python_code(
-        request, next(iter(exception_history[::-1]), None)
+        request, next(iter(exception_history[::-1]), None), token_tracker
     )
     try:
         result = execute_python(
@@ -1243,10 +1154,13 @@ async def _run_charts(
 
 
 @log_api_call
-async def run_charts(request: RunChartsRequest) -> RunChartsResult:
+@telemetry.meter_and_trace
+async def run_charts(
+    request: RunChartsRequest, token_tracker: TokenUsageTracker | None = None
+) -> RunChartsResult:
     """Execute analysis workflow on datasets."""
     try:
-        chart_result = await _run_charts(request)
+        chart_result = await _run_charts(request, token_tracker=token_tracker)
         return chart_result
     except ValidationError:
         return RunChartsResult(
@@ -1264,8 +1178,10 @@ async def run_charts(request: RunChartsRequest) -> RunChartsResult:
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def get_business_analysis(
     request: GetBusinessAnalysisRequest,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> GetBusinessAnalysisResult:
     """
     Generate business analysis based on data and question.
@@ -1282,8 +1198,11 @@ async def get_business_analysis(
 
         df = request.dataset.to_df().to_pandas()
 
-        # Get first 1000 rows as CSV with quoted values for context
-        df_csv = df.head(750).to_csv(index=False, quoting=1)
+        initial_rows = 750
+
+        df_csv, _ = estimate_csv_rows_for_token_limit(
+            df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
+        )
 
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [
@@ -1302,15 +1221,18 @@ async def get_business_analysis(
                 content=f"Data Dictionary:\n{request.dictionary.model_dump_json()}",
             ),
         ]
-        async with AsyncLLMClient() as client:
-            completion: BusinessAnalysisGeneration = (
-                await client.chat.completions.create(
-                    response_model=BusinessAnalysisGeneration,
-                    model=ALTERNATIVE_LLM_BIG,
-                    temperature=0.1,
-                    messages=messages,
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{get_business_analysis.__module__}.{get_business_analysis.__qualname__}.llm_call"
+            ):
+                completion: BusinessAnalysisGeneration = (
+                    await client.chat.completions.create(
+                        response_model=BusinessAnalysisGeneration,
+                        model=ALTERNATIVE_LLM_BIG,
+                        temperature=0.1,
+                        messages=messages,
+                    )
                 )
-            )
         duration = (datetime.now() - start).total_seconds()
         # Ensure all response fields are present
         metadata = GetBusinessAnalysisMetadata(
@@ -1338,10 +1260,12 @@ async def get_business_analysis(
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_analysis(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> RunAnalysisResult:
     start_time = datetime.now()
 
@@ -1356,6 +1280,7 @@ async def _run_analysis(
         analyst_db,
         next(iter(exception_history[::-1]), None),
         attempt=len(exception_history),
+        token_tracker=token_tracker,
     )
     logger.info("Code generated, preparing execution")
     dataframes: dict[str, pl.DataFrame] = {}
@@ -1429,12 +1354,15 @@ async def _run_analysis(
 async def run_analysis(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> RunAnalysisResult:
     """Execute analysis workflow on datasets."""
     logger.debug("Entering run_analysis")
     log_memory()
     try:
-        return await _run_analysis(request, analyst_db=analyst_db)
+        return await _run_analysis(
+            request, analyst_db=analyst_db, token_tracker=token_tracker
+        )
     except MaxReflectionAttempts as e:
         return RunAnalysisResult(
             status="error",
@@ -1460,6 +1388,7 @@ async def _generate_database_analysis_code(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
     validation_error: InvalidGeneratedCode | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> str:
     """
     Generate Snowflake SQL analysis code based on data samples and question.
@@ -1525,23 +1454,28 @@ async def _generate_database_analysis_code(
         )
 
     # Get response from OpenAI
-    async with AsyncLLMClient() as client:
-        completion = await client.chat.completions.create(
-            response_model=DatabaseAnalysisCodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0.1,
-            messages=messages,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_database_analysis_code.__module__}.{_generate_database_analysis_code.__qualname__}.llm_call"
+        ):
+            completion = await client.chat.completions.create(
+                response_model=DatabaseAnalysisCodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0.1,
+                messages=messages,
+            )
 
-    return completion.code
+    return str(completion.code)
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_database_analysis(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
     database_override: DatabaseOperator[Any] | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> RunDatabaseAnalysisResult:
     start_time = datetime.now()
     if not request.dataset_names:
@@ -1555,7 +1489,11 @@ async def _run_database_analysis(
     )
 
     sql_code = await _generate_database_analysis_code(
-        database, request, analyst_db, next(iter(exception_history[::-1]), None)
+        database,
+        request,
+        analyst_db,
+        next(iter(exception_history[::-1]), None),
+        token_tracker,
     )
     try:
         results = await database.execute_query(query=sql_code)
@@ -1582,15 +1520,20 @@ async def _run_database_analysis(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def run_database_analysis(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
     database_override: DatabaseOperator[Any] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> RunDatabaseAnalysisResult:
     """Execute analysis workflow on datasets."""
     try:
         return await _run_database_analysis(
-            request, analyst_db, database_override=database_override
+            request,
+            analyst_db,
+            database_override=database_override,
+            token_tracker=token_tracker,
         )
     except MaxReflectionAttempts as e:
         return RunDatabaseAnalysisResult(
@@ -1622,6 +1565,7 @@ class AnalysisGenerationError:
 async def execute_business_analysis_and_charts(
     analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult,
     enhanced_message: str,
+    token_tracker: TokenUsageTracker | None = None,
     enable_chart_generation: bool = True,
     enable_business_insights: bool = True,
 ) -> tuple[
@@ -1644,20 +1588,21 @@ async def execute_business_analysis_and_charts(
     if enable_chart_generation and enable_business_insights:
         # Run both analyses concurrently
         result = await asyncio.gather(
-            run_charts(chart_request),
-            get_business_analysis(business_request),
+            run_charts(chart_request, token_tracker),
+            get_business_analysis(business_request, token_tracker),
             return_exceptions=True,
         )
 
         return (result[0], result[1])
     elif enable_chart_generation:
-        charts_result = await run_charts(chart_request)
+        charts_result = await run_charts(chart_request, token_tracker)
         return charts_result, None
     else:
-        business_result = await get_business_analysis(business_request)
+        business_result = await get_business_analysis(business_request, token_tracker)
         return None, business_result
 
 
+@telemetry.meter_and_trace
 async def run_complete_analysis(
     chat_request: ChatRequest,
     data_source: DataSourceType,
@@ -1676,10 +1621,13 @@ async def run_complete_analysis(
         yield AnalysisGenerationError("Message not found")
 
         return
+    # Create token tracker for this complete analysis pipeline
+    token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+
     # Get enhanced message
     try:
         logger.info("Getting rephrased question...")
-        enhanced_message = await rephrase_message(chat_request)
+        enhanced_message = await rephrase_message(chat_request, token_tracker)
         logger.info("Getting rephrased question done")
 
         yield enhanced_message
@@ -1726,6 +1674,7 @@ async def run_complete_analysis(
                     question=enhanced_message,
                 ),
                 analyst_db,
+                token_tracker=token_tracker,
             )
         elif isinstance(data_source, ExternalDataStoreNameDataSourceType):
             logger.info("Running DataStore DataWrangling analysis")
@@ -1778,6 +1727,7 @@ async def run_complete_analysis(
                 ),
                 analyst_db,
                 database_override=recipe.as_database_operator(),
+                token_tracker=token_tracker,
             )
 
         else:
@@ -1816,6 +1766,7 @@ async def run_complete_analysis(
                     ),
                     analyst_db,
                     database_override=recipe.as_database_operator(),
+                    token_tracker=token_tracker,
                 )
             elif all(m.external_id is None for m in dataset_metadata):
                 logging.info("Running local analysis")
@@ -1825,6 +1776,7 @@ async def run_complete_analysis(
                         question=enhanced_message,
                     ),
                     analyst_db,
+                    token_tracker,
                 )
             else:
                 raise ValueError(
@@ -1849,6 +1801,11 @@ async def run_complete_analysis(
         yield analysis_result
 
         assistant_message.components.append(analysis_result)
+
+        assistant_message = await extract_and_store_datasets(
+            analyst_db, assistant_message
+        )
+
         await analyst_db.update_chat_message(
             message_id=assistant_message.id, message=assistant_message
         )
@@ -1882,6 +1839,7 @@ async def run_complete_analysis(
         charts_result, business_result = await execute_business_analysis_and_charts(
             analysis_result,
             enhanced_message,
+            token_tracker,
             enable_business_insights=enable_business_insights,
             enable_chart_generation=enable_chart_generation,
         )
@@ -1933,6 +1891,21 @@ async def run_complete_analysis(
         )
 
         yield AnalysisGenerationError(error_message)
+
+    finally:
+        # Generate token usage component
+        if token_tracker.call_count > 0:
+            final_usage_component = UsageInfoComponent(
+                usage=TokenUsageInfo(**token_tracker.to_dict())
+            )
+
+            assistant_message.components.append(final_usage_component)
+
+            await analyst_db.update_chat_message(
+                message_id=assistant_message.id, message=assistant_message
+            )
+
+            yield final_usage_component
 
 
 async def process_data_and_update_state(

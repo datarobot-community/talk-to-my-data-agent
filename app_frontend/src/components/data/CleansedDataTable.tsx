@@ -1,35 +1,47 @@
 import React, { useEffect, useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useInfiniteCleansedDataset } from '@/api/cleansed-datasets/hooks';
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table';
+import { useInfiniteDatasetById } from '@/api/datasets/hooks';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import loader from '@/assets/loader.svg';
 import { Loading } from '@/components/ui-custom/loading';
 import { useTranslation } from '@/i18n';
 import { HighlightText } from '@/components/ui-custom/highlight-text';
 
 interface CleansedDataTableProps {
-  datasetName: string;
+  datasetName?: string;
+  datasetId?: string;
   rowsPerPage?: number;
   searchText?: string;
+  maxHeight?: string;
+  className?: string;
 }
 
 export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   datasetName,
+  datasetId,
   rowsPerPage = 50,
   searchText,
+  maxHeight = 'max-h-[600px]',
+  className = '',
 }) => {
   const { ref, inView } = useInView();
   const { t } = useTranslation();
 
+  const cleansedDataQuery = useInfiniteCleansedDataset(
+    datasetName || '',
+    rowsPerPage,
+    searchText,
+    !datasetId && !!datasetName
+  );
+  const datasetByIdQuery = useInfiniteDatasetById(datasetId, {
+    pageSize: rowsPerPage,
+    enabled: !!datasetId,
+  });
+
+  const activeQuery = datasetId ? datasetByIdQuery : cleansedDataQuery;
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status, isError, error } =
-    useInfiniteCleansedDataset(datasetName, rowsPerPage, searchText);
+    activeQuery;
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
@@ -45,8 +57,12 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
 
   // Get column headers from the first page if available
   const columns = useMemo(() => {
-    if (!data || !data.pages[0]?.dataset?.data_records[0]) return [];
-    return Object.keys(data.pages[0].dataset.data_records[0]);
+    if (!data?.pages || data.pages.length === 0) return [];
+
+    const firstPage = data.pages[0];
+    const firstRecord = firstPage.dataset?.data_records?.[0];
+
+    return firstRecord ? Object.keys(firstRecord) : [];
   }, [data]);
 
   if (status === 'pending') {
@@ -74,44 +90,46 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   }
 
   return (
-    <div className="w-full overflow-auto">
-      <Table>
-        <TableHeader className="bg-background">
-          <TableRow>
-            {columns.map(column => (
-              <TableHead key={column}>
-                <HighlightText text={column} searchText={searchText || ''} />
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {allRows.map((row, index) => (
-            <TableRow key={index}>
+    <div className={`w-0 min-w-full ${className}`}>
+      <div className={`overflow-auto ${maxHeight}`}>
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader className="bg-background sticky top-0 z-10">
+            <TableRow>
               {columns.map(column => (
-                <TableCell key={column}>
-                  {row[column] !== null && row[column] !== undefined ? String(row[column]) : ''}
-                </TableCell>
+                <TableHead key={column} className="whitespace-nowrap">
+                  <HighlightText text={column} searchText={searchText || ''} />
+                </TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {allRows.map((row, index) => (
+              <TableRow key={index}>
+                {columns.map(column => (
+                  <TableCell key={column} className="whitespace-nowrap">
+                    {row[column] !== null && row[column] !== undefined ? String(row[column]) : ''}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </table>
 
-      {/* Loading indicator */}
-      <div ref={ref} className="w-full text-center p-4">
-        {isFetchingNextPage ? (
-          <div className="flex justify-center items-center">
-            <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
-            <span className="ml-2">{t('Loading more...')}</span>
-          </div>
-        ) : hasNextPage ? (
-          <div className="h-10" />
-        ) : (
-          <div className="text-muted-foreground">
-            {allRows.length > 0 ? t('End of data') : t('No data available')}
-          </div>
-        )}
+        {/* Loading indicator - inside scrollable area */}
+        <div ref={ref} className="w-full text-center p-4">
+          {isFetchingNextPage ? (
+            <div className="flex justify-center items-center">
+              <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
+              <span className="ml-2">{t('Loading more...')}</span>
+            </div>
+          ) : hasNextPage ? (
+            <div className="h-10" />
+          ) : (
+            <div className="text-muted-foreground">
+              {allRows.length > 0 ? t('End of data') : t('No data available')}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

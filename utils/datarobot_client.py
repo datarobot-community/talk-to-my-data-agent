@@ -21,8 +21,8 @@ import datarobot as dr
 import trafaret as t
 from fastapi import HTTPException, Request
 
-FILE_API_CONNECT_TIMEOUT = os.environ.get("FILE_API_CONNECT_TIMEOUT", 180)
-FILE_API_READ_TIMEOUT = os.environ.get("FILE_API_READ_TIMEOUT", 180)
+FILE_API_CONNECT_TIMEOUT = float(os.environ.get("FILE_API_CONNECT_TIMEOUT", 180))
+FILE_API_READ_TIMEOUT = float(os.environ.get("FILE_API_READ_TIMEOUT", 180))
 
 
 class KeyValueEntityType(Enum):

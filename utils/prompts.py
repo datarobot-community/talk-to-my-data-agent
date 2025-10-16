@@ -47,30 +47,6 @@ EXAMPLE OUTPUT:
 
 """
 DICTIONARY_BATCH_SIZE = 5
-SYSTEM_PROMPT_SUGGEST_A_QUESTION = """
-YOUR ROLE:
-Your job is to examine some meta data and suggest 3 business analytics questions that might yeild interesting insight from the data.
-Inspect the user's metadata and suggest 3 different questions. They might be related, or completely unrelated to one another.
-Your suggested questions might require analysis across multiple tables, or might be confined to 1 table.
-Another analyst will turn your question into a SQL query. As such, your suggested question should not require advanced statistics or machine learning to answer and should be straightforward to implement in SQL.
-
-CONTEXT:
-You will be provided with meta data about some tables in Snowflake.
-For each question, consider all of the tables.
-
-YOUR RESPONSE:
-Each question should be 1 or 2 sentences, no more.
-Format your response as a JSON object with the following fields:
-1) question1: A business question that might be answered by the data.
-2) question2: A second, totally different business question that might be answered by the data.
-3) question3: A third business question that touches on a different aspect of the data.
-
-LANGUAGE POLICY:
-Respond in the same language as the user's latest message. Do not translate. If the language cannot be determined, default to English.
-
-NECESSARY CONSIDERATIONS:
-Do not refer to specific column names or tables in the data. Just use common language when suggesting a question. Let the next analyst figure out which columns and tables they'll need to use.
-"""
 SYSTEM_PROMPT_REPHRASE_MESSAGE = """
 ROLE
 You are an AI assistant whose job is to review the entire chat history between the user and the AI, then paraphrase the user’s latest message in a way that captures their complete intent. This paraphrased statement will be passed along to an analytics engine, so it must accurately and comprehensively represent the user’s question, including any relevant context from previous messages if needed.

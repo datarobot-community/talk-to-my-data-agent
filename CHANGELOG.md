@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] - 2025-10-03
+
+### Added
+
+- Token usage estimate tracking for LLM calls.
+- Refactored message storage (analyst dataset) to prevent oversized chat API responses and failures.
+- Integration with DataRobot Python client 3.9.1 `CustomApplication` and `CustomApplicationSource` entities.
+- Dynamic resource fetching from CustomApplicationSource when creating CustomApplications.
+- Fixed `RuntimeError: asyncio.run() cannot be called from a running event loop` in Streamlit frontend by applying `nest_asyncio` patch.
+
+### Improvements
+
+- Performance improvements in app's database.
+  + Replace expensive + blocking check for updates with separate read/write connections.
+  + Replaced synchronous persistence methods with asynchronous methods.
+
+## Documentation
+
+- Updated README to describe connecting to DataRobot data stores.
+
 ## [0.3.14] - 2025-10-03
 
 ### Fixes
@@ -23,7 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move some expensive calls into background thread to avoid blocking main event loop.
 - Updated chat UX to progressively load components of chat response.
 - Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
-
 
 ## [0.3.12] - 2025-09-25
 

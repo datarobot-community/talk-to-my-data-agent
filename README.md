@@ -13,24 +13,55 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 ## Table of contents
 
 1. [Quick Start](#quick-start)
-2. [Setup](#setup)
-3. [Architecture overview](#architecture-overview)
-4. [Why build AI Apps with DataRobot app templates?](#why-build-ai-apps-with-datarobot-app-templates)
-5. [Data privacy](#data-privacy)
-6. [Make changes](#make-changes)
+2. [User's Guide](#users-guide)
+3. [Setup](#setup)
+4. [Architecture overview](#architecture-overview)
+5. [Why build AI Apps with DataRobot app templates?](#why-build-ai-apps-with-datarobot-app-templates)
+6. [Data privacy](#data-privacy)
+7. [Make changes](#make-changes)
    - [Change the frontend](#change-the-frontend)
    - [Change the LLM](#change-the-llm)
    - [Change the database](#change-the-database)
      - [Snowflake](#snowflake)
      - [BigQuery](#bigquery)
-7. [Tools](#tools)
-8. [Share results](#share-results)
-9. [Delete all provisioned resources](#delete-all-provisioned-resources)
-10. [Setup for advanced users](#setup-for-advanced-users)
+8. [Tools](#tools)
+9. [Share results](#share-results)
+10. [Delete all provisioned resources](#delete-all-provisioned-resources)
+11. [Setup for advanced users](#setup-for-advanced-users)
 
 ## Quick Start
 
 Please check out this [Talk To My Data walkthrough](https://docs.datarobot.com/en/docs/get-started/gs-dr5/talk-data-walk.html).
+
+## User's Guide
+
+The basic usage of the app is straightforward. The user uploads one or more structured files to the application, starts a chat and asks questions about those files.
+Behind the scenes, the LLM configured for the application translates the user's question into code, the application runs the code and again sends the results to
+an LLM to generate analysis and visualizations. Because the dataset is loaded into the application itself, this limits the size of the data that can be analyzed.
+The application can support larger datasets and connect to remote data stores through the DataRobot platform, described below.
+
+### Connecting to Data Registry in the DataRobot Platform
+
+Large datasets can be uploaded to the DataRobot platform (see [this documentation](https://docs.datarobot.com/en/docs/workbench/wb-dataprep/wb-add-data/wb-data-registry.html)).
+Items from the user's data registry can be connected to the application (see screenshot below). These items are not downloaded into the application, but instead
+analysis is performed through DataRobot's data wrangling platform. This performs efficient queries that can support larger datasets (we have validated at least 5GB).
+Note there is a several minute cold start with the platform as it creates the analysis environment and loads data. These datasets can also be added locally,
+which will avoid this cold start, and is suitable for smaller files. 
+
+![Remote Data Registry screenshot.](_docs/images/screenshot-remote-data-registry.png)
+
+### Connecting to Data Stores in the DataRobot Platform
+
+When a user of the application is a DataRobot user (see [this documentation](https://docs.datarobot.com/en/docs/workbench/wb-apps/custom-apps/nxt-manage-custom-app.html#share-applications)
+for sharing applications) and has data stores configured in the DataRobot platform (see [this page for configuring data stores](https://docs.datarobot.com/en/docs/platform/acct-settings/nxt-data-connect.html)
+and [this page for details on supported data stores](https://docs.datarobot.com/en/docs/reference/data-ref/data-sources/index.html))
+of a supported connection (currently Postgres and Redshift), these will appear in the application as a "Remote Data Connection" (see screenshot below).
+These DataStores will be queried via DataRobot's data wrangling platform ([see documentation](https://docs.datarobot.com/en/docs/workbench/wb-dataprep/wb-wrangle-data/wb-sql-editor.html)).
+Unlike the app's bespoke database integration (see [Change the database](#change-the-database)), a data store will not be visible to all users of the app, only to those who have access to
+the data store and its default credentials in the DataRobot platform.
+
+![Add Remote Data Connection](_docs/images/screenshot-remote-data-connections.png)
+
 
 ## Setup
 

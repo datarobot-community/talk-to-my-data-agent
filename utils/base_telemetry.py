@@ -21,12 +21,24 @@ for specific Custom Applications while maintaining consistent datavolt patterns.
 
 from __future__ import annotations
 
+import functools
+import inspect
 import logging
 import os
 import time
-from typing import Any, Optional
+from contextlib import contextmanager
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Coroutine,
+    Generator,
+    Optional,
+    no_type_check,
+    overload,
+)
 
-from opentelemetry import metrics, trace
+from opentelemetry import context, metrics, trace
 from opentelemetry._logs import set_logger_provider
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
@@ -35,11 +47,18 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 # Note: LoggingInstrumentor not needed for basic telemetry setup
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics import Histogram, MeterProvider
+from opentelemetry.sdk.metrics.export import (
+    PeriodicExportingMetricReader,
+)
+from opentelemetry.sdk.metrics.view import ExponentialBucketHistogramAggregation
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from typing_extensions import ParamSpec, Self, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
 class BaseTelemetry:
@@ -82,7 +101,7 @@ class BaseTelemetry:
 
     def configure_logging(self) -> LoggerProvider:
         """
-        Configure OpenTelemetry logging based on datavolt patterns.
+        Configure OpenTelemetry logging based on DataRobot patterns.
         """
         if self._logger_provider:
             return self._logger_provider
@@ -118,11 +137,14 @@ class BaseTelemetry:
             return self._meter_provider
 
         # Create OTLP exporter
-        otlp_exporter = OTLPMetricExporter()
+        otlp_exporter = OTLPMetricExporter(
+            preferred_aggregation={Histogram: ExponentialBucketHistogramAggregation()},
+        )
 
         # Create metric reader
         reader = PeriodicExportingMetricReader(
-            exporter=otlp_exporter, export_interval_millis=1000
+            exporter=otlp_exporter,
+            export_interval_millis=1000,
         )
 
         # Create resource
@@ -134,7 +156,12 @@ class BaseTelemetry:
         )
 
         # Create meter provider
-        meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
+        meter_provider = MeterProvider(
+            resource=resource,
+            metric_readers=[
+                reader,
+            ],
+        )
         metrics.set_meter_provider(meter_provider)
 
         self._meter_provider = meter_provider
@@ -215,7 +242,7 @@ class BaseTelemetry:
 
         return logger
 
-    def get_meter(self, name: str) -> Any:
+    def get_meter(self, name: str) -> metrics.Meter:
         """
         Get a meter instance for the given name using OpenTelemetry global API.
         """
@@ -223,13 +250,27 @@ class BaseTelemetry:
             self.configure_metrics()
         return metrics.get_meter(name)
 
-    def get_tracer(self, name: str) -> Any:
+    def get_tracer(self, name: str) -> trace.Tracer:
         """
         Get a tracer instance for the given name using OpenTelemetry global API.
         """
         if not self._tracer_provider:
             self.configure_tracing()
         return trace.get_tracer(name)
+
+    def get_context(self) -> context.Context:
+        """
+        Returns current OTEL context. To cross thread boundaries, you'll need to do
+        get_context in spawning thread and set_context in spawned thread.
+        """
+        return context.get_current()
+
+    def set_context(self, otel_context: context.Context) -> Any:
+        """Sets OTEL context."""
+        return context.attach(otel_context)
+
+    def reset_context(self, token: Any) -> None:
+        context.detach(token)
 
     def shutdown(self) -> None:
         """
@@ -265,3 +306,189 @@ class BaseTelemetry:
                 "application_type": self.entity_type,
             },
         )
+
+    @overload
+    def trace(
+        self: Self,
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def trace(
+        self: Self,
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def trace(
+        self: Self,
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def trace(self: Self, func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @no_type_check
+    def trace(self: Self, func: Any) -> Any:
+        """
+        Wrap the execution of the decorated function in an OTEL span sharing the same name as the function.
+        WARNING: There are sharp edges with this decorator if applied to functions that are reflected on.
+        (I've seen this with methods in utils.rest_api.)
+        """
+        tracer = self.get_tracer("talk-to-my-data-application-tracer")
+
+        span_name = f"{func.__module__}.{func.__qualname__}"
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_inner(*args, **kwargs):
+                with tracer.start_as_current_span(span_name):
+                    return await func(*args, **kwargs)
+
+            return async_inner
+        elif inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def inner_asyncgen(*args, **kwargs):
+                with tracer.start_as_current_span(span_name):
+                    async for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_asyncgen
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def inner_gen(*args, **kwargs):
+                with tracer.start_as_current_span(span_name):
+                    for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_gen
+        elif inspect.isfunction(func):
+
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                with tracer.start_as_current_span(span_name):
+                    return func(*args, **kwargs)
+
+            return inner
+        else:
+            raise ValueError(
+                f"instrument can only decorate a function type, while {span_name} is a {type(func)}."
+            )
+
+    @functools.cache
+    def _function_histogram(self: Self, name: str) -> metrics.Histogram:
+        meter = self.get_meter("talk-to-my-data-application-meter")
+        return meter.create_histogram(
+            f"ttmdata.function.{name}", "s", "A histogram recording function timings."
+        )
+
+    @contextmanager
+    def time(self, name: str) -> Generator[None, None, None]:
+        start_time = time.time_ns()
+        success = True
+        try:
+            yield
+        except Exception:
+            success = False
+            raise
+        finally:
+            end_time = time.time_ns()
+            histogram = self._function_histogram(name)
+            histogram.record((end_time - start_time) / 1e9, {"success": success})
+
+    @overload
+    def meter(
+        self: Self,
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def meter(
+        self: Self,
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def meter(
+        self: Self,
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def meter(self: Self, func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @no_type_check
+    def meter(self: Self, func: Any) -> Any:
+        """
+        Wrap the execution of the decorated function in an OTEL span sharing the same name as the function.
+        WARNING: There are sharp edges with this decorator if applied to functions that are reflected on.
+        (I've seen this with methods in utils.rest_api.)
+        """
+        span_name = f"{func.__module__}.{func.__qualname__}"
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_inner(*args, **kwargs):
+                with self.time(span_name):
+                    return await func(*args, **kwargs)
+
+            return async_inner
+        elif inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def inner_asyncgen(*args, **kwargs):
+                with self.time(span_name):
+                    async for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_asyncgen
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def inner_gen(*args, **kwargs):
+                with self.time(span_name):
+                    for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_gen
+        elif inspect.isfunction(func):
+
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                with self.time(span_name):
+                    return func(*args, **kwargs)
+
+            return inner
+        else:
+            raise ValueError(
+                f"instrument can only decorate a function type, while {span_name} is a {type(func)}."
+            )
+
+    @overload
+    def meter_and_trace(
+        self: Self,
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def meter_and_trace(
+        self: Self,
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def meter_and_trace(
+        self: Self,
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def meter_and_trace(self: Self, func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @no_type_check
+    def meter_and_trace(self: Self, func: Any) -> Any:
+        return functools.wraps(func)(self.meter(self.trace(func)))

@@ -5,6 +5,7 @@ import {
   IBusinessComponent,
   IChartsComponent,
   IAnalysisComponent,
+  IUsageInfoComponent,
 } from '@/api/chat-messages/types';
 import { MessageContainer } from './MessageContainer';
 import { MessageHeader } from './MessageHeader';
@@ -55,6 +56,15 @@ const isAnalysisComponent = (component: unknown): component is IAnalysisComponen
   );
 };
 
+const isUsageInfoComponent = (component: unknown): component is IUsageInfoComponent => {
+  return (
+    !!component &&
+    typeof component === 'object' &&
+    'type' in component &&
+    (component as { type?: string }).type === 'usage_info'
+  );
+};
+
 export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   message,
   chatId,
@@ -72,8 +82,8 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     followUpQuestions,
     fig1_json,
     fig2_json,
-    dataset,
     code,
+    datasetId,
     tabStates,
     analysisErrors,
     chartsErrors,
@@ -84,6 +94,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     const businessComponent = message?.components?.find(isBusinessComponent);
     const chartsComponent = message?.components?.find(isChartsComponent);
     const analysisComponent = message?.components?.find(isAnalysisComponent);
+    const usageInfoComponent = message?.components?.find(isUsageInfoComponent);
 
     const enhancedUserMessage = messageComponent?.enhanced_user_message || '';
     const bottomLine = businessComponent?.bottom_line || '';
@@ -91,8 +102,8 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     const followUpQuestions = businessComponent?.follow_up_questions;
     const fig1_json = chartsComponent?.fig1_json || '';
     const fig2_json = chartsComponent?.fig2_json || '';
-    const dataset = analysisComponent?.dataset;
     const code = analysisComponent?.code || chartsComponent?.code;
+    const datasetId = analysisComponent?.dataset_id || null;
 
     // Extract errors from components
     const hasBusinessError = businessComponent?.status === 'error';
@@ -137,13 +148,14 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       followUpQuestions,
       fig1_json,
       fig2_json,
-      dataset,
       code,
+      datasetId,
       tabStates,
       analysisErrors,
       chartsErrors,
       businessErrors,
       analysisAttempts,
+      usageInfoComponent,
     };
   }, [message]);
 
@@ -156,7 +168,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   return (
     <MessageContainer testId={testId} ref={ref} key={message.id}>
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
-      <div className="self-stretch text-sm font-normal leading-tight">
+      <div className="self-stretch text-sm font-normal leading-tight min-w-0">
         {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
 
         {message?.error && (
@@ -165,7 +177,9 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
           </div>
         )}
 
-        <ResponseTabs value={activeTab} onValueChange={setActiveTab} tabStates={tabStates} />
+        <div className="flex items-center justify-between">
+          <ResponseTabs value={activeTab} onValueChange={setActiveTab} tabStates={tabStates} />
+        </div>
 
         {activeTab === RESPONSE_TABS.SUMMARY && (
           <>
@@ -199,7 +213,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
                 componentType="Analysis"
               />
             )}
-            <CodeTabContent dataset={dataset} code={code} />
+            <CodeTabContent code={code} datasetId={datasetId} />
           </>
         )}
       </div>

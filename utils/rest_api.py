@@ -61,6 +61,8 @@ from utils.analyst_db import (
     get_data_source_type,
 )
 from utils.api_exceptions import ExceptionBody
+from utils.chat_dataset_helper import cleanup_message_datasets
+from utils.data_analyst_telemetry import telemetry
 from utils.database_helpers import NoDatabaseOperator, get_external_database
 from utils.datarobot_client import use_user_token
 from utils.datarobot_dataset_handler import DatasetSparkRecipe, DataSourceRecipe
@@ -286,6 +288,8 @@ async def add_session_middleware(request: Request, call_next):  # type: ignore[n
     return response
 
 
+@telemetry.trace
+@telemetry.meter
 async def _initialize_session(
     request: Request,
 ) -> tuple[
@@ -598,6 +602,63 @@ async def get_dictionaries(
     return dictionaries if dictionaries else []
 
 
+@router.get("/datasets/{dataset_id}")
+async def get_dataset_by_id(
+    dataset_id: str,
+    skip: int = 0,
+    limit: int = 1000,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> DatasetCleansedResponse:
+    """
+    Get a dataset by its ID with pagination support.
+
+    Args:
+        dataset_id: The unique identifier of the dataset
+        skip: Number of records to skip (for pagination)
+        limit: Maximum number of records to return (for pagination)
+
+    Returns:
+        A response containing the dataset (similar to cleansed dataset format)
+
+    Raises:
+        HTTPException: If the dataset doesn't exist or cannot be retrieved
+    """
+    try:
+        from utils.analyst_db import DatasetType
+
+        df = await analyst_db.dataset_handler.get_dataframe(
+            dataset_id,
+            expected_type=DatasetType.ANALYST_RESULT_DATASET,
+            max_rows=None,
+        )
+
+        if skip > 0 or limit > 0:
+            df = df.slice(skip, limit)
+
+        metadata = await analyst_db.dataset_handler.get_dataset_metadata(dataset_id)
+
+        dataset = AnalystDataset(
+            name=metadata.original_name,
+            data=df,
+        )
+
+        # Return in the same format as cleansed dataset
+        return DatasetCleansedResponse(
+            dataset_name=metadata.original_name,
+            cleaning_report=None,  # No cleaning report for analyst datasets
+            dataset=dataset,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404, detail=f"Dataset '{dataset_id}' not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving dataset '{dataset_id}': {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving dataset: {str(e)}"
+        )
+
+
 @router.get("/datasets/{name}/metadata")
 async def get_dataset_metadata(
     name: str, analyst_db: AnalystDB = Depends(get_initialized_db)
@@ -877,6 +938,13 @@ async def delete_chat(
     chat_id: str, analyst_db: AnalystDB = Depends(get_initialized_db)
 ) -> dict[str, str]:
     """Delete a chat"""
+    # Get all messages to clean up datasets
+    messages = await analyst_db.get_chat_messages(chat_id=chat_id)
+
+    # Clean up datasets for all messages
+    for message in messages:
+        await cleanup_message_datasets(analyst_db, message)
+
     # Delete the chat
     await analyst_db.delete_chat(chat_id=chat_id)
 
@@ -909,6 +977,9 @@ async def delete_chat_message(
                 status_code=404, detail=f"Message with ID {message_id} not found"
             )
         else:
+            # Clean up associated datasets before deleting the message
+            await cleanup_message_datasets(analyst_db, message)
+
             await analyst_db.delete_chat_message(message_id=message_id)
             messages = await analyst_db.get_chat_messages(
                 chat_id=message.chat_id,

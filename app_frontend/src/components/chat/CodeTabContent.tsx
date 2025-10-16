@@ -1,7 +1,6 @@
 import React from 'react';
-import { IDataset as DatasetType } from '@/api/chat-messages/types';
 import { CollapsiblePanel } from './CollapsiblePanel';
-import { AnalystDatasetTable } from './AnalystDatasetTable';
+import { CleansedDataTable } from '../data/CleansedDataTable';
 import { useTranslation } from '@/i18n';
 // @ts-expect-error ???
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -10,17 +9,18 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './MarkdownContent.css';
 
 interface CodeTabContentProps {
-  dataset?: DatasetType | null;
   code?: string | null;
+  datasetId?: string | null;
 }
 
-export const CodeTabContent: React.FC<CodeTabContentProps> = ({ dataset, code }) => {
+export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId }) => {
   const { t } = useTranslation();
+
   return (
-    <div className="flex flex-col gap-2.5">
-      {dataset && (
+    <div className="flex flex-col gap-2.5 min-w-0">
+      {datasetId && (
         <CollapsiblePanel header={t('Dataset')}>
-          <AnalystDatasetTable records={dataset?.data_records} />
+          <CleansedDataTable datasetId={datasetId} />
         </CollapsiblePanel>
       )}
       {code && (

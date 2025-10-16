@@ -195,8 +195,8 @@ export const Chats: React.FC = () => {
       ) : (
         <>
           <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
-            {messages?.map(message =>
-              activeChat?.id ? (
+            {activeChat?.id &&
+              messages?.map(message => (
                 <div key={message.id} className="flex flex-col w-full">
                   {message.role === 'user' && (
                     <UserMessage
@@ -219,8 +219,7 @@ export const Chats: React.FC = () => {
                     </Suspense>
                   )}
                 </div>
-              ) : null
-            )}
+              ))}
           </ScrollArea>
           <div className="flex w-full justify-center">
             <UserPrompt

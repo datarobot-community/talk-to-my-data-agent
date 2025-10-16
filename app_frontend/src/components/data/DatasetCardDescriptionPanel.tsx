@@ -86,7 +86,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
       ref={ref}
       className={cn('flex flex-col w-full bg-card p-4', {
         'h-[400px]': isProcessing,
-        'h-full': fullHeight,
+        'h-full overflow-hidden': fullHeight,
       })}
     >
       <ConfirmDialog
@@ -150,17 +150,14 @@ export const DatasetCardDescriptionPanel = forwardRef<
           />
         </div>
       </div>
-      <div
-        className={cn('flex flex-col flex-1 text-lg', {
-          'h-full': fullHeight,
-        })}
-      >
+      <div className="flex flex-col flex-1 text-lg min-h-0 overflow-hidden">
         {isProcessing ? (
           <div className="flex flex-col flex-1 items-center justify-center">
             {t('Processing the dataset may take a few minutes...')}
           </div>
-        ) : (
-          <ScrollArea className={cn('mt-4', fullHeight ? 'h-full' : 'h-96')}>
+        ) : fullHeight ? (
+          // When fullHeight, render content directly without ScrollArea wrapper
+          <div className="mt-4 flex-1 min-h-0 overflow-auto">
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <DictionaryTable
                 data={filteredDictionary}
@@ -188,6 +185,43 @@ export const DatasetCardDescriptionPanel = forwardRef<
                 datasetName={dictionary.name}
                 rowsPerPage={50}
                 searchText={searchText}
+                className="h-full overflow-hidden"
+                maxHeight="h-full"
+              />
+            )}
+          </div>
+        ) : (
+          <ScrollArea className={cn('mt-4 flex-1 min-h-0', !fullHeight && 'h-96')}>
+            {viewMode === DATA_TABS.DESCRIPTION ? (
+              <div className={cn(!fullHeight && 'max-h-[360px] overflow-auto')}>
+                <DictionaryTable
+                  data={filteredDictionary}
+                  searchText={searchText}
+                  onUpdateCell={(rowIndex, field, value) => {
+                    const originalRowIndex = getOriginalRowIndex(rowIndex);
+                    updateCell(
+                      {
+                        name: dictionary.name,
+                        rowIndex: originalRowIndex,
+                        field,
+                        value,
+                      },
+                      {
+                        onError: () => {
+                          // Error handling is managed by React Query's
+                          // automatic cache restoration
+                        },
+                      }
+                    );
+                  }}
+                />
+              </div>
+            ) : (
+              <CleansedDataTable
+                datasetName={dictionary.name}
+                rowsPerPage={50}
+                searchText={searchText}
+                maxHeight="max-h-[360px]"
               />
             )}
           </ScrollArea>

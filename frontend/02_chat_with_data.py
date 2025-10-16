@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import logging
 import time
 import uuid
 import warnings
@@ -20,9 +21,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, cast
 
+import nest_asyncio
+import opentelemetry
 import streamlit as st
-
-# Import FastAPI functions directly
 from app_settings import (
     apply_custom_css,
     display_page_logo,
@@ -53,13 +54,17 @@ from utils.schema import (
     RunDatabaseAnalysisResult,
 )
 
+# Apply nest_asyncio to allow asyncio.run() in Streamlit's event loop
+nest_asyncio.apply()
+
 warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")
 app_infra = load_app_infra()
 
 # Initialize telemetry for chat page
-chat_logger: Optional[Any] = None
-chat_tracer: Optional[Any] = None
+chat_logger: Optional[logging.Logger] = None
+chat_tracer: Optional[opentelemetry.trace.Tracer] = None
+chat_meter: Optional[opentelemetry.metrics.Meter] = None
 
 try:
     from utils.data_analyst_telemetry import DataAnalystTelemetry

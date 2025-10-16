@@ -49,6 +49,7 @@ export default defineConfig({
   build: {
     outDir: '../app_backend/static/',
     emptyOutDir: true,
+    manifest: true,
     rollupOptions: {
       external: ['_dr_env.js'],
     },

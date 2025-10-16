@@ -73,6 +73,7 @@ from utils.analyst_db import (
 from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
 from utils.code_execution import InvalidGeneratedCode
 from utils.credentials import NoDatabaseCredentials
+from utils.data_analyst_telemetry import telemetry
 from utils.database_helpers import _DEFAULT_DB_QUERY_TIMEOUT, DatabaseOperator
 from utils.logging_helper import get_logger
 from utils.prompts import (
@@ -198,6 +199,7 @@ def default_retry(func: Callable[P, T]) -> Callable[P, T]:
 
 
 @default_retry
+@telemetry.trace
 async def load_or_create_spark_recipe(
     analyst_db: AnalystDB, initial_dataset_ids: list[str] = []
 ) -> DatasetSparkRecipe:
@@ -212,41 +214,48 @@ async def load_or_create_spark_recipe(
     ):
         return cast(DatasetSparkRecipe, result)
 
-    # user id is a uuid, not anything identifiable.
-    logger.debug("Looking up / creating recipe for user.", extra={"user": key})
+    # Time inside the cache.
+    with telemetry.time(
+        f"{load_or_create_spark_recipe.__module__}.{load_or_create_spark_recipe.__name__}"
+    ):
+        # user id is a uuid, not anything identifiable.
+        logger.debug("Looking up / creating recipe for user.", extra={"user": key})
 
-    user_recipe = await analyst_db.get_user_recipe()
+        user_recipe = await analyst_db.get_user_recipe()
 
-    recipe_exists = bool(user_recipe and user_recipe.recipe_id)
+        recipe_exists = bool(user_recipe and user_recipe.recipe_id)
 
-    maybe_recipe: Recipe | None = None
+        maybe_recipe: Recipe | None = None
 
-    if recipe_exists:
-        logger.debug(
-            "Recipe saved for user, checking that it exists.",
-            extra={"user": key, "recipe": user_recipe and user_recipe.recipe_id},
-        )
-        maybe_recipe = lookup_recipe(key, user_recipe)  # type:ignore[arg-type]
+        if recipe_exists:
+            logger.debug(
+                "Recipe saved for user, checking that it exists.",
+                extra={"user": key, "recipe": user_recipe and user_recipe.recipe_id},
+            )
+            maybe_recipe = lookup_recipe(key, user_recipe)  # type:ignore[arg-type]
 
-    if maybe_recipe:
-        recipe = maybe_recipe
-    else:
-        logger.debug("Creating recipe.", extra={"user": key})
-        current_datasets = await analyst_db.list_analyst_dataset_metadata(
-            data_source=InternalDataSourceType.REMOTE_REGISTRY
-        )
-        current_dataset_ids = {d.external_id for d in current_datasets if d.external_id}
-        recipe = await create_new_recipe(
-            analyst_db, list(current_dataset_ids | set(initial_dataset_ids))
-        )
+        if maybe_recipe:
+            recipe = maybe_recipe
+        else:
+            logger.debug("Creating recipe.", extra={"user": key})
+            current_datasets = await analyst_db.list_analyst_dataset_metadata(
+                data_source=InternalDataSourceType.REMOTE_REGISTRY
+            )
+            current_dataset_ids = {
+                d.external_id for d in current_datasets if d.external_id
+            }
+            recipe = await create_new_recipe(
+                analyst_db, list(current_dataset_ids | set(initial_dataset_ids))
+            )
 
-    spark_recipe = DatasetSparkRecipe(recipe=recipe, analyst_db=analyst_db)
+        spark_recipe = DatasetSparkRecipe(recipe=recipe, analyst_db=analyst_db)
 
     load_or_create_spark_recipe.__cache__[key] = spark_recipe  # type:ignore[attr-defined]
 
     return spark_recipe
 
 
+@telemetry.trace
 def lookup_recipe(user_id: str, user_recipe: UserRecipe) -> Recipe | None:
     recipe = None
     with handle_datarobot_error(f"Recipe({user_recipe.recipe_id})"):
@@ -267,6 +276,7 @@ def lookup_recipe(user_id: str, user_recipe: UserRecipe) -> Recipe | None:
     return recipe
 
 
+@telemetry.trace
 async def create_new_recipe(
     analyst_db: AnalystDB, initial_dataset_ids: list[str]
 ) -> Recipe:
@@ -312,6 +322,7 @@ async def create_new_recipe(
     return recipe
 
 
+@telemetry.trace
 def get_or_create_wrangling_use_case(analyst_db: AnalystDB) -> UseCase:
     use_case_name = f"TalkToMyData Data Wrangling {analyst_db.user_id}"
 
@@ -365,6 +376,7 @@ class BaseRecipe(abc.ABC):
         pass
 
     @default_retry
+    @telemetry.trace
     async def list_dataset_names(self) -> list[str]:
         """Return the names of datasets that are inputs to this recipe.
 
@@ -382,6 +394,7 @@ class BaseRecipe(abc.ABC):
             raise ApplicationUsageException(UsageExceptionType.RECIPE_NOT_INITIALIZED)
 
     @default_retry
+    @telemetry.trace
     async def set_query(self, query: str) -> None:
         """
         Update the recipe to use the given SQL query
@@ -401,6 +414,7 @@ class BaseRecipe(abc.ABC):
             Recipe.set_recipe_metadata(self._recipe.id, {"sql": query})
 
     @default_retry
+    @telemetry.trace
     async def clear_query(self) -> None:
         """
         Update the recipe to not use any query.
@@ -417,6 +431,7 @@ class BaseRecipe(abc.ABC):
         reraise=True,
         after=after_log(logger, logging.DEBUG),
     )
+    @telemetry.trace
     async def _retrieve_preview(self, timeout_seconds: int = 300) -> DataFrameWrapper:
         assert self._recipe is not None
         logger.debug(
@@ -443,6 +458,7 @@ class BaseRecipe(abc.ABC):
 
         return DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
 
+    @telemetry.meter_and_trace
     async def retrieve_preview(self, timeout_seconds: int = 900) -> DataFrameWrapper:
         """
         Retrieve a preview of the set SQL query.
@@ -635,6 +651,7 @@ class DataSourceRecipe(BaseRecipe):
 
     @default_retry
     @staticmethod
+    @telemetry.trace
     async def list_available_datastores(user_id: str) -> list[ExternalDataStore]:
         # We have a pretty basic caching strategy here to avoid driving unnecessary load as this is an expensive lookup.
         # Each replica will fetch for each user all the datastores that user has access to every 30 minutes.
@@ -668,43 +685,46 @@ class DataSourceRecipe(BaseRecipe):
                 ):
                     return cache_value
 
-            data_stores = DataSourceRecipe._fetch_data_stores()
+            with telemetry.time(
+                f"{DataSourceRecipe.list_available_datastores.__module__}.{DataSourceRecipe.list_available_datastores.__qualname__}"
+            ):
+                data_stores = DataSourceRecipe._fetch_data_stores()
 
-            external_data_stores = []
+                external_data_stores = []
 
-            for data_store in data_stores:
-                driver: str | None = data_store.get("driverClassType")
+                for data_store in data_stores:
+                    driver: str | None = data_store.get("driverClassType")
 
-                data_store_obj = DataStore.from_server_data(data_store)
+                    data_store_obj = DataStore.from_server_data(data_store)
 
-                if (
-                    driver not in DataSourceRecipe.SUPPORTED_DRIVER_CLASS_TYPES
-                    or not data_store_obj.id
-                    or not data_store_obj.canonical_name
-                ):
-                    continue
+                    if (
+                        driver not in DataSourceRecipe.SUPPORTED_DRIVER_CLASS_TYPES
+                        or not data_store_obj.id
+                        or not data_store_obj.canonical_name
+                    ):
+                        continue
 
-                external_data_store = ExternalDataStore(
-                    id=data_store_obj.id,
-                    canonical_name=data_store_obj.canonical_name,
-                    driver_class_type=driver,
-                    defined_data_sources=[],
-                )
+                    external_data_store = ExternalDataStore(
+                        id=data_store_obj.id,
+                        canonical_name=data_store_obj.canonical_name,
+                        driver_class_type=driver,
+                        defined_data_sources=[],
+                    )
 
-                cred = DataSourceRecipe._fetch_default_cred(data_store_obj, user_id)
+                    cred = DataSourceRecipe._fetch_default_cred(data_store_obj, user_id)
 
-                if not cred:
-                    continue
+                    if not cred:
+                        continue
 
-                external_data_sources = DataSourceRecipe._fetch_tables(
-                    user_id, data_store_obj, cred
-                )
+                    external_data_sources = DataSourceRecipe._fetch_tables(
+                        user_id, data_store_obj, cred
+                    )
 
-                if not external_data_sources:
-                    continue
+                    if not external_data_sources:
+                        continue
 
-                external_data_store.defined_data_sources = external_data_sources
-                external_data_stores.append(external_data_store)
+                    external_data_store.defined_data_sources = external_data_sources
+                    external_data_stores.append(external_data_store)
 
                 refresh_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -731,6 +751,7 @@ class DataSourceRecipe(BaseRecipe):
             lock.release()
 
     @staticmethod
+    @telemetry.trace
     def _fetch_data_stores() -> list[dict[str, Any]]:
         logger.debug("Listing user-accessible data stores.")
         with handle_datarobot_error("DataStore.list()"):
@@ -748,6 +769,7 @@ class DataSourceRecipe(BaseRecipe):
         return data_stores
 
     @staticmethod
+    @telemetry.trace
     def _fetch_default_cred(
         data_store_obj: DataStore, user_id: str
     ) -> Credential | None:
@@ -784,6 +806,7 @@ class DataSourceRecipe(BaseRecipe):
         return Credential.from_server_data(default_cred) if default_cred else None
 
     @staticmethod
+    @telemetry.trace
     def _fetch_tables(
         user_id: str, data_store_obj: DataStore, cred: Credential
     ) -> list[ExternalDataSource] | None:
@@ -896,6 +919,7 @@ class DataSourceRecipe(BaseRecipe):
     @staticmethod
     @default_retry
     @lru_cache(128)
+    @telemetry.trace
     def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
         logger.debug(
             "Searching for datastore with name",
@@ -916,6 +940,7 @@ class DataSourceRecipe(BaseRecipe):
     @staticmethod
     @lru_cache(128)
     @default_retry
+    @telemetry.trace
     def get_canonical_name_for_datastore_id(data_store_id: str) -> str | None:
         """Return the canonical name of a given data store.
 
@@ -942,6 +967,7 @@ class DataSourceRecipe(BaseRecipe):
 
     @staticmethod
     @default_retry
+    @telemetry.meter_and_trace
     async def load_or_create(
         analyst_db: AnalystDB, data_store_id: str
     ) -> DataSourceRecipe:
@@ -1025,6 +1051,7 @@ class DataSourceRecipe(BaseRecipe):
         )
 
     @staticmethod
+    @telemetry.trace
     async def _refresh_recipe(
         analyst_db: AnalystDB, data_store_dr: DataStore, data_store: ExternalDataStore
     ) -> Recipe | None:
@@ -1130,6 +1157,7 @@ class DataSourceRecipe(BaseRecipe):
         return recipe
 
     @default_retry
+    @telemetry.trace
     async def refresh(self) -> bool:
         async with self._lock:
             logger.debug(
@@ -1171,6 +1199,7 @@ class DataSourceRecipe(BaseRecipe):
             return False
 
     @default_retry
+    @telemetry.meter_and_trace
     async def select_data_sources(self, data_sources: list[ExternalDataSource]) -> None:
         """Update recipe with given data sources.
 
@@ -1347,6 +1376,7 @@ class DatasetSparkRecipe(BaseRecipe):
         return Version(version) >= Version("2.38")
 
     @default_retry
+    @telemetry.trace
     async def refresh(self) -> bool:
         """Refreshes the underlying recipe, recreating if necessary. This ensures that the app's datasets and the recipe's input are in sync.
 
@@ -1453,6 +1483,7 @@ class DatasetSparkRecipe(BaseRecipe):
             )
 
     @default_retry
+    @telemetry.trace
     async def add_datasets(self, dataset_ids: list[str]) -> None:
         """This updates the recipe to add additional datasets in the use case and persists those datasets
         to the database. Note, this uses the default wrangling policy of using the latest dataset version.

@@ -16,6 +16,7 @@ import os
 import warnings
 from typing import Any, Optional, cast
 
+import nest_asyncio
 import polars as pl
 import streamlit as st
 from app_settings import (
@@ -42,6 +43,9 @@ from utils.schema import (
     DataDictionary,
     DataRegistryDataset,
 )
+
+# Apply nest_asyncio to allow asyncio.run() in Streamlit's event loop
+nest_asyncio.apply()
 
 warnings.filterwarnings("ignore")
 

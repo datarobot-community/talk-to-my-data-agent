@@ -23,7 +23,10 @@ Includes auto-instrumentation for FastAPI and requests library.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import (
+    TYPE_CHECKING,
+    Any,
+)
 
 from .base_telemetry import BaseTelemetry
 
@@ -125,3 +128,6 @@ class DataAnalystTelemetry(BaseTelemetry):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - gracefully shutdown telemetry."""
         self.shutdown()
+
+
+telemetry = DataAnalystTelemetry()

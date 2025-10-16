@@ -25,7 +25,11 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
   const [isOpen, setIsOpen] = React.useState(collapsiblePanelDefaultOpen);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="rounded border border-border">
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="rounded border border-border min-w-0"
+    >
       <CollapsibleTrigger asChild className="bg-muted">
         <div className="h-[52px] flex justify-between items-center px-4 cursor-pointer">
           <div>{header}</div>
@@ -43,7 +47,9 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
           </div>
         </div>
       </CollapsibleTrigger>
-      <CollapsibleContent className="py-4 px-4 bg-muted">{children}</CollapsibleContent>
+      <CollapsibleContent className="py-4 px-4 bg-muted min-w-0 overflow-hidden">
+        {children}
+      </CollapsibleContent>
     </Collapsible>
   );
 };
