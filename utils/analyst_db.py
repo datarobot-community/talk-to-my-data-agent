@@ -272,6 +272,7 @@ class BaseDuckDBHandler(ABC):
                         tables_to_drop,
                     ) = await self._check_db_version_and_collect_tables(conn)
             except duckdb.IOException:
+                version_update = True
                 stats = os.stat(self.db_path)
                 if stats.st_size == 0:
                     logger.warning(
@@ -283,7 +284,9 @@ class BaseDuckDBHandler(ABC):
                         f"DB {self.db_path} ({stats=}) exists in an invalid state!",
                         exc_info=True,
                     )
-                    raise
+                    # We had a now-fixed critical bug in PersistentStorage that led to data being deleted after being stored.
+                    # Unfortunately that data is not at all recoverable, so the best we can do here is remove the malformed file and continue.
+                    await self._async_path.unlink()
         else:
             version_update = True
 

@@ -263,7 +263,7 @@ class PersistentStorage:
                 name=storage_link.name,
                 category=storage_link.category,
                 value_type=storage_link.value_type,
-                value=storage_link.value,
+                value=json.dumps(file_data),
                 description=storage_link.description,
                 comment=None,
             )
