@@ -1647,14 +1647,16 @@ async def run_complete_analysis(
         role="assistant",
         content=enhanced_message,
         components=[EnhancedQuestionGeneration(enhanced_user_message=enhanced_message)],
+        in_progress=True,
     )
+
+    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
 
     user_message.in_progress = False
     await analyst_db.update_chat_message(
         message_id=message_id,
         message=user_message,
     )
-    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
     # Run main analysis
     logger.info("Start main analysis")
     try:
@@ -1874,13 +1876,16 @@ async def run_complete_analysis(
 
         elif business_result is not None:
             assistant_message.components.append(business_result)
-            assistant_message.in_progress = False
-
             await analyst_db.update_chat_message(
                 message_id=assistant_message.id, message=assistant_message
             )
 
             yield business_result
+
+        assistant_message.in_progress = False
+        await analyst_db.update_chat_message(
+            message_id=assistant_message.id, message=assistant_message
+        )
 
     except Exception as e:
         error_message = f"Error setting up additional analysis: {str(e)}"

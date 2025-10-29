@@ -90,6 +90,9 @@ class BaseTelemetry:
 
         self.entity_type = entity_type
         self.entity_id = entity_id or os.environ.get("APPLICATION_ID")
+        
+        # Telemetry enabled by default, disabled in local dev (start scripts set DISABLE_TELEMETRY=true)
+        self.telemetry_enabled = os.environ.get("DISABLE_TELEMETRY") != "true"
 
         self._logger_provider: Optional[LoggerProvider] = None
         self._meter_provider: Optional[MeterProvider] = None
@@ -213,6 +216,10 @@ class BaseTelemetry:
         """
         Get a Python logger configured to send logs through OpenTelemetry.
         """
+        # Skip OpenTelemetry handler if telemetry is disabled
+        if not self.telemetry_enabled:
+            return logging.getLogger(name)
+        
         if not self._logger_provider:
             self.configure_logging()
 
@@ -246,7 +253,7 @@ class BaseTelemetry:
         """
         Get a meter instance for the given name using OpenTelemetry global API.
         """
-        if not self._meter_provider:
+        if self.telemetry_enabled and not self._meter_provider:
             self.configure_metrics()
         return metrics.get_meter(name)
 
@@ -254,7 +261,7 @@ class BaseTelemetry:
         """
         Get a tracer instance for the given name using OpenTelemetry global API.
         """
-        if not self._tracer_provider:
+        if self.telemetry_enabled and not self._tracer_provider:
             self.configure_tracing()
         return trace.get_tracer(name)
 
