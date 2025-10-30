@@ -90,7 +90,7 @@ class BaseTelemetry:
 
         self.entity_type = entity_type
         self.entity_id = entity_id or os.environ.get("APPLICATION_ID")
-        
+
         # Telemetry enabled by default, disabled in local dev (start scripts set DISABLE_TELEMETRY=true)
         self.telemetry_enabled = os.environ.get("DISABLE_TELEMETRY") != "true"
 
@@ -219,7 +219,7 @@ class BaseTelemetry:
         # Skip OpenTelemetry handler if telemetry is disabled
         if not self.telemetry_enabled:
             return logging.getLogger(name)
-        
+
         if not self._logger_provider:
             self.configure_logging()
 

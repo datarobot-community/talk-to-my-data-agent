@@ -101,6 +101,7 @@ from utils.schema import (
     LoadDatabaseRequest,
     RunAnalysisResult,
     RunChartsResult,
+    RunDatabaseAnalysisResult,
     SupportedDataSourceTypes,
 )
 
@@ -1261,14 +1262,39 @@ async def save_chat_messages(
                     ).value = followup_question
 
             # Handle Data sheets
-            run_analysis_components: List[RunAnalysisResult] = [
+            run_analysis_components: List[
+                RunAnalysisResult | RunDatabaseAnalysisResult
+            ] = [
                 component
                 for component in chat_message.components
-                if isinstance(component, RunAnalysisResult)
+                if isinstance(component, (RunAnalysisResult, RunDatabaseAnalysisResult))
             ]
             for run_analysis_component in run_analysis_components:
-                if not run_analysis_component.dataset:
+                # Load dataset from storage (dataset field is excluded from serialization)
+                if not run_analysis_component.dataset_id:
                     continue
+
+                try:
+                    from utils.analyst_db import DatasetType
+
+                    df = await analyst_db.dataset_handler.get_dataframe(
+                        run_analysis_component.dataset_id,
+                        expected_type=DatasetType.ANALYST_RESULT_DATASET,
+                        max_rows=None,
+                    )
+                    metadata = await analyst_db.dataset_handler.get_dataset_metadata(
+                        run_analysis_component.dataset_id
+                    )
+                    dataset_to_export = AnalystDataset(
+                        name=metadata.original_name,
+                        data=df,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to load dataset {run_analysis_component.dataset_id}: {e}"
+                    )
+                    continue
+
                 data_sheets_count += 1
                 data_sheet_name = (
                     "Data" if data_sheets_count == 1 else f"Data {data_sheets_count}"
@@ -1277,7 +1303,7 @@ async def save_chat_messages(
 
                 try:
                     dataset: polars.dataframe.frame.DataFrame = (
-                        run_analysis_component.dataset.data.df
+                        dataset_to_export.data.df
                     )
 
                     # Convert to pandas with error handling for large datasets
@@ -1335,8 +1361,10 @@ async def save_chat_messages(
                                 0
                             ].copy()  # Create copy to avoid modifying original
                             [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
-                            df = pd.DataFrame(fig_json)
-                            for r in dataframe_to_rows(df, index=False, header=True):
+                            chart_df = pd.DataFrame(fig_json)
+                            for r in dataframe_to_rows(
+                                chart_df, index=False, header=True
+                            ):
                                 charts_sheet.append(r)
 
                         with tempfile.NamedTemporaryFile(
