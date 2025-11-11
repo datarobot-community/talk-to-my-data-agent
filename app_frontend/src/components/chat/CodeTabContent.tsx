@@ -7,6 +7,12 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 // @ts-expect-error ???
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './MarkdownContent.css';
+import { Button } from '@/components/ui/button';
+import { useDownloadDataset } from '@/api/datasets/hooks';
+import { useAppState } from '@/state';
+import loader from '@/assets/loader.svg';
+import { Download } from 'lucide-react';
+import { CopyToClipboardButton } from '@/components/ui-custom/copy-to-clipboard-button';
 
 interface CodeTabContentProps {
   code?: string | null;
@@ -15,29 +21,55 @@ interface CodeTabContentProps {
 
 export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId }) => {
   const { t } = useTranslation();
+  const { mutate: downloadDataset, isPending: isDownloadingDataset } = useDownloadDataset();
+  const { includeCsvBom } = useAppState();
+
+  const downloadTooltip = isDownloadingDataset ? t('Downloading...') : t('Download dataset as CSV');
 
   return (
     <div className="flex flex-col gap-2.5 min-w-0">
       {datasetId && (
-        <CollapsiblePanel header={t('Dataset')}>
-          <CleansedDataTable datasetId={datasetId} />
+        <CollapsiblePanel header={t('Analysis Dataset')}>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => downloadDataset({ datasetId, includeBom: includeCsvBom })}
+                disabled={isDownloadingDataset}
+                title={downloadTooltip}
+              >
+                {isDownloadingDataset ? (
+                  <img src={loader} alt={t('downloading')} className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {t('Download dataset')}
+              </Button>
+            </div>
+            <CleansedDataTable datasetId={datasetId} maxHeight="max-h-[400px]" />
+          </div>
         </CollapsiblePanel>
       )}
       {code && (
         <CollapsiblePanel header={t('Code')}>
-          <div className="markdown-content">
-            <SyntaxHighlighter
-              language="python"
-              style={oneDark}
-              customStyle={{
-                margin: 0,
-                borderRadius: '4px',
-              }}
-              wrapLongLines={true}
-              showLineNumbers={true}
-            >
-              {code}
-            </SyntaxHighlighter>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-end">
+              <CopyToClipboardButton content={code} label={t('Copy snippet to clipboard')} />
+            </div>
+            <div className="markdown-content">
+              <SyntaxHighlighter
+                language="python"
+                style={oneDark}
+                customStyle={{
+                  margin: 0,
+                  borderRadius: '4px',
+                }}
+                wrapLongLines={true}
+                // Note: showLineNumbers={true} breaks text selection for copy - react-syntax-highlighter known issue
+              >
+                {code}
+              </SyntaxHighlighter>
+            </div>
           </div>
         </CollapsiblePanel>
       )}

@@ -34,6 +34,11 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, messa
           <Loading />
         </div>
       )}
+      {message.error && (
+        <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">
+          <span className="text-destructive text-sm">{message.error}</span>
+        </div>
+      )}
     </div>
   );
 };

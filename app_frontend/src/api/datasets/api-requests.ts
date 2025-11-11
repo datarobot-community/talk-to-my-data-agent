@@ -105,3 +105,39 @@ export async function getSupportedDataSourceTypes(): Promise<string[]> {
 
   return data.supported_types;
 }
+
+export const downloadDataset = async ({
+  datasetId,
+  signal,
+  includeBom,
+}: {
+  datasetId: string;
+  signal?: AbortSignal;
+  includeBom?: boolean;
+}): Promise<void> => {
+  try {
+    const response = await apiClient.get(`/v1/datasets/${datasetId}/download`, {
+      params: { bom: includeBom },
+      responseType: 'blob',
+      signal,
+    });
+
+    const blob = response.data;
+    const contentDisposition = response.headers['content-disposition'];
+    const filename = contentDisposition?.match(/filename="?([^"]+)"?/)?.[1] || 'dataset.csv';
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error('DEBUG Error downloading dataset:', error);
+    throw error;
+  }
+};

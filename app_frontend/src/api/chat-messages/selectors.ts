@@ -37,8 +37,15 @@ export const getResponseMessage = (
   // If it's already an assistant message, return it
   if (message.role === 'assistant') return message;
 
-  // If it's a user message, find the next assistant message
+  // If it's a user message, find the next assistant message (skip system messages)
   const userIndex = messages.findIndex(msg => msg.id === messageId);
-  const responseMessage = messages[userIndex + 1];
-  return responseMessage?.role === 'assistant' ? responseMessage : undefined;
+  if (userIndex === -1) return undefined;
+
+  for (let i = userIndex + 1; i < messages.length; i++) {
+    if (messages[i].role === 'assistant') {
+      return messages[i];
+    }
+  }
+
+  return undefined;
 };

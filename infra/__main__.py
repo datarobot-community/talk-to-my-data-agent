@@ -320,3 +320,6 @@ pulumi.export(
     settings_app_infra.app_resource_name,
     app.application_url,
 )
+
+# Export for CI/e2e to reliably access the app ID
+pulumi.export("DATAROBOT_APPLICATION_ID", app.id)

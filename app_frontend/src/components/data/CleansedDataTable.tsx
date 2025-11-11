@@ -122,12 +122,8 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
               <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
               <span className="ml-2">{t('Loading more...')}</span>
             </div>
-          ) : hasNextPage ? (
-            <div className="h-10" />
           ) : (
-            <div className="text-muted-foreground">
-              {allRows.length > 0 ? t('End of data') : t('No data available')}
-            </div>
+            <div className="h-4" />
           )}
         </div>
       </div>

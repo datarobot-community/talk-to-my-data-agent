@@ -324,3 +324,11 @@ class TokenUsageTracker:
             "call_count": self.call_count,
             "model": self.model,
         }
+
+
+def count_messages_tokens(
+    messages: list[ChatCompletionMessageParam], model: str = ALTERNATIVE_LLM_BIG
+) -> int:
+    """Count tokens in messages using tiktoken."""
+    strategy = TiktokenCountingStrategy()
+    return strategy._count_messages(messages, model)

@@ -6,6 +6,7 @@ import {
   deleteAllDatasets,
   getSupportedDataSourceTypes,
   getDatasetById,
+  downloadDataset,
 } from './api-requests';
 import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
@@ -197,4 +198,10 @@ export const useDeleteAllDatasets = ({ onSuccess }: { onSuccess?: () => void }) 
     },
   });
   return mutation;
+};
+
+export const useDownloadDataset = () => {
+  return useMutation({
+    mutationFn: downloadDataset,
+  });
 };

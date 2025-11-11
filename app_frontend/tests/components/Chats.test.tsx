@@ -242,4 +242,102 @@ describe('Chats Component', () => {
     expect(exportButton).toBeDisabled();
     expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
   });
+
+  test('renders system message (conversation summary) in chat', () => {
+    const mockMessages = [
+      {
+        id: 'user-1',
+        role: 'user' as const,
+        content: 'What is the data about?',
+        components: [],
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'system-1',
+        role: 'system' as const,
+        content: 'The user analyzed patient demographics focusing on readmission rates.',
+        components: [],
+        created_at: '2024-01-01T00:01:00Z',
+        in_progress: false,
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant' as const,
+        content: 'Analysis shows key patterns.',
+        components: [],
+        created_at: '2024-01-01T00:02:00Z',
+      },
+    ];
+
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    renderWithProviders(<Chats />);
+
+    const systemMessage = screen.getByTestId('system-message-system-1');
+    expect(systemMessage).toBeInTheDocument();
+  });
+
+  test('renders system message with in_progress state', () => {
+    const mockMessages = [
+      {
+        id: 'user-1',
+        role: 'user' as const,
+        content: 'Question',
+        components: [],
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'system-1',
+        role: 'system' as const,
+        content: 'Summarizing conversation...',
+        components: [],
+        created_at: '2024-01-01T00:01:00Z',
+        in_progress: true,
+      },
+    ];
+
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    renderWithProviders(<Chats />);
+
+    const systemMessage = screen.getByTestId('system-message-system-1');
+    expect(systemMessage).toBeInTheDocument();
+  });
+
+  test('displays error message when user message fails', () => {
+    const question = 'What is the weather?';
+    const errorMessage =
+      'Failed to process your question: LLM validation failed: Invalid response format from model';
+    const mockMessages = [
+      {
+        id: 'msg-1',
+        role: 'user' as const,
+        content: question,
+        created_at: '2024-01-01T00:00:00Z',
+        components: [],
+        in_progress: false,
+        error: errorMessage,
+      },
+    ];
+
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    renderWithProviders(<Chats />);
+
+    expect(screen.getByText(question)).toBeInTheDocument();
+    expect(screen.getByText(errorMessage)).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+  });
 });

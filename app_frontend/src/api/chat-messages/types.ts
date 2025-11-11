@@ -69,7 +69,7 @@ interface IComponent {
 }
 
 export interface IChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   components: (
     | IMessageComponent

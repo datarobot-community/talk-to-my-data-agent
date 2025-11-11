@@ -33,6 +33,8 @@ DISK_CACHE_LIMIT_BYTES = 512e6
 
 # Token and Context Limits
 MAX_CSV_TOKENS = 50000  # limit for data analyst csv sended to llm
+MODEL_CONTEXT_WINDOW = 128000  # GPT-4o context window
+CONTEXT_WARNING_THRESHOLD = int(MODEL_CONTEXT_WINDOW * 0.8)
 
 # Tiktoken Encoding Configuration
 DEFAULT_TIKTOKEN_ENCODING = "o200k_base"

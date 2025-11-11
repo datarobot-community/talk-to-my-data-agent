@@ -54,7 +54,7 @@ from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 from plotly.subplots import make_subplots
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
 from utils.chat_dataset_helper import extract_and_store_datasets
@@ -81,6 +81,7 @@ from utils.llm_client import AsyncLLMClient
 from utils.token_tracking import (
     TiktokenCountingStrategy,
     TokenUsageTracker,
+    count_messages_tokens,
     estimate_csv_rows_for_token_limit,
 )
 
@@ -1046,6 +1047,67 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
 
 @log_api_call
 @telemetry.meter_and_trace
+async def summarize_conversation(
+    messages: list[ChatCompletionMessageParam],
+    token_tracker: TokenUsageTracker | None = None,
+) -> str:
+    """Summarize a conversation history, when getting close to model's context window limit.
+
+    Args:
+        messages: list of message dictionaries with 'role' and 'content' fields
+        token_tracker: Optional token usage tracker
+
+    Returns:
+        str: Summary of the conversation
+
+    Raises:
+        Exception: If summarization fails (network, LLM, parsing errors)
+    """
+
+    class ConversationSummary(BaseModel):
+        summary: str
+
+    try:
+        messages_str = "\n".join(
+            [f"{msg['role']}: {msg['content']}" for msg in messages]
+        )
+
+        token_count = count_messages_tokens(messages, ALTERNATIVE_LLM_SMALL)
+        logger.info(
+            f"Summarizing conversation: {token_count} tokens, {len(messages)} messages"
+        )
+
+        prompt_messages: list[ChatCompletionMessageParam] = [
+            ChatCompletionSystemMessageParam(
+                content=prompts.SYSTEM_PROMPT_SUMMARIZE_CONVERSATION,
+                role="system",
+            ),
+            ChatCompletionUserMessageParam(
+                content=f"Conversation History:\n{messages_str}",
+                role="user",
+            ),
+        ]
+
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{summarize_conversation.__module__}.{summarize_conversation.__qualname__}.llm_call"
+            ):
+                completion: ConversationSummary = await client.chat.completions.create(
+                    response_model=ConversationSummary,
+                    model=ALTERNATIVE_LLM_SMALL,
+                    messages=prompt_messages,
+                )
+
+        logger.info(f"Summary created: {len(completion.summary)} characters")
+        return completion.summary
+
+    except Exception as e:
+        logger.error(f"Failed to summarize conversation: {e}")
+        raise
+
+
+@log_api_call
+@telemetry.meter_and_trace
 async def rephrase_message(
     messages: ChatRequest, token_tracker: TokenUsageTracker | None = None
 ) -> str:
@@ -1058,21 +1120,24 @@ async def rephrase_message(
     Returns:
         Dict[str, str]: Dictionary containing response content
     """
-    # Convert messages to string format for prompt
-    messages_str = "\n".join(
-        [f"{msg['role']}: {msg['content']}" for msg in messages.messages]
+    # Debug logging
+    token_count = count_messages_tokens(messages.messages, ALTERNATIVE_LLM_BIG)
+
+    logger.info(
+        f"DEBUG rephrase_message: {token_count} tokens, {len(messages.messages)} messages"
     )
 
+    # Build prompt: system message + actual conversation history
     prompt_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             content=prompts.SYSTEM_PROMPT_REPHRASE_MESSAGE,
             role="system",
         ),
-        ChatCompletionUserMessageParam(
-            content=f"Message History:\n{messages_str}",
-            role="user",
-        ),
     ]
+
+    # Add the actual conversation messages (already includes summary if present)
+    prompt_messages.extend(messages.messages)
+
     async with AsyncLLMClient(token_tracker=token_tracker) as client:
         with telemetry.time(
             f"{rephrase_message.__module__}.{rephrase_message.__qualname__}.llm_call"
@@ -1621,19 +1686,20 @@ async def run_complete_analysis(
         yield AnalysisGenerationError("Message not found")
 
         return
-    # Create token tracker for this complete analysis pipeline
-    token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
 
-    # Get enhanced message
     try:
+        token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+
+        # Get enhanced message
         logger.info("Getting rephrased question...")
         enhanced_message = await rephrase_message(chat_request, token_tracker)
         logger.info("Getting rephrased question done")
 
         yield enhanced_message
 
-    except ValidationError:
-        user_message.error = "LLM Error, please retry"
+    except Exception as e:
+        logger.error(f"Error rephrasing message: {e}", exc_info=True)
+        user_message.error = f"Failed to process your question: {str(e)}"
         user_message.in_progress = False
         await analyst_db.update_chat_message(
             message_id=message_id,

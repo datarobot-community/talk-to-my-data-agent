@@ -14,7 +14,7 @@ import {
   useExport,
   usePollInProgressMessage,
 } from '@/api/chat-messages/hooks';
-import { InitialPrompt, UserPrompt, UserMessage } from '@/components/chat';
+import { InitialPrompt, UserPrompt, UserMessage, SystemMessage } from '@/components/chat';
 import { ROUTES } from './routes';
 import { Loading } from '@/components/ui-custom/loading';
 import { RenameChatModal } from '@/components/RenameChatModal';
@@ -217,6 +217,9 @@ export const Chats: React.FC = () => {
                         testId={`response-message-${message.id}`}
                       />
                     </Suspense>
+                  )}
+                  {message.role === 'system' && (
+                    <SystemMessage message={message} testId={`system-message-${message.id}`} />
                   )}
                 </div>
               ))}

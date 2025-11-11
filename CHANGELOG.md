@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.19] - 2025-11-11
+
+### Added
+
+- Gracefully handle Context Window Limit of a chat on the UI.
+- Direct download functionality for analysis datasets.
+- Copy-to-clipboard button for code snippets in chat responses. Improved code snippet selection.
+- Improved error treatment for user messages.
+
 ## [0.3.18] - 2025-10-30
 
 ### Fixed

@@ -78,7 +78,13 @@ from utils.api import (
     process_data_and_update_state,
     register_remote_registry_datasets,
     run_complete_analysis,
+    summarize_conversation,
     sync_data_sources_and_datasets,
+)
+from utils.constants import (
+    ALTERNATIVE_LLM_BIG,
+    CONTEXT_WARNING_THRESHOLD,
+    MODEL_CONTEXT_WINDOW,
 )
 from utils.schema import (
     AnalystChatMessage,
@@ -103,6 +109,11 @@ from utils.schema import (
     RunChartsResult,
     RunDatabaseAnalysisResult,
     SupportedDataSourceTypes,
+)
+from utils.token_tracking import (
+    TiktokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
 )
 
 logger = get_logger()
@@ -660,6 +671,60 @@ async def get_dataset_by_id(
         )
 
 
+@router.get("/datasets/{dataset_id}/download")
+async def download_dataset(
+    dataset_id: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+    bom: bool = False,
+) -> Response:
+    """
+    Download a dataset by ID as a CSV file.
+
+    Args:
+        dataset_id: The unique identifier of the dataset to download
+        bom: Whether to include UTF-8 BOM for Excel compatibility (default: False)
+
+    Returns:
+        CSV file attachment
+
+    Raises:
+        HTTPException: If the dataset doesn't exist or cannot be retrieved
+    """
+    try:
+        from utils.analyst_db import DatasetType
+
+        df = await analyst_db.dataset_handler.get_dataframe(
+            dataset_id,
+            expected_type=DatasetType.ANALYST_RESULT_DATASET,
+            max_rows=None,
+        )
+
+        csv_content = io.StringIO()
+        df.write_csv(csv_content)
+
+        csv_text = csv_content.getvalue()
+        if bom:
+            csv_text = "\ufeff" + csv_text
+
+        response = Response(content=csv_text)
+        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+
+        filename = f"analysis_result_dataset_{dataset_id[:8]}.csv"
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404, detail=f"Dataset '{dataset_id}' not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error downloading dataset '{dataset_id}': {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading dataset: {str(e)}"
+        )
+
+
 @router.get("/datasets/{name}/metadata")
 async def get_dataset_metadata(
     name: str, analyst_db: AnalystDB = Depends(get_initialized_db)
@@ -1103,25 +1168,132 @@ async def create_chat_message(
 
     # Check if cancelled
     if not in_progress:
-        # Create the user message
-        user_message = AnalystChatMessage(
-            role="user", content=payload.message, components=[]
-        )
+        # Check if there's an existing summary (find last system message)
+        last_summary_idx = None
+        for i in range(len(messages) - 1, -1, -1):  # Iterate backwards through indices
+            if messages[i].role == "system":
+                last_summary_idx = i
+                break
 
-        message_id = await analyst_db.add_chat_message(
-            chat_id=chat_id,
-            message=user_message,
-        )
+        # Build context: if summary exists, use [summary] + messages_after, else all messages
+        if last_summary_idx is not None:
+            context_messages = messages[last_summary_idx:]
+            logger.info(
+                f"[chat_id={chat_id}] Using summary + {len(context_messages) - 1} messages after"
+            )
+        else:
+            context_messages = messages
 
         # Create valid messages for the chat request
         valid_messages: list[ChatCompletionMessageParam] = [
-            msg.to_openai_message_param() for msg in messages if msg.content.strip()
+            msg.to_openai_message_param()
+            for msg in context_messages
+            if msg.content.strip()
         ]
 
         # Add the current message
         valid_messages.append(
             ChatCompletionUserMessageParam(role="user", content=payload.message)
         )
+
+        # Check context usage
+        tokens_used = count_messages_tokens(valid_messages, ALTERNATIVE_LLM_BIG)
+        usage_pct = (tokens_used / MODEL_CONTEXT_WINDOW) * 100
+
+        logger.info(
+            f"[chat_id={chat_id}] Context: {tokens_used:,}/{MODEL_CONTEXT_WINDOW:,} tokens ({usage_pct:.1f}%)"
+        )
+
+        # Create and store the user message first (before summarization)
+        user_message = AnalystChatMessage(
+            role="user", content=payload.message, components=[]
+        )
+        message_id = await analyst_db.add_chat_message(
+            chat_id=chat_id, message=user_message
+        )
+        user_message.id = message_id
+
+        # Trigger summarization if over threshold
+        if tokens_used >= CONTEXT_WARNING_THRESHOLD:
+            logger.warning(
+                f"[chat_id={chat_id}] ⚠️  Context at {usage_pct:.1f}% - creating summary"
+            )
+
+            # Create new system message with in_progress=True
+            summary_message = AnalystChatMessage(
+                role="system",
+                content="Summarizing conversation...",
+                components=[],
+                in_progress=True,
+            )
+            summary_message.id = await analyst_db.add_chat_message(
+                chat_id=chat_id, message=summary_message
+            )
+
+            # Determine what to summarize: from last system message (if exists) to now, or all messages
+            if last_summary_idx is not None:
+                # Summarize from last system message onwards
+                messages_to_summarize = [
+                    msg.to_openai_message_param()
+                    for msg in messages[last_summary_idx:]
+                    if msg.content.strip()
+                ]
+            else:
+                # Summarize all messages
+                messages_to_summarize = [
+                    msg.to_openai_message_param()
+                    for msg in messages
+                    if msg.content.strip()
+                ]
+
+            # Create token tracker for summarization
+            summarization_tracker = TokenUsageTracker(
+                strategy=TiktokenCountingStrategy()
+            )
+
+            try:
+                summary_text = await summarize_conversation(
+                    messages_to_summarize, token_tracker=summarization_tracker
+                )
+
+                logger.info(
+                    f"[chat_id={chat_id}] Summarization token usage: "
+                    f"{summarization_tracker.prompt_tokens} prompt + "
+                    f"{summarization_tracker.completion_tokens} completion = "
+                    f"{summarization_tracker.total_tokens} total tokens"
+                )
+
+                # Update the summary message with actual content
+                summary_message.content = summary_text
+                summary_message.in_progress = False
+
+                await analyst_db.update_chat_message(
+                    message_id=summary_message.id,
+                    message=summary_message,
+                )
+
+                logger.info(
+                    f"[chat_id={chat_id}] Summary stored ({len(summary_text)} chars)"
+                )
+
+                # Rebuild context using the new summary
+                summary_param = summary_message.to_openai_message_param()
+                valid_messages = [
+                    summary_param,
+                    valid_messages[-1],
+                ]  # summary + current message
+
+            except Exception as e:
+                logger.error(f"[chat_id={chat_id}] Failed to create summary: {e}")
+                # Mark summary as failed
+                summary_message.content = "Failed to create summary"
+                summary_message.in_progress = False
+                summary_message.error = str(e)
+                await analyst_db.update_chat_message(
+                    message_id=summary_message.id,
+                    message=summary_message,
+                )
+                # Continue without summary
 
         # Create the chat request
         chat_request = ChatRequest(messages=valid_messages)
@@ -1177,11 +1349,20 @@ async def save_chat_messages(
         idx = next((i for i, m in enumerate(chat_messages) if m.id == message_id), None)
         if idx is None or chat_messages[idx].role != "user":
             raise HTTPException(detail="User message not found", status_code=404)
-        # Ensure there is a following assistant message
-        if idx == len(chat_messages) - 1 or chat_messages[idx + 1].role != "assistant":
-            filtered_messages = [chat_messages[idx]]
+
+        # Find the following assistant message
+        assistant_message = None
+        for i in range(idx + 1, len(chat_messages)):
+            if chat_messages[i].role == "assistant":
+                assistant_message = chat_messages[i]
+                break
+
+        # Include user message and assistant response if found
+        if assistant_message:
+            filtered_messages = [chat_messages[idx], assistant_message]
         else:
-            filtered_messages = [chat_messages[idx], chat_messages[idx + 1]]
+            filtered_messages = [chat_messages[idx]]
+
         chat_messages = filtered_messages
     if not chat_messages:
         # Create an empty workbook with basic structure for empty chats
@@ -1216,6 +1397,10 @@ async def save_chat_messages(
     analysis_workbook.remove(analysis_workbook.active)
 
     for i, chat_message in enumerate(chat_messages):
+        # Skip system messages (summarization messages)
+        if chat_message.role == "system":
+            continue
+
         if chat_message.role == "assistant":
             # Handle Analysis Report sheet
             report_sheets_count += 1
@@ -1226,12 +1411,12 @@ async def save_chat_messages(
 
             report_sheet["A1"] = "Analysis Report"
 
-            # Since messages alternate user/assistant, the previous message is always the user question
-            user_question = (
-                chat_messages[i - 1].content
-                if i > 0 and chat_messages[i - 1].role == "user"
-                else "No question found"
-            )
+            # Find the previous user message by searching backwards
+            user_question = "No question found"
+            for j in range(i - 1, -1, -1):
+                if chat_messages[j].role == "user":
+                    user_question = chat_messages[j].content
+                    break
 
             report_sheet["A3"] = "Question"
             report_sheet["A4"] = user_question
