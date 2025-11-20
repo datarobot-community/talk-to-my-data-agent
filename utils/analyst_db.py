@@ -152,6 +152,9 @@ class DatasetMetadata:
     )
     created_at: datetime
     columns: list[str]
+    original_column_types: (
+        dict[str, str] | None
+    )  # For dataset tables, the SQL types of columns
     row_count: int
     data_source: DataSourceType
     file_size: int = 0  # Size of the file in bytes
@@ -294,7 +297,9 @@ class BaseDuckDBHandler(ABC):
             async with self._write_connection() as conn:
                 await self._create_db_version_table(conn)
                 for table_name in tables_to_drop:
-                    await self.execute_query(conn, f"DROP TABLE IF EXISTS {table_name}")
+                    await self.execute_query(
+                        conn, f'DROP TABLE IF EXISTS "{table_name}"'
+                    )
         await self._initialize_child()
 
     @abstractmethod
@@ -462,7 +467,10 @@ class DatasetHandler(BaseDuckDBHandler):
                 )
 
         # For backwards compatibility, add new columns.
-        additional_columns = [("dataset_id", "VARCHAR")]
+        additional_columns = [
+            ("dataset_id", "VARCHAR"),
+            ("original_column_types", "JSON NULL"),
+        ]
         table = "dataset_metadata"
         await self._add_columns(additional_columns, table)
 
@@ -472,6 +480,7 @@ class DatasetHandler(BaseDuckDBHandler):
         name: str,
         dataset_type: DatasetType,
         data_source: DataSourceType,
+        original_column_types: dict[str, str] | None = None,
         external_id: str | None = None,
         original_name: str | None = None,
         file_size: int = 0,
@@ -527,14 +536,15 @@ class DatasetHandler(BaseDuckDBHandler):
                 row_count=len(df),
                 data_source=data_source,
                 file_size=file_size,
+                original_column_types=original_column_types,
             )
 
             await self.execute_query(
                 conn,
                 """
                 INSERT INTO dataset_metadata
-                (table_name, dataset_type, original_name, created_at, columns, row_count, data_source, file_size, dataset_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (table_name, dataset_type, original_name, created_at, columns, row_count, data_source, file_size, dataset_id, original_column_types)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (table_name) DO UPDATE SET
                   dataset_type = EXCLUDED.dataset_type,
                   original_name = EXCLUDED.original_name,
@@ -543,7 +553,8 @@ class DatasetHandler(BaseDuckDBHandler):
                   row_count = EXCLUDED.row_count,
                   data_source = EXCLUDED.data_source,
                   file_size = EXCLUDED.file_size,
-                  dataset_id = EXCLUDED.dataset_id;
+                  dataset_id = EXCLUDED.dataset_id,
+                  original_column_types = EXCLUDED.original_column_types;
                 """,
                 [
                     metadata.name,
@@ -555,6 +566,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     display_data_source_type(metadata.data_source),
                     metadata.file_size,
                     metadata.external_id,
+                    metadata.original_column_types,
                 ],
             )
 
@@ -578,7 +590,7 @@ class DatasetHandler(BaseDuckDBHandler):
                 SELECT
                     table_name, dataset_type, original_name,
                     created_at, columns, row_count, data_source, file_size,
-                    dataset_id
+                    dataset_id, original_column_types
                 FROM dataset_metadata
             """
             params = []
@@ -611,6 +623,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     data_source=get_data_source_type(row[6]),
                     file_size=row[7],
                     external_id=row[8],
+                    original_column_types=row[9],
                 )
                 for row in rows
             ]
@@ -689,7 +702,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     SELECT
                         table_name, dataset_type, original_name,
                         created_at, columns, row_count, data_source, file_size,
-                        dataset_id
+                        dataset_id, original_column_types
                     FROM dataset_metadata
                     WHERE table_name = ?
                     """,
@@ -713,6 +726,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     data_source=get_data_source_type(row[6]),
                     file_size=row[7],
                     external_id=row[8],
+                    original_column_types=json.loads(row[9]) if row[9] else row[9],
                 )
 
                 return metadata
@@ -1807,7 +1821,7 @@ class ExternalDataStoreHandler(BaseDuckDBHandler):
         async with self._write_connection() as conn:
             await self.execute_query(conn, "TRUNCATE TABLE external_data_source")
 
-            await self.execute_query(conn, "TRUNCATE TABLE external_data_stores")
+            await self.execute_query(conn, "TRUNCATE TABLE external_data_store")
 
     async def clear_external_data_store_sources(self, data_store_id: str) -> None:
         async with self._write_connection() as conn:
@@ -1939,6 +1953,7 @@ class AnalystDB:
         data_source: DataSourceType,
         file_size: int = 0,
         external_id: str | None = None,
+        original_column_types: dict[str, str] | None = None,
         clobber: bool = False,
     ) -> None:
         if isinstance(df, CleansedDataset):
@@ -1959,6 +1974,7 @@ class AnalystDB:
                 original_name=df.name,
                 file_size=file_size,
                 external_id=external_id,
+                original_column_types=original_column_types,
                 clobber=clobber,
             )
         except Exception as e:

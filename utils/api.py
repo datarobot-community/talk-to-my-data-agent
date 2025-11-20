@@ -361,13 +361,14 @@ async def register_remote_datasets(
     for dataset in datasets:
         with use_user_token(request):
             preview = await recipe.preview_dataset(dataset)
-        analyst_dataset = AnalystDataset(name=dataset.name, data=preview)
+        analyst_dataset = AnalystDataset(name=dataset.name, data=preview.response)
 
         await analyst_db.register_dataset(
             analyst_dataset,
             InternalDataSourceType.REMOTE_REGISTRY,
             file_size=0,
             external_id=dataset.id,
+            original_column_types=preview.original_types,
             clobber=True,
         )
 
@@ -453,7 +454,7 @@ async def register_datasource(
         recipe = await DataSourceRecipe.load_or_create(analyst_db, data_store_id)
         for ds in datasources:
             preview = await recipe.preview_datasource(ds)
-            analyst_dataset = AnalystDataset(name=ds.path, data=preview)
+            analyst_dataset = AnalystDataset(name=ds.path, data=preview.response)
 
             await analyst_db.register_dataset(
                 analyst_dataset,
@@ -463,6 +464,7 @@ async def register_datasource(
                 file_size=0,
                 external_id=None,
                 clobber=True,
+                original_column_types=preview.original_types,
             )
 
 
@@ -1467,12 +1469,25 @@ async def _generate_database_analysis_code(
 
     # Convert dictionary data structure to list of columns for all tables
     dictionaries = [
-        await analyst_db.get_data_dictionary(name) for name in request.dataset_names
+        (
+            await analyst_db.get_data_dictionary(name),
+            await analyst_db.get_dataset_metadata(name),
+        )
+        for name in request.dataset_names
     ]
-    for dictionary in dictionaries:
+
+    for dictionary, metadata in dictionaries:
         if dictionary:
+            if metadata and metadata.original_column_types:
+                for column in dictionary.column_descriptions:
+                    if original_type := metadata.original_column_types.get(
+                        column.column
+                    ):
+                        column.data_type = original_type
             dictionary.name = database.query_friendly_name(dictionary.name)
-    all_tables_info = [d.model_dump(mode="json") for d in dictionaries if d is not None]
+    all_tables_info = [
+        d.model_dump(mode="json") for d, m in dictionaries if d is not None
+    ]
 
     # Get sample data for all tables
     all_samples = []

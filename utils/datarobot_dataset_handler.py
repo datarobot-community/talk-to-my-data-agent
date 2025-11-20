@@ -27,7 +27,16 @@ import threading
 import uuid
 from contextlib import contextmanager
 from functools import cache, lru_cache
-from typing import Any, Callable, Generator, Iterable, ParamSpec, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Generator,
+    Iterable,
+    NamedTuple,
+    ParamSpec,
+    TypeVar,
+    cast,
+)
 
 import datarobot as dr
 import polars as pl
@@ -77,10 +86,9 @@ from utils.data_analyst_telemetry import telemetry
 from utils.database_helpers import _DEFAULT_DB_QUERY_TIMEOUT, DatabaseOperator
 from utils.logging_helper import get_logger
 from utils.prompts import (
-    PostgresPromptFactory,
-    QueryPromptFactory,
-    RedshiftPromptFactory,
-    SparkPromptFactory,
+    SYSTEM_PROMPT_POSTGRES,
+    SYSTEM_PROMPT_REDSHIFT,
+    SYSTEM_PROMPT_SPARK_SQL,
 )
 from utils.schema import (
     DataFrameWrapper,
@@ -347,6 +355,11 @@ def get_or_create_wrangling_use_case(analyst_db: AnalystDB) -> UseCase:
     return use_case
 
 
+class RunSqlResponse(NamedTuple):
+    response: DataFrameWrapper
+    original_types: dict[str, str]
+
+
 class BaseRecipe(abc.ABC):
     MAX_ROWS = 1000
 
@@ -432,13 +445,13 @@ class BaseRecipe(abc.ABC):
         after=after_log(logger, logging.DEBUG),
     )
     @telemetry.trace
-    async def _retrieve_preview(self, timeout_seconds: int = 300) -> DataFrameWrapper:
+    async def _retrieve_preview(self, timeout_seconds: int = 300) -> RunSqlResponse:
         assert self._recipe is not None
         logger.debug(
             "Retrieving preview of recipe.", extra={"recipe_id": self._recipe.id}
         )
         preview = self._recipe.retrieve_preview(timeout_seconds)
-        schema = preview["resultSchema"]
+        schema: list[dict[str, Any]] = preview["resultSchema"]
 
         # Unfortunately the Python SDK currently doesn't have a nice API for Previews
         all_rows: list[Any] = preview["data"]
@@ -456,10 +469,12 @@ class BaseRecipe(abc.ABC):
                 if len(all_rows) >= BaseRecipe.MAX_ROWS:
                     break
 
-        return DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
+        original_types = {col["name"]: col["dataType"] for col in schema}
+        dataframe = DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
+        return RunSqlResponse(dataframe, original_types)
 
     @telemetry.meter_and_trace
-    async def retrieve_preview(self, timeout_seconds: int = 900) -> DataFrameWrapper:
+    async def retrieve_preview(self, timeout_seconds: int = 900) -> RunSqlResponse:
         """
         Retrieve a preview of the set SQL query.
 
@@ -473,16 +488,12 @@ class BaseRecipe(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def prompt(self) -> QueryPromptFactory:
+    def prompt(self) -> str:
         pass
 
-    @property
-    def catalog(self) -> str | None:
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        return None
+    @abc.abstractmethod
+    def query_friendly_name(self, dataset_name: str) -> str:
+        pass
 
     def as_database_operator(self) -> DataRobotOperator:
         return DataRobotOperator(NoDatabaseCredentials(), self)
@@ -613,6 +624,14 @@ class BaseRecipe(abc.ABC):
         return pl.String
 
 
+def format_postgres_table(table_parts: list[str]) -> str:
+    return ".".join(f'"{part}"' for part in table_parts)
+
+
+def format_spark_table(table_parts: list[str]) -> str:
+    return ".".join(f"`{part}`" for part in table_parts)
+
+
 class DataSourceRecipe(BaseRecipe):
     """
     A recipe defined over data sources.
@@ -625,9 +644,13 @@ class DataSourceRecipe(BaseRecipe):
         "postgres": DataWranglingDialect.POSTGRES,
         "redshift": DataWranglingDialect.POSTGRES,
     }
-    PROMPTS: dict[str, QueryPromptFactory] = {
-        "postgres": PostgresPromptFactory(),
-        "redshift": RedshiftPromptFactory(),
+    PROMPTS: dict[str, str] = {
+        "postgres": SYSTEM_PROMPT_POSTGRES,
+        "redshift": SYSTEM_PROMPT_REDSHIFT,
+    }
+    FORMAT_TABLE_NAME: dict[str, Callable[[list[str]], str]] = {
+        "postgres": format_postgres_table,
+        "redshift": format_postgres_table,
     }
     INSTANCE_CACHE: dict[tuple[str, str], DataSourceRecipe] = {}
     EXTERNAL_DATA_STORE_CACHE: dict[
@@ -1308,24 +1331,13 @@ class DataSourceRecipe(BaseRecipe):
         return
 
     @property
-    def catalog(self) -> str | None:
-        for ds in self._data_store.defined_data_sources:
-            if ds.database_catalog:
-                return ds.database_catalog
-
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        for ds in self._data_store.defined_data_sources:
-            if ds.database_schema:
-                return ds.database_schema
-
-        return None
-
-    @property
-    def prompt(self) -> QueryPromptFactory:
+    def prompt(self) -> str:
         return DataSourceRecipe.PROMPTS[self._data_store.driver_class_type]
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return DataSourceRecipe.FORMAT_TABLE_NAME[self._data_store.driver_class_type](
+            dataset_name.split(".")
+        )
 
     @property
     def data_store(self) -> ExternalDataStore:
@@ -1333,7 +1345,7 @@ class DataSourceRecipe(BaseRecipe):
 
     async def preview_datasource(
         self, dataset: ExternalDataSource, preview_limit: int = 1000
-    ) -> DataFrameWrapper:
+    ) -> RunSqlResponse:
         """Preview the first `preview_limit` rows of a datasource (behind the hood queries and previews data.)
 
         Args:
@@ -1341,11 +1353,11 @@ class DataSourceRecipe(BaseRecipe):
             preview_limit (int, optional): The maximum number of rows to return. Defaults to 1000.
 
         Returns:
-            DataFrameWrapper: The first preview_limit rows.
+            RetrievePreviewResponse: The first preview_limit rows.
         """
         await self._ensure_recipe_initialized()
 
-        dataset_identifier = self.prompt.adapt_table_path(dataset.path)
+        dataset_identifier = self.query_friendly_name(dataset.path)
         await self.set_query(
             f"SELECT * FROM {dataset_identifier} LIMIT {preview_limit}"
         )
@@ -1530,12 +1542,15 @@ class DatasetSparkRecipe(BaseRecipe):
         await self._set_large_spark_instance_size()
 
     @property
-    def prompt(self) -> QueryPromptFactory:
-        return SparkPromptFactory()
+    def prompt(self) -> str:
+        return SYSTEM_PROMPT_SPARK_SQL
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return ".".join(f"`{part}`" for part in dataset_name.split("."))
 
     async def preview_dataset(
         self, dataset: Dataset, preview_limit: int = 1000
-    ) -> DataFrameWrapper:
+    ) -> RunSqlResponse:
         """Preview the first `preview_limit` rows of a dataset (behind the hood queries and previews data.)
 
         Args:
@@ -1543,7 +1558,7 @@ class DatasetSparkRecipe(BaseRecipe):
             preview_limit (int, optional): The maximum number of rows to return. Defaults to 1000.
 
         Returns:
-            DataFrameWrapper: The first preview_limit rows.
+            RetrievePreviewResponse: The first preview_limit rows.
         """
         await self.set_query(f"SELECT * FROM `{dataset.name}` LIMIT {preview_limit}")
         return await self.retrieve_preview()
@@ -1569,7 +1584,7 @@ class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
         logger.debug("Running SQL on Recipe.", extra={"sql": sql_query})
         await self.recipe.set_query(sql_query)
         logger.debug("Set query SQL, awaiting results.", extra={"sql": sql_query})
-        return await self.recipe.retrieve_preview(timeout_seconds=timeout)
+        return (await self.recipe.retrieve_preview(timeout_seconds=timeout)).response
 
     async def execute_query(
         self,
@@ -1620,10 +1635,8 @@ class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
         return ChatCompletionSystemMessageParam(
             role="system",
-            content=self.recipe.prompt.prompt_for_datasource(
-                catalog=self.recipe.catalog, schema=self.recipe.schema
-            ),
+            content=self.recipe.prompt,
         )
 
     def query_friendly_name(self, dataset_name: str) -> str:
-        return self.recipe.prompt.adapt_table_path(dataset_name)
+        return self.recipe.query_friendly_name(dataset_name)
