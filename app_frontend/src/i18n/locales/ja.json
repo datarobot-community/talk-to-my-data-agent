@@ -20,7 +20,7 @@
   "Dataset": "データセット",
   "Code": "コード",
   "Toggle panel": "パネルを表示/非表示",
-  "Failed to generate valid code after {attempts} attempts": "{attempts}回試しても有効なコードを生成できませんでした",
+  "Failed to generate valid code after {{attempts}} attempts": "{attempts}回試しても有効なコードを生成できませんでした",
   "An error occurred during execution": "実行中にエラーが発生しました",
   "Code that caused the error:": "エラーの原因となったコード：",
   "Traceback:": "トレースバック：",

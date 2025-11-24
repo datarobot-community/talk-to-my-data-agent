@@ -12,7 +12,7 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 
 ## Table of contents
 
-1. [Quick Start](#quick-start)
+1. [Quick Start](#-quick-start)
 2. [User's Guide](#users-guide)
 3. [Setup](#setup)
 4. [Architecture overview](#architecture-overview)
@@ -29,9 +29,120 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 10. [Delete all provisioned resources](#delete-all-provisioned-resources)
 11. [Setup for advanced users](#setup-for-advanced-users)
 
-## Quick Start
+## 🚀 Quick Start
 
-Please check out this [Talk To My Data walkthrough](https://docs.datarobot.com/en/docs/get-started/gs-dr5/talk-data-walk.html).
+### Build in Codespace
+
+If you're using **DataRobot Codespace**, everything you need is already installed.
+Follow the steps below to launch the entire application in just a few minutes.
+
+#### 1. Set Up Your Environment File
+
+1.  Rename `.env.template` → `.env`
+2.  Open the new `.env` file and fill in the required values.\
+    For local use, these can be simple placeholder strings:
+
+- `PULUMI_CONFIG_PASSPHRASE=1234abc` — A passphrase for Pulumi (any string works locally)
+- `USE_DATAROBOT_LLM_GATEWAY=true` to use DataRobot LLM Gateway
+
+#### 2. Install & Deploy
+
+Use the built-in terminal on the left sidebar of the Codespace.
+
+From the project root:
+
+```sh
+python quickstart.py YOUR_PROJECT_NAME
+```
+
+Replace `YOUR_PROJECT_NAME` with any name you prefer, then press **Enter**.
+
+When deployment completes, the terminal will display a link to your running application.\
+👉 **Click the link to open and start using your app!**
+
+Additionally, please find a guided Talk To My Data walkthrough [here](https://docs.datarobot.com/en/docs/get-started/gs-dr5/talk-data-walk.html).
+
+### Build Locally
+
+For local development, follow all of the steps below.
+
+#### 1. Install Pulumi (if you don’t have it yet)
+
+If Pulumi is not already installed, follow the installation instructions in the Pulumi [documentation](https://www.pulumi.com/docs/iac/download-install/).
+After installing for the first time, **restart your terminal** and run:
+
+```sh
+pulumi login --local      # omit --local to use Pulumi Cloud (requires an account)
+```
+
+#### 2. Clone the Template Repository
+
+```sh
+git clone https://github.com/datarobot-community/talk-to-my-data-agent.git
+cd talk-to-my-data-agent
+```
+
+#### 3. Create and Populate Your `.env` File
+
+Rename `.env.template` → `.env`, then fill in the required credentials:
+
+```sh
+DATAROBOT_API_TOKEN=...             # Required.
+DATAROBOT_ENDPOINT=...              # Required. e.g. https://app.datarobot.com/api/v2
+
+OPENAI_API_KEY=...
+OPENAI_API_VERSION=...              # e.g. 2024-02-01
+OPENAI_API_BASE=...                 # e.g. https://your_org.openai.azure.com/
+OPENAI_API_DEPLOYMENT_ID=...        # e.g. gpt-4o
+
+PULUMI_CONFIG_PASSPHRASE=...        # Required. Choose any alphanumeric passphrase used to encrypt Pulumi config.
+
+FRONTEND_TYPE=...                   # Optional: "react" (default) or "streamlit"
+USE_DATAROBOT_LLM_GATEWAY=...       # Optional: "true" to use DataRobot LLM Gateway
+```
+
+**Where to Find Your Credentials**
+
+- **DataRobot API Token:**
+  See Create a DataRobot API Key in the [DataRobot API Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#create-a-datarobot-api-key).
+
+- **DataRobot Endpoint:**
+  See Retrieve the API Endpoint in the same [Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#retrieve-the-api-endpoint).
+
+- **LLM Endpoint & API Key (Azure OpenAI):**
+  Refer to the [Azure OpenAI documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/chatgpt-quickstart?tabs=command-line%2Cjavascript-keyless%2Ctypescript-keyless%2Cpython-new&pivots=programming-language-python#retrieve-key-and-endpoint) for your resource and deployment values.
+
+#### 4. Deploy the Project
+
+From the project root:
+
+```sh
+python quickstart.py YOUR_PROJECT_NAME
+# Windows users may need:  py quickstart.py YOUR_PROJECT_NAME
+```
+
+Replace `YOUR_PROJECT_NAME` with any name you prefer, then press **Enter**.
+
+When deployment completes, the terminal will display a link to your running application.\
+👉 **Click the link to open and start using your app!**
+
+**What does `quickstart.py` do?**
+
+The quickstart script automates the entire setup process for you:
+
+- Creates and activates a Python virtual environment
+- Installs all required dependencies (using `uv` for faster installation, falling back to `pip`)
+- Loads your `.env` configuration
+- Sets up the Pulumi stack with your project name
+- Runs `pulumi up` to deploy your application
+- Displays your application URL when complete
+
+This single command replaces all the manual steps described in the [advanced setup section](#setup-for-advanced-users).
+
+Python 3.10 - 3.12 are supported
+
+Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
+and `pulumi` invocation see [here](#setup-for-advanced-users).
 
 ## User's Guide
 
@@ -46,7 +157,7 @@ Large datasets can be uploaded to the DataRobot platform (see [this documentatio
 Items from the user's data registry can be connected to the application (see screenshot below). These items are not downloaded into the application, but instead
 analysis is performed through DataRobot's data wrangling platform. This performs efficient queries that can support larger datasets (we have validated at least 5GB).
 Note there is a several minute cold start with the platform as it creates the analysis environment and loads data. These datasets can also be added locally,
-which will avoid this cold start, and is suitable for smaller files. 
+which will avoid this cold start, and is suitable for smaller files.
 
 ![Remote Data Registry screenshot.](_docs/images/screenshot-remote-data-registry.png)
 
@@ -62,7 +173,6 @@ the data store and its default credentials in the DataRobot platform.
 
 ![Add Remote Data Connection](_docs/images/screenshot-remote-data-connections.png)
 
-
 ## Setup
 
 Before proceeding, ensure you have access to the required credentials and services. This template is pre-configured to use an Azure OpenAI endpoint and Snowflake Database credentials. To run the template as-is, you will need access to Azure OpenAI (leverages `gpt-4o` by default).
@@ -74,68 +184,6 @@ Before proceeding, ensure you have access to the required credentials and servic
 - [Taskfile.dev](https://taskfile.dev/#/installation) (task runner)
 - [Node.js](https://nodejs.org/en/download/) 18+ (for React frontend)
 - [Pulumi](https://www.pulumi.com/docs/iac/download-install/) (infrastructure as code)
-
-**DataRobot Codespaces users:** If you opened this template from the [Application Templates gallery](https://docs.datarobot.com/en/docs/workbench/wb-apps/app-templates/index.html#application-templates), you can **skip steps 1 and 2**. If you created a fresh codespace, you can **skip step 1** but still need to **clone the repository (step 2)**.
-
-**For local development,** follow all of the following steps:
-
-1. If `pulumi` is not already installed, install the CLI following instructions [here](https://www.pulumi.com/docs/iac/download-install/).
-   After installing for the first time, restart your terminal and run:
-
-   ```bash
-   pulumi login --local  # omit --local to use Pulumi Cloud (requires separate account)
-   ```
-
-2. Clone the template repository
-
-   ```bash
-   git clone https://github.com/datarobot-community/talk-to-my-data-agent.git
-   cd talk-to-my-data-agent
-   ```
-
-3. Rename the file `.env.template` to `.env` in the root directory of the repo and populate your credentials.
-
-   ```bash
-   DATAROBOT_API_TOKEN=...
-   DATAROBOT_ENDPOINT=...  # e.g. https://app.datarobot.com/api/v2
-   OPENAI_API_KEY=...
-   OPENAI_API_VERSION=...  # e.g. 2024-02-01
-   OPENAI_API_BASE=...  # e.g. https://your_org.openai.azure.com/
-   OPENAI_API_DEPLOYMENT_ID=...  # e.g. gpt-4o
-   PULUMI_CONFIG_PASSPHRASE=...  # Required. Choose your own alphanumeric passphrase to be used for encrypting pulumi config
-   FRONTEND_TYPE=...  # Optional. Default is "react", set to "streamlit" to use Streamlit frontend
-   USE_DATAROBOT_LLM_GATEWAY=...  # Optional. Set to "true" to use DataRobot LLM Gateway with consumption based pricing instead of using your own LLM credentials
-   ```
-
-   Use the following resources to locate the required credentials:
-
-   - **DataRobot API Token**: Refer to the _Create a DataRobot API Key_ section of the [DataRobot API Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#create-a-datarobot-api-key).
-   - **DataRobot Endpoint**: Refer to the _Retrieve the API Endpoint_ section of the same [DataRobot API Quickstart docs](https://docs.datarobot.com/en/docs/api/api-quickstart/index.html#retrieve-the-api-endpoint).
-   - **LLM Endpoint and API Key**: Refer to the [Azure OpenAI documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/chatgpt-quickstart?tabs=command-line%2Cjavascript-keyless%2Ctypescript-keyless%2Cpython-new&pivots=programming-language-python#retrieve-key-and-endpoint).
-
-4. In a terminal, run:
-
-   ```bash
-   python quickstart.py YOUR_PROJECT_NAME  # Windows users may have to use `py` instead of `python`
-   ```
-
-   **What does `quickstart.py` do?**
-
-   The quickstart script automates the entire setup process for you:
-
-   - Creates and activates a Python virtual environment
-   - Installs all required dependencies (using `uv` for faster installation, falling back to `pip`)
-   - Loads your `.env` configuration
-   - Sets up the Pulumi stack with your project name
-   - Runs `pulumi up` to deploy your application
-   - Displays your application URL when complete
-
-   This single command replaces all the manual steps described in the [advanced setup section](#setup-for-advanced-users).
-
-   Python 3.10 - 3.12 are supported
-
-Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
-and `pulumi` invocation see [here](#setup-for-advanced-users).
 
 ## Template development
 

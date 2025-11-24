@@ -1761,7 +1761,7 @@ async def run_complete_analysis(
             )
         elif isinstance(data_source, ExternalDataStoreNameDataSourceType):
             logger.info("Running DataStore DataWrangling analysis")
-            data_store_id = DataSourceRecipe.get_id_for_data_store_canonical_name(
+            data_store_id = await DataSourceRecipe.get_id_for_data_store_canonical_name(
                 data_source.friendly_name
             )
             if not data_store_id:

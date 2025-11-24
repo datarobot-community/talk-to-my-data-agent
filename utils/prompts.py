@@ -643,6 +643,12 @@ Use standard Redshift SQL syntax and functions.
 When performing date operations on a date column, consider using appropriate Redshift date functions for error redundancy.
 The table name will be provided in fully quoted form, with catalog and schema (if present). No need to add quotes.
 
+To display an integer timestamp column (epoch seconds, milliseconds or nanoseconds), the following expression will convert from integer timestamp to a friendly timestamp.
+
+    TIMESTAMP 'epoch' + ({column_name} / CONVERSION_FACTOR) * INTERVAL '1 second' AS {column_name}_value
+
+Where `{column_name}` is the name of the column and `CONVERSION_FACTOR` is the number of nanoseconds in the given time unit (e.g. for nanoseconds this is 1000000000).
+
 Redshift's query language is mostly equal to PostgreSQL, but it does not support all PostgreSQL functions. 
 Do NOT attempt to use any of the following functions unsupported by Redshift:
 - STRING_AGG

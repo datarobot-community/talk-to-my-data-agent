@@ -20,7 +20,7 @@
   "Dataset": "Jeu de données",
   "Code": "Code",
   "Toggle panel": "Basculer le panneau",
-  "Failed to generate valid code after {attempts} attempts": "Échec de la génération d'un code valide après {attempts} tentatives",
+  "Failed to generate valid code after {{attempts}} attempts": "Échec de la génération d'un code valide après {{attempts}} tentatives",
   "An error occurred during execution": "Une erreur s'est produite pendant l'exécution",
   "Code that caused the error:": "Code qui a causé l'erreur:",
   "Traceback:": "Traceback:",

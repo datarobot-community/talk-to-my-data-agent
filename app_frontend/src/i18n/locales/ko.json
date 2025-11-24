@@ -20,7 +20,7 @@
   "Dataset": "데이터셋",
   "Code": "코드",
   "Toggle panel": "패널 토글",
-  "Failed to generate valid code after {attempts} attempts": "{attempts}번 시도 후 유효한 코드 생성에 실패했습니다",
+  "Failed to generate valid code after {{attempts}} attempts": "{{attempts}}번 시도 후 유효한 코드 생성에 실패했습니다",
   "An error occurred during execution": "실행 중 오류가 발생했습니다",
   "Code that caused the error:": "오류를 발생시킨 코드:",
   "Traceback:": "오류 추적:",

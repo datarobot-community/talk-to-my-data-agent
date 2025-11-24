@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -29,6 +30,7 @@ from contextlib import contextmanager
 from functools import cache, lru_cache
 from typing import (
     Any,
+    AsyncGenerator,
     Callable,
     Generator,
     Iterable,
@@ -59,7 +61,6 @@ from datarobot.models.recipe import (
     RecipeDatasetInput,
 )
 from datarobot.models.use_cases.use_case import UseCase
-from datarobot.utils.pagination import unpaginate
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
 )
@@ -108,6 +109,9 @@ class SparkRecipeError(RuntimeError):
         super().__init__(*args)
 
 
+ASYNC_PROCESS_PRE_JOB_TOKEN = "Job Data:"
+
+
 def find_underlying_client_message(exc: BaseException) -> str | None:
     stack: list[BaseException] = [exc]
     while stack:
@@ -116,6 +120,21 @@ def find_underlying_client_message(exc: BaseException) -> str | None:
             return cast(str, exc.json["message"])
         if isinstance(exc, HTTPError) and "message" in exc.response.json():
             return cast(str, exc.response.json()["message"])
+        if (
+            isinstance(exc, dr.errors.AsyncProcessUnsuccessfulError)
+            and exc.args
+            and isinstance(exc.args[0], str)
+        ):
+            message: str = exc.args[0]
+            if ASYNC_PROCESS_PRE_JOB_TOKEN in message:
+                index = message.find(ASYNC_PROCESS_PRE_JOB_TOKEN)
+                if index:
+                    json_portion = message[index + len(ASYNC_PROCESS_PRE_JOB_TOKEN) :]
+                    try:
+                        message = json.loads(json_portion)["message"]
+                    except Exception:
+                        message = json_portion
+            return message
         stack.extend(
             [
                 e
@@ -423,8 +442,11 @@ class BaseRecipe(abc.ABC):
         logger.debug(
             "Setting recipe query.", extra={"recipe_id": self._recipe.id, "sql": query}
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"Recipe.set_recipe_metadata({self._recipe.id})"):
-            Recipe.set_recipe_metadata(self._recipe.id, {"sql": query})
+            await loop.run_in_executor(
+                None, Recipe.set_recipe_metadata, self._recipe.id, {"sql": query}
+            )
 
     @default_retry
     @telemetry.trace
@@ -434,8 +456,11 @@ class BaseRecipe(abc.ABC):
         """
         await self._ensure_recipe_initialized()
         assert self._recipe is not None
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"Recipe.set_recipe_metadata({self._recipe.id})"):
-            Recipe.set_recipe_metadata(self._recipe.id, {})
+            await loop.run_in_executor(
+                None, Recipe.set_recipe_metadata, self._recipe.id, {}
+            )
 
     @retry(
         wait=wait_random_exponential(multiplier=2, max=300),
@@ -447,10 +472,15 @@ class BaseRecipe(abc.ABC):
     @telemetry.trace
     async def _retrieve_preview(self, timeout_seconds: int = 300) -> RunSqlResponse:
         assert self._recipe is not None
+
+        loop = asyncio.get_running_loop()
+
         logger.debug(
             "Retrieving preview of recipe.", extra={"recipe_id": self._recipe.id}
         )
-        preview = self._recipe.retrieve_preview(timeout_seconds)
+        preview = await loop.run_in_executor(
+            None, self._recipe.retrieve_preview, timeout_seconds
+        )
         schema: list[dict[str, Any]] = preview["resultSchema"]
 
         # Unfortunately the Python SDK currently doesn't have a nice API for Previews
@@ -461,8 +491,11 @@ class BaseRecipe(abc.ABC):
                 "Fetching additional pages of preview.",
                 extra={"recipe_id": self._recipe.id},
             )
-            for row in unpaginate(
-                preview["next"], initial_params=None, client=dr.client.get_client()
+            async for row in self._unpaginate(
+                loop,
+                preview["next"],
+                initial_params=None,
+                client=dr.client.get_client(),
             ):
                 all_rows.append(row)
                 # Normally queries should be limited in how much data they return, this serves as a backstop.
@@ -472,6 +505,35 @@ class BaseRecipe(abc.ABC):
         original_types = {col["name"]: col["dataType"] for col in schema}
         dataframe = DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
         return RunSqlResponse(dataframe, original_types)
+
+    async def _unpaginate(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        initial_url: str,
+        initial_params: None | dict[Any, Any],
+        client: dr.client.RESTClientObject,
+    ) -> AsyncGenerator[Any, None]:
+        """Iterate over a paginated endpoint and get all results
+
+        Assumes the endpoint follows the "standard" pagination interface (data stored under "data",
+        "next" used to link next page, "offset" and "limit" accepted as query parameters).
+
+        Yields
+        ------
+        data : dict
+            a series of objects from the endpoint's data, as raw server data
+        """
+
+        resp_data = (
+            await loop.run_in_executor(None, client.get, initial_url, initial_params)
+        ).json()
+        for data in resp_data["data"]:
+            yield data
+        while resp_data["next"] is not None:
+            next_url = resp_data["next"]
+            resp_data = (await loop.run_in_executor(None, client.get, next_url)).json()
+            for data in resp_data["data"]:
+                yield data
 
     @telemetry.meter_and_trace
     async def retrieve_preview(self, timeout_seconds: int = 900) -> RunSqlResponse:
@@ -657,6 +719,8 @@ class DataSourceRecipe(BaseRecipe):
         str, tuple[datetime.datetime, list[ExternalDataStore]]
     ] = {}
     EXTERNAL_DATA_STORE_CACHE_MAX_SIZE = 1024
+    DATA_STORE_ID_TO_NAME_CACHE: dict[str, str] = {}
+    DATA_STORE_NAME_TO_ID_CACHE: dict[str, str] = {}
     PER_USER_LOCKS: dict[str, threading.Lock] = {}
     PER_USER_LOCKS_LOCK: threading.Lock = threading.Lock()
     EXTERNAL_DATA_STORE_REFRESH_INTERVAL: datetime.timedelta = datetime.timedelta(
@@ -715,7 +779,13 @@ class DataSourceRecipe(BaseRecipe):
 
                 external_data_stores = []
 
-                for data_store in data_stores:
+                # Process datastores concurrently in a threadpool to avoid serial blocking
+                loop = asyncio.get_running_loop()
+
+                def _process_store(
+                    data_store: dict[str, Any],
+                    executor: concurrent.futures.ThreadPoolExecutor,
+                ) -> ExternalDataStore | None:
                     driver: str | None = data_store.get("driverClassType")
 
                     data_store_obj = DataStore.from_server_data(data_store)
@@ -725,7 +795,7 @@ class DataSourceRecipe(BaseRecipe):
                         or not data_store_obj.id
                         or not data_store_obj.canonical_name
                     ):
-                        continue
+                        return None
 
                     external_data_store = ExternalDataStore(
                         id=data_store_obj.id,
@@ -737,17 +807,34 @@ class DataSourceRecipe(BaseRecipe):
                     cred = DataSourceRecipe._fetch_default_cred(data_store_obj, user_id)
 
                     if not cred:
-                        continue
+                        return None
 
                     external_data_sources = DataSourceRecipe._fetch_tables(
-                        user_id, data_store_obj, cred
+                        user_id, data_store_obj, cred, executor
                     )
 
                     if not external_data_sources:
-                        continue
+                        return None
 
                     external_data_store.defined_data_sources = external_data_sources
-                    external_data_stores.append(external_data_store)
+                    return external_data_store
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    tasks = [
+                        loop.run_in_executor(executor, _process_store, ds, executor)
+                        for ds in data_stores
+                    ]
+                    results = await asyncio.gather(*tasks)
+                for res in results:
+                    if res:
+                        cleaned_name = res.canonical_name.lower().strip()
+                        DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[res.id] = (
+                            cleaned_name
+                        )
+                        DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE[cleaned_name] = (
+                            res.id
+                        )
+                        external_data_stores.append(res)
 
                 refresh_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -831,7 +918,10 @@ class DataSourceRecipe(BaseRecipe):
     @staticmethod
     @telemetry.trace
     def _fetch_tables(
-        user_id: str, data_store_obj: DataStore, cred: Credential
+        user_id: str,
+        data_store_obj: DataStore,
+        cred: Credential,
+        executor: concurrent.futures.ThreadPoolExecutor,
     ) -> list[ExternalDataSource] | None:
         logger.debug(
             "Listing schemas for datastore.",
@@ -893,9 +983,9 @@ class DataSourceRecipe(BaseRecipe):
             },
         )
 
-        for payload in tables_payloads:
+        def _retrieve_tables(payload: dict[str, Any]) -> list[dict[str, Any]] | None:
             with handle_datarobot_error(
-                f"POST /externalDataStores/{data_store_obj}/tables/"
+                f"POST /externalDataStores/{data_store_obj.id}/tables/"
             ):
                 response = dr.client.get_client().post(
                     f"externalDataStores/{data_store_obj.id}/tables/", payload
@@ -910,14 +1000,23 @@ class DataSourceRecipe(BaseRecipe):
                             "user_id": user_id,
                         },
                     )
-                    continue
+                    return None
                 elif response.status_code == 200:
-                    pass
+                    return cast(list[dict[str, Any]], response.json().get("tables", []))
                 else:
                     response.raise_for_status()
+            return None
 
-            tables = response.json()["tables"]
+        futures = [
+            executor.submit(_retrieve_tables, payload) for payload in tables_payloads
+        ]
+        all_tables = []
+        for fut in concurrent.futures.as_completed(futures):
+            tables = fut.result()
+            if tables:
+                all_tables.append(tables)
 
+        for tables in all_tables:
             for table in tables:
                 if "name" not in table:
                     logger.warning(
@@ -941,15 +1040,23 @@ class DataSourceRecipe(BaseRecipe):
 
     @staticmethod
     @default_retry
-    @lru_cache(128)
     @telemetry.trace
-    def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
+    async def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
+        data_store_name = data_store_name.lower().strip()
+        if data_store_name in DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE:
+            return DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE[data_store_name]
         logger.debug(
             "Searching for datastore with name",
             extra={"data_store_canonical_name": data_store_name},
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"DataStore.list({data_store_name})"):
-            stores = DataStore.list(typ=DataStoreListTypes.ALL, name=data_store_name)
+            stores = await loop.run_in_executor(
+                None,
+                lambda: DataStore.list(
+                    typ=DataStoreListTypes.ALL, name=data_store_name
+                ),
+            )
 
         for store in stores:
             if (
@@ -961,10 +1068,9 @@ class DataSourceRecipe(BaseRecipe):
         return None
 
     @staticmethod
-    @lru_cache(128)
     @default_retry
     @telemetry.trace
-    def get_canonical_name_for_datastore_id(data_store_id: str) -> str | None:
+    async def get_canonical_name_for_datastore_id(data_store_id: str) -> str | None:
         """Return the canonical name of a given data store.
 
         Args:
@@ -973,13 +1079,20 @@ class DataSourceRecipe(BaseRecipe):
         Returns:
             str | None: The canonical name, or None if there's no such datastore.
         """
+        if data_store_id in DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE:
+            return DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[data_store_id]
         logger.debug(
             "Searching for datastore with name",
             extra={"data_store_id": data_store_id},
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"DataStore.get({data_store_id})"):
             try:
-                store = DataStore.get(data_store_id)
+                store = await loop.run_in_executor(None, DataStore.get, data_store_id)
+                if store and store.canonical_name and store.id:
+                    DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[store.id] = (
+                        store.canonical_name.lower().strip()
+                    )
             except ClientError as e:
                 if e.status_code in [404, 410]:
                     store = None

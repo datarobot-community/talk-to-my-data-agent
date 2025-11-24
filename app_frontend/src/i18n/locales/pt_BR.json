@@ -21,7 +21,7 @@
   "Dataset": "Conjunto de Dados",
   "Code": "Código",
   "Toggle panel": "Alternar painel",
-  "Failed to generate valid code after {attempts} attempts": "Falha ao gerar código válido após {attempts} tentativas",
+  "Failed to generate valid code after {{attempts}} attempts": "Falha ao gerar código válido após {{attempts}} tentativas",
   "An error occurred during execution": "Ocorreu um erro durante a execução",
   "Code that caused the error:": "Código que causou o erro:",
   "Traceback:": "Rastreamento (traceback):",

@@ -26,7 +26,7 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
     <>
       {attempts && (
         <h2 className="mb-2">
-          {t('Failed to generate valid code after {attempts} attempts', { attempts })}
+          {t('Failed to generate valid code after {{attempts}} attempts', { attempts })}
         </h2>
       )}
       {errors.map(e => {

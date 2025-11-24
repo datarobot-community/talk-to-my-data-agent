@@ -1667,7 +1667,7 @@ def get_available_external_data_stores(
     "/external-data-stores/{external_data_store_id}/external-data-sources/",
     responses={404: {"model": ExceptionBody}},
 )
-def register_external_data_sources(
+async def register_external_data_sources(
     request: Request,
     selected_datasource_ids: ExternalDataSourcesSelection,
     external_data_store_id: str,
@@ -1687,29 +1687,11 @@ def register_external_data_sources(
     Returns:
         ExternalDataStore: The updated data store
     """
-    return asyncio.run(
-        _register_external_data_sources_async(
-            request,
-            selected_datasource_ids,
-            external_data_store_id,
-            background_tasks,
-            analyst_db,
-        )
-    )
-
-
-async def _register_external_data_sources_async(
-    request: Request,
-    selected_datasource_ids: ExternalDataSourcesSelection,
-    external_data_store_id: str,
-    background_tasks: BackgroundTasks,
-    analyst_db: AnalystDB,
-) -> EmptyResponse:
     logger.debug(
         "PUT /external-data-stores/%s/external-data-sources/", external_data_store_id
     )
     with use_user_token(request):
-        name = DataSourceRecipe.get_canonical_name_for_datastore_id(
+        name = await DataSourceRecipe.get_canonical_name_for_datastore_id(
             external_data_store_id
         )
         if not name:
