@@ -33,7 +33,7 @@ import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api
 import { SingleSelect } from './ui-custom/single-select';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
-  const { data } = useFetchDatasets();
+  const { data, isLoading: isLoadingDatasets } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const { data: dbTables } = useGetDatabaseTables();
@@ -121,6 +121,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     <Dialog
       defaultOpen={isOpen}
       onOpenChange={open => {
+        if (isPending) return;
         setIsOpen(open);
         setError(null);
         setFiles([]);
@@ -215,6 +216,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <h4>{t('Data Registry')}</h4>
             <h6>{t('Select one or more catalog items')}</h6>
             <MultiSelect
+              isLoading={isLoadingDatasets}
               options={
                 data && data.remote
                   ? data.remote.map(i => ({
@@ -245,6 +247,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <h4>{t('Add External Data Source')}</h4>
             <h6>{t('Select a data store')}</h6>
             <SingleSelect
+              isLoading={availableDataStores.isLoading}
               options={
                 availableDataStores?.data
                   ? availableDataStores.data.map(d => ({
@@ -296,7 +299,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         <DialogFooter>
           <div className="flex gap-2 w-full items-center">
             <div className="flex-1" />
-            <Button variant={'ghost'} onClick={() => setIsOpen(false)}>
+            <Button disabled={isPending} variant={'ghost'} onClick={() => setIsOpen(false)}>
               {t('Cancel')}
             </Button>
             <Button

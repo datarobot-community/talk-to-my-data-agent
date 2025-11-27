@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.22] - 2025-11-27
+
+### Fixes
+
+- Fixed telemetry initialization in local development mode and in environments where OTLP endpoint is not configured.
+
+
 ## [0.3.21] - 2025-11-24
 
 ### Improvements

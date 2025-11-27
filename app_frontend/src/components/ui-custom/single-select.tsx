@@ -5,6 +5,7 @@ import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import { TruncatedText } from '@/components/ui-custom/truncated-text';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -51,6 +52,7 @@ interface SingleSelectProps
   asChild?: boolean;
   className?: string;
   testId?: string;
+  isLoading?: boolean;
 }
 
 export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProps>(
@@ -65,6 +67,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
       modalPopover = false,
       className,
       testId,
+      isLoading = false,
       ...props
     },
     ref
@@ -144,53 +147,65 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
           <Command>
             <CommandInput
               placeholder={t('Search...')}
+              disabled={isLoading || !options.length}
               onKeyDown={handleInputKeyDown}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
             />
             <CommandList className="max-w-[800px]">
-              <CommandEmpty>{t('No results found.')}</CommandEmpty>
-              <CommandGroup>
-                {options.map(option => {
-                  const isSelected = selectedValue === option.value;
-                  return (
-                    <CommandItem
-                      data-testid={`multi-select-option-${option.value}`}
-                      key={option.value}
-                      onSelect={() => applyValue(option.value)}
-                      className="cursor-pointer"
-                    >
-                      <div
-                        className={cn(
-                          'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
-                          {
-                            'opacity-50 [&_svg]:invisible': !isSelected,
-                          }
-                        )}
-                      >
-                        <CheckIcon className="h-4 w-4 text-primary" />
-                      </div>
-                      <span>{option.label}</span>
-                      {option?.postfix && (
-                        <span className="ml-1 grow text-right">{option?.postfix}</span>
-                      )}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
+              {isLoading ? (
+                <CommandItem className="flex items-center justify-center py-6">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </CommandItem>
+              ) : (
+                <>
+                  <CommandEmpty>{t('No results found.')}</CommandEmpty>
+                  <CommandGroup>
+                    {options.map(option => {
+                      const isSelected = selectedValue === option.value;
+                      return (
+                        <CommandItem
+                          data-testid={`multi-select-option-${option.value}`}
+                          key={option.value}
+                          onSelect={() => applyValue(option.value)}
+                          className="cursor-pointer"
+                        >
+                          <div
+                            className={cn(
+                              'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                              {
+                                'opacity-50 [&_svg]:invisible': !isSelected,
+                              }
+                            )}
+                          >
+                            <CheckIcon className="h-4 w-4 text-primary" />
+                          </div>
+                          <span>{option.label}</span>
+                          {option?.postfix && (
+                            <span className="ml-1 grow text-right">{option?.postfix}</span>
+                          )}
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </>
+              )}
             </CommandList>
             <CommandSeparator />
-            <CommandGroup>
-              <div className="flex items-center justify-between">
-                <CommandItem
-                  data-testid="multi-select-close"
-                  onSelect={() => setIsPopoverOpen(false)}
-                  className="flex-1 justify-center cursor-pointer max-w-full"
-                >
-                  {t('Confirm')}
-                </CommandItem>
-              </div>
-            </CommandGroup>
+            {!!options.length && (
+              <CommandGroup>
+                <div className="flex items-center justify-between">
+                  <CommandItem
+                    disabled={isLoading}
+                    data-testid="multi-select-close"
+                    onSelect={() => setIsPopoverOpen(false)}
+                    className="flex-1 justify-center cursor-pointer max-w-full"
+                  >
+                    {t('Confirm')}
+                  </CommandItem>
+                </div>
+              </CommandGroup>
+            )}
           </Command>
         </PopoverContent>
       </Popover>

@@ -61,6 +61,47 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
+class OTLPConnectionErrorFilter(logging.Filter):
+    """
+    Filter to suppress connection errors from urllib3/requests when OTLP collector is unavailable.
+
+    This prevents error spam in Chronosphere when the OTLP collector endpoint isn't properly
+    configured or available (e.g., localhost:4318 connection refused errors).
+    """
+
+    def __init__(self, warning_callback: Optional[Callable[[], None]] = None):
+        super().__init__()
+        self.warning_callback = warning_callback
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False to suppress the log record, True to allow it."""
+        should_suppress = False
+
+        # Suppress urllib3 connection errors related to OTLP endpoints
+        if record.name.startswith("urllib3.connectionpool"):
+            message = record.getMessage()
+            if "HTTPConnectionPool" in message and (
+                ":4318" in message  # Default OTLP port
+                or "/v1/metrics" in message
+                or "/v1/traces" in message
+                or "/v1/logs" in message
+            ):
+                should_suppress = True
+
+        # Suppress requests connection errors related to OTLP
+        if record.name.startswith("requests."):
+            message = record.getMessage()
+            if "ConnectionError" in message and ":4318" in message:
+                should_suppress = True
+
+        if should_suppress:
+            if self.warning_callback:
+                self.warning_callback()
+            return False
+
+        return True
+
+
 class BaseTelemetry:
     """
     Base telemetry manager for DataRobot Custom Applications.
@@ -94,13 +135,53 @@ class BaseTelemetry:
         # Telemetry enabled by default, disabled in local dev (start scripts set DISABLE_TELEMETRY=true)
         self.telemetry_enabled = os.environ.get("DISABLE_TELEMETRY") != "true"
 
+        # Auto-disable telemetry if OTLP endpoint is not configured
+        if self.telemetry_enabled and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            # Check if internal endpoint is set (fallback)
+            if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT_INTERNAL"):
+                self.telemetry_enabled = False
+                logging.getLogger(__name__).warning(
+                    "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
+                )
+
         self._logger_provider: Optional[LoggerProvider] = None
         self._meter_provider: Optional[MeterProvider] = None
         self._tracer_provider: Optional[TracerProvider] = None
         self._configured: bool = False
         self._startup_logged: bool = False  # Track if startup has been logged
+        self._otlp_warning_logged: bool = (
+            False  # Track if OTLP connection warning has been logged
+        )
+
+        # Install filter to suppress OTLP connection errors from spamming logs
+        # We keep this even if telemetry is disabled, just in case something tries to force it
+        self._install_otlp_error_filter()
 
         self._initialized = True
+
+    def _install_otlp_error_filter(self) -> None:
+        """Install logging filter to suppress OTLP connection errors."""
+        otlp_filter = OTLPConnectionErrorFilter(self._log_otlp_warning)
+
+        # Apply to urllib3 logger
+        urllib3_logger = logging.getLogger("urllib3.connectionpool")
+        urllib3_logger.addFilter(otlp_filter)
+
+        # Apply to requests logger
+        requests_logger = logging.getLogger("requests")
+        requests_logger.addFilter(otlp_filter)
+
+    def _log_otlp_warning(self) -> None:
+        """Log a warning about OTLP connection failure (only once)."""
+        if not self._otlp_warning_logged:
+            self._otlp_warning_logged = True
+            # Use a logger that is NOT filtered or ensure this message doesn't trigger the filter
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "OTLP collector connection failed. Telemetry data may be lost. "
+                "Suppressing further connection errors to prevent log spam. "
+                "Check OTLP_EXPORTER_OTLP_ENDPOINT configuration."
+            )
 
     def configure_logging(self) -> LoggerProvider:
         """
@@ -122,11 +203,16 @@ class BaseTelemetry:
         set_logger_provider(logger_provider)
 
         # Create OTLP exporter
-        otlp_exporter = OTLPLogExporter()
-
-        # Create batch processor
-        batch_processor = BatchLogRecordProcessor(otlp_exporter)
-        logger_provider.add_log_record_processor(batch_processor)
+        try:
+            otlp_exporter = OTLPLogExporter()
+            # Create batch processor
+            batch_processor = BatchLogRecordProcessor(otlp_exporter)
+            logger_provider.add_log_record_processor(batch_processor)
+        except Exception as e:
+            # Log warning but don't crash
+            logging.getLogger(__name__).warning(
+                f"Failed to initialize OTLP logging exporter: {e}"
+            )
 
         # Note: LoggingHandler will be created per logger in get_logger() method
         self._logger_provider = logger_provider
@@ -139,17 +225,6 @@ class BaseTelemetry:
         if self._meter_provider:
             return self._meter_provider
 
-        # Create OTLP exporter
-        otlp_exporter = OTLPMetricExporter(
-            preferred_aggregation={Histogram: ExponentialBucketHistogramAggregation()},
-        )
-
-        # Create metric reader
-        reader = PeriodicExportingMetricReader(
-            exporter=otlp_exporter,
-            export_interval_millis=1000,
-        )
-
         # Create resource
         resource = Resource.create(
             {
@@ -158,17 +233,44 @@ class BaseTelemetry:
             }
         )
 
-        # Create meter provider
-        meter_provider = MeterProvider(
-            resource=resource,
-            metric_readers=[
-                reader,
-            ],
-        )
-        metrics.set_meter_provider(meter_provider)
+        # Create OTLP exporter
+        try:
+            otlp_exporter = OTLPMetricExporter(
+                preferred_aggregation={
+                    Histogram: ExponentialBucketHistogramAggregation()
+                },
+            )
 
-        self._meter_provider = meter_provider
-        return meter_provider
+            # Create metric reader
+            reader = PeriodicExportingMetricReader(
+                exporter=otlp_exporter,
+                export_interval_millis=1000,
+            )
+
+            # Create meter provider
+            meter_provider = MeterProvider(
+                resource=resource,
+                metric_readers=[
+                    reader,
+                ],
+            )
+            metrics.set_meter_provider(meter_provider)
+            self._meter_provider = meter_provider
+            return meter_provider
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                f"Failed to initialize OTLP metrics exporter: {e}"
+            )
+            # Return a no-op provider or just the one we have?
+            # If we fail here, self._meter_provider is None.
+            # We should probably return a no-op provider to avoid errors downstream?
+            # Or just let get_meter return the global one which might be no-op if not set.
+            # But configure_metrics is supposed to return a MeterProvider.
+            # Let's return a basic one without readers.
+            meter_provider = MeterProvider(resource=resource)
+            metrics.set_meter_provider(meter_provider)
+            self._meter_provider = meter_provider
+            return meter_provider
 
     def configure_tracing(self) -> TracerProvider:
         """
@@ -190,11 +292,16 @@ class BaseTelemetry:
         trace.set_tracer_provider(tracer_provider)
 
         # Create OTLP exporter
-        otlp_exporter = OTLPSpanExporter()
+        try:
+            otlp_exporter = OTLPSpanExporter()
 
-        # Create batch processor
-        batch_processor = BatchSpanProcessor(otlp_exporter)
-        tracer_provider.add_span_processor(batch_processor)
+            # Create batch processor
+            batch_processor = BatchSpanProcessor(otlp_exporter)
+            tracer_provider.add_span_processor(batch_processor)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                f"Failed to initialize OTLP tracing exporter: {e}"
+            )
 
         self._tracer_provider = tracer_provider
         return tracer_provider
