@@ -1,7 +1,7 @@
 # infra
 pulumi==3.153.0
 pulumi-command<1.1.0
-pulumi-datarobot==0.10.20
+pulumi-datarobot>=0.10.22
 datarobot-pulumi-utils>=0.0.2.post8,<0.1
 # OpenTelemetry dependencies for telemetry (compatible with protobuf <5.0)
 opentelemetry-api>=1.20.0,<1.30.0

@@ -1659,7 +1659,7 @@ class DatasetSparkRecipe(BaseRecipe):
         return SYSTEM_PROMPT_SPARK_SQL
 
     def query_friendly_name(self, dataset_name: str) -> str:
-        return ".".join(f"`{part}`" for part in dataset_name.split("."))
+        return f"`{dataset_name}`"
 
     async def preview_dataset(
         self, dataset: Dataset, preview_limit: int = 1000
