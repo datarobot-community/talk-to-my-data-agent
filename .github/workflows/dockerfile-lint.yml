@@ -20,7 +20,7 @@ jobs:
     name: lint-dockerfile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Check for Dockerfile changes (excluding deletions)
