@@ -92,8 +92,8 @@ def get_app_files(
 
     # Get all .py files from utils directory
     utils_files = [
-        (str(PROJECT_ROOT / f"utils/{f.name}"), f"utils/{f.name}")
-        for f in (PROJECT_ROOT / "utils").glob("*.py")
+        (f.as_posix(), f.relative_to(PROJECT_ROOT).as_posix())
+        for f in (PROJECT_ROOT / "utils").glob("**/*.py")
         if f.is_file()
     ]
 

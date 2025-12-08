@@ -172,6 +172,9 @@ class SnowflakeCredentials(DRCredentials):
         """Get private key for Snowflake authentication if configured."""
         logger = logging.getLogger(__name__)
 
+        if project_root is None:
+            project_root = Path(__file__).resolve().parents[1]
+
         key_path = self.snowflake_key_path
         if not key_path:
             return None

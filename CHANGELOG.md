@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.24] - 2025-12-8
+
+### Fixes
+
+- Async handling of external databases (Snowflake, BigQuery, SAP), allowing app to run queries in background and service other requests.
+- More robust handling of invalid JSON produced by LLMs.
+- Fixed uploading BOM-encoded CSV files.
+
 ## [0.3.23] - 2025-12-2
 
 ### Fixes
@@ -13,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improvements
 
+- Add pre-analysis connection test for DataRobot remote registry and data source connections.
+- Track and display in UI current analysis step.
 - Bump pulumi-datarobot to version 0.10.22 and simplify resource injection into CustomApplications
 
 

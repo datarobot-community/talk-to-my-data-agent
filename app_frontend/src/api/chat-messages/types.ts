@@ -68,6 +68,11 @@ interface IComponent {
   metadata?: IMetadata;
 }
 
+export interface IChatMessageStep {
+  step: string;
+  reattempt: number;
+}
+
 export interface IChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -78,6 +83,7 @@ export interface IChatMessage {
     | IBusinessComponent
     | IUsageInfoComponent
   )[];
+  step?: IChatMessageStep;
   in_progress?: boolean;
   created_at?: string; // ISO timestamp for message creation time
   chat_id?: string; // ID of the chat this message belongs to

@@ -7,6 +7,7 @@ import {
   IAnalysisComponent,
   IUsageInfoComponent,
 } from '@/api/chat-messages/types';
+import { getTranslatedMessageStep } from '@/api/chat-messages/utils';
 import { MessageContainer } from './MessageContainer';
 import { MessageHeader } from './MessageHeader';
 
@@ -16,6 +17,7 @@ import { InsightsTabContent } from './InsightsTabContent';
 import { CodeTabContent } from './CodeTabContent';
 import { ErrorPanel } from './ErrorPanel';
 import { RESPONSE_TABS } from './constants';
+import { LoadingIndicator } from './LoadingIndicator';
 
 interface ResponseMessageProps {
   chatId: string;
@@ -89,6 +91,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     chartsErrors,
     businessErrors,
     analysisAttempts,
+    messageStep,
   } = useMemo(() => {
     const messageComponent = message?.components?.find(isMessageComponent);
     const businessComponent = message?.components?.find(isBusinessComponent);
@@ -104,6 +107,8 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     const fig2_json = chartsComponent?.fig2_json || '';
     const code = analysisComponent?.code || chartsComponent?.code;
     const datasetId = analysisComponent?.dataset_id || null;
+
+    const messageStep = getTranslatedMessageStep(message);
 
     // Extract errors from components
     const hasBusinessError = businessComponent?.status === 'error';
@@ -156,6 +161,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       businessErrors,
       analysisAttempts,
       usageInfoComponent,
+      messageStep,
     };
   }, [message]);
 
@@ -170,6 +176,17 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
       <div className="self-stretch text-sm font-normal leading-tight min-w-0">
         {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
+
+        {messageStep && (
+          <div className="flex w-full justify-start items-center">
+            <LoadingIndicator
+              isLoading={true}
+              hasError={false}
+              successTestId="step-loading-success"
+            />
+            <div className="ml-1 mb-0 italic text-muted-foreground">{messageStep}</div>
+          </div>
+        )}
 
         {message?.error && (
           <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">

@@ -1,4 +1,5 @@
 import i18n from '@/i18n';
+import { IChatMessage } from './types';
 
 const languageMap = {
   es_419: 'es',
@@ -32,4 +33,41 @@ export const getChatName = () => {
   } catch {
     return configureChatName('en');
   }
+};
+
+export const getTranslatedMessageStep = (message: IChatMessage) => {
+  if (
+    message &&
+    message.role !== 'user' &&
+    message.in_progress &&
+    !message.error &&
+    message.step &&
+    message.step.step
+  ) {
+    switch (message.step.step) {
+      case 'ANALYZING_QUESTION':
+        return i18n.t('Analyzing Question');
+      case 'TESTING_CONNECTION':
+        return i18n.t('Testing Connection');
+      case 'GENERATING_QUERY':
+        if (message.step.reattempt > 0) {
+          return i18n.t('Generating Query (attempt {{attempt}})', {
+            attempt: message.step.reattempt + 1,
+          });
+        }
+        return i18n.t('Generating Query');
+      case 'RUNNING_QUERY':
+        if (message.step.reattempt > 0) {
+          return i18n.t('Running Query (attempt {{attempt}})', {
+            attempt: message.step.reattempt + 1,
+          });
+        }
+        return i18n.t('Running Query');
+      case 'ANALYZING_RESULTS':
+        return i18n.t('Analyzing Results');
+      default:
+        return null;
+    }
+  }
+  return null;
 };

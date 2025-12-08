@@ -38,6 +38,7 @@ streamlit-javascript>=0.1.5,<1.0
 nest-asyncio>=1.6.0,<2.0
 
 # backend
+aiologic>=0.16,<1.0
 datarobot>=3.9.1,<4.0
 fastapi>=0.115.6,<1.0
 python-multipart>=0.0.20,<1.0

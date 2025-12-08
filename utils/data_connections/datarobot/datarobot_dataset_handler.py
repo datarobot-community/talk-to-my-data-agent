@@ -26,17 +26,14 @@ import json
 import logging
 import threading
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from functools import cache, lru_cache
 from typing import (
     Any,
     AsyncGenerator,
     Callable,
-    Generator,
     Iterable,
     NamedTuple,
-    ParamSpec,
-    TypeVar,
     cast,
 )
 
@@ -49,7 +46,7 @@ from datarobot.enums import (
     RecipeInputType,
     RecipeType,
 )
-from datarobot.errors import AsyncTimeoutError, ClientError
+from datarobot.errors import ClientError
 from datarobot.models.credential import Credential
 from datarobot.models.data_source import DataSource
 from datarobot.models.data_store import DataStore
@@ -84,7 +81,16 @@ from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
 from utils.code_execution import InvalidGeneratedCode
 from utils.credentials import NoDatabaseCredentials
 from utils.data_analyst_telemetry import telemetry
-from utils.database_helpers import _DEFAULT_DB_QUERY_TIMEOUT, DatabaseOperator
+from utils.data_connections.database.database_interface import (
+    _DEFAULT_DB_QUERY_TIMEOUT,
+    DatabaseOperator,
+)
+from utils.data_connections.datarobot.helpers import (
+    default_retry,
+    find_underlying_client_message,
+    handle_datarobot_error,
+    retryable_recipe_preview_exception,
+)
 from utils.logging_helper import get_logger
 from utils.prompts import (
     SYSTEM_PROMPT_POSTGRES,
@@ -98,131 +104,6 @@ from utils.schema import (
 )
 
 logger = get_logger(__name__)
-
-
-class SparkRecipeError(RuntimeError):
-    """
-    Exception class for initializing/using Spark Recipe
-    """
-
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
-
-
-ASYNC_PROCESS_PRE_JOB_TOKEN = "Job Data:"
-
-
-def find_underlying_client_message(exc: BaseException) -> str | None:
-    stack: list[BaseException] = [exc]
-    while stack:
-        exc = stack.pop()
-        if isinstance(exc, ClientError) and "message" in exc.json:
-            return cast(str, exc.json["message"])
-        if isinstance(exc, HTTPError) and "message" in exc.response.json():
-            return cast(str, exc.response.json()["message"])
-        if (
-            isinstance(exc, dr.errors.AsyncProcessUnsuccessfulError)
-            and exc.args
-            and isinstance(exc.args[0], str)
-        ):
-            message: str = exc.args[0]
-            if ASYNC_PROCESS_PRE_JOB_TOKEN in message:
-                index = message.find(ASYNC_PROCESS_PRE_JOB_TOKEN)
-                if index:
-                    json_portion = message[index + len(ASYNC_PROCESS_PRE_JOB_TOKEN) :]
-                    try:
-                        message = json.loads(json_portion)["message"]
-                    except Exception:
-                        message = json_portion
-            return message
-        stack.extend(
-            [
-                e
-                for e in (
-                    [exc.__cause__]
-                    if exc.__cause__ is exc.__context__
-                    else [exc.__cause__, exc.__context__]
-                )
-                if e is not None
-            ]
-        )
-    return None
-
-
-def retryable_recipe_preview_exception(exc: BaseException) -> bool:
-    """A predicate on whether an exception raised in Recipe.preview is retryable
-
-    Args:
-        exc (BaseException): The exception.
-
-    Returns:
-        bool: True iff it is safe to retry previewing
-    """
-    return isinstance(exc, AsyncTimeoutError) or (
-        isinstance(exc, ClientError)
-        and (
-            exc.json.get("status") == "ABORTED"
-            or (
-                exc.status_code == 404
-                and exc.json.get("message") == "Preview is not ready yet"
-            )
-            or exc.status_code // 100 == 5
-        )
-    )
-
-
-@contextmanager
-def handle_datarobot_error(
-    resource: str,
-    exception_type: type[Exception] | None = SparkRecipeError,
-    not_found_severity: int = logging.INFO,
-    other_severity: int = logging.ERROR,
-) -> Generator[None, None, None]:
-    """
-    A context manager that wraps and logs errors from a DataRobot call.
-
-    Expected usage:
-        with handle_data_robot_error(f"UseCase({use_case_id})"):
-            use_case = UseCase.get(use_case_id)
-    """
-    try:
-        yield
-    except ClientError as e:
-        if e.status_code == 404:
-            message = f"{resource} not found (404.)"
-            logger.log(not_found_severity, message, exc_info=True)
-        else:
-            message = f"Exception in retrieving {resource} ({e.status_code})."
-            logger.log(other_severity, message, exc_info=True)
-        if exception_type:
-            raise exception_type(message) from e
-        else:
-            raise
-    except InterruptedError:
-        raise
-    except BaseException as e:
-        message = f"Unexpected exception in retrieving {resource}."
-        logger.log(other_severity, message, exc_info=True)
-        if exception_type:
-            raise exception_type(message) from e
-        else:
-            raise
-
-
-P = ParamSpec("P")
-T = TypeVar("T")
-
-
-def default_retry(func: Callable[P, T]) -> Callable[P, T]:
-    return retry(
-        wait=wait_random_exponential(),
-        stop=stop_after_attempt(3),
-        reraise=True,
-        retry=retry_if_exception(
-            lambda ex: not isinstance(ex, ApplicationUsageException)
-        ),
-        after=after_log(logger, logging.DEBUG),
-    )(func)
 
 
 @default_retry
@@ -379,6 +260,83 @@ class RunSqlResponse(NamedTuple):
     original_types: dict[str, str]
 
 
+class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
+    """A wrapper around DataRobot's DataWrangling"""
+
+    def __init__(
+        self,
+        credentials: NoDatabaseCredentials,
+        recipe: "BaseRecipe",
+        default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
+    ):
+        self.default_timeout = default_timeout
+        self.recipe = recipe
+
+    async def _run_sql(self, sql_query: str, timeout: int) -> DataFrameWrapper:
+        logger.debug("Running SQL on Recipe.", extra={"sql": sql_query})
+        await self.recipe.set_query(sql_query)
+        logger.debug("Set query SQL, awaiting results.", extra={"sql": sql_query})
+        return (await self.recipe.retrieve_preview(timeout_seconds=timeout)).response
+
+    async def execute_query(
+        self,
+        query: str,
+        timeout: int | None = None,
+        table_names: list[str] = [],
+        **kwargs: Any,
+    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
+        """Execute a SQL query using DataRobot's Data Wrangling platform"""
+
+        timeout = timeout if timeout is not None else self.default_timeout
+
+        try:
+            df = await self._run_sql(query, timeout)
+            return df.to_dict()  # TODO: this is silly as cast gets undone.
+
+        except Exception as e:
+            message = find_underlying_client_message(e)
+
+            raise InvalidGeneratedCode(
+                f"Query execution failed: {message}"
+                if message
+                else "Query execution failed.",
+                code=query,
+                exception=e,
+                traceback_str=str(e.__traceback__),
+            )
+
+    @asynccontextmanager
+    async def create_connection(self) -> AsyncGenerator[None, None]:
+        yield None
+
+    @lru_cache(8)
+    async def get_data(self, *args, **kwargs) -> Any:  # type:ignore[no-untyped-def]
+        raise NotImplementedError()
+
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
+        """Fetch list of available datasets from DataRobot"""
+        timeout = timeout if timeout is not None else self.default_timeout
+
+        try:
+            return await self.recipe.list_dataset_names()
+
+        except Exception as e:
+            logger.error(f"Failed to fetch DataRobot dataset info: {str(e)}")
+            return []
+
+    def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
+        return ChatCompletionSystemMessageParam(
+            role="system",
+            content=self.recipe.prompt,
+        )
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return self.recipe.query_friendly_name(dataset_name)
+
+    def warmup_query(self) -> str | None:
+        return self.recipe.warmup_query()
+
+
 class BaseRecipe(abc.ABC):
     MAX_ROWS = 1000
 
@@ -392,6 +350,9 @@ class BaseRecipe(abc.ABC):
     def should_use_spark_recipe(cls) -> bool:
         """Check if the API version is compatible with our usage."""
         return True
+
+    def warmup_query(self) -> str | None:
+        return None
 
     @abc.abstractmethod
     async def refresh(self) -> bool:
@@ -571,9 +532,14 @@ class BaseRecipe(abc.ABC):
             for col in schema
         }
 
-        # Getting polars to ignore / set null invalid values is a bit of a chore.
         df = pl.DataFrame(
-            all_rows, schema={k: str for k in polars_schema}, orient="row", strict=False
+            [
+                [str(v) if isinstance(v, datetime.datetime) else v for v in row]
+                for row in all_rows
+            ],
+            schema={k: str for k in polars_schema},
+            orient="row",
+            strict=False,
         )
 
         df = DatasetSparkRecipe.unstrict_cast_dataframe_to_schema(df, polars_schema)
@@ -582,7 +548,7 @@ class BaseRecipe(abc.ABC):
 
     @staticmethod
     def unstrict_cast_dataframe_to_schema(
-        dataframe: pl.DataFrame, schema: dict[str, type[pl.DataType]]
+        dataframe: pl.DataFrame, schema: dict[str, pl.DataType]
     ) -> pl.DataFrame:
         """
         Cast data frame to schema. This will be lax in that failed casts are set to null.
@@ -597,18 +563,18 @@ class BaseRecipe(abc.ABC):
         """
         cast_expr = [
             pl.col(col).str.to_time(strict=False)
-            if schema[col] == pl.Time
+            if schema[col] == pl.Time()
             else pl.col(col).str.to_date(strict=False)
-            if schema[col] == pl.Date
+            if schema[col] == pl.Date()
             else pl.col(col).str.to_datetime(strict=False, ambiguous="earliest")
-            if schema[col] == pl.Datetime
+            if schema[col] == pl.Datetime()
             else pl.when(
                 pl.col(col).str.to_lowercase().is_in(["true", "t", "1", "yes", "y"])
             )
             .then(True)
             .otherwise(False)
             .alias(col)
-            if schema[col] == pl.Boolean
+            if schema[col] == pl.Boolean()
             else pl.col(col).cast(schema[col], strict=False)
             for col in dataframe.columns
         ]
@@ -630,14 +596,14 @@ class BaseRecipe(abc.ABC):
         return df
 
     @staticmethod
-    def map_datarobot_type_to_polars_type(datarobot_type: str) -> type[pl.DataType]:
+    def map_datarobot_type_to_polars_type(datarobot_type: str) -> pl.DataType:
         """
         Return the matching Polars DataType for the given identifier of a DataRobot result type.
         """
         spark_mapping = {
-            "STRING_TYPE": pl.String,
-            "INT_TYPE": pl.Int64,
-            "DOUBLE_TYPE": pl.Float64,
+            "STRING_TYPE": pl.String(),
+            "INT_TYPE": pl.Int64(),
+            "DOUBLE_TYPE": pl.Float64(),
         }
 
         if polars_type := spark_mapping.get(datarobot_type):
@@ -646,28 +612,33 @@ class BaseRecipe(abc.ABC):
         # For JDBC data connections, DataRobot gives the native type name of the source driver.
         # There's enough consistency among SQL variants that we should be able to get away without having to have
         # a map per connector.
-        jdbc_prefix_to_type: dict[str, type[pl.DataType]] = {
-            "REAL": pl.Float64,
-            "NUMERIC": pl.Float64,
-            "DECIMAL": pl.Float64,
-            "FLOAT": pl.Float64,
-            "DOUBLE": pl.Float64,
-            "INT128": pl.Int128,
-            "INT": pl.Int64,  # To cover INT2/4/8...
-            "SMALLINT": pl.Int64,
-            "BIGINT": pl.Int128,
-            "BIT": pl.Boolean,
-            "BOOL": pl.Boolean,  # also covers "Boolean"
-            "BYTE": pl.Binary,  # also covers BYTEA/BYTEARRAY
-            "VARCHAR": pl.String,
-            "NVARCHAR": pl.String,
-            "CHAR": pl.String,
-            "NCHAR": pl.String,
-            "TEXT": pl.String,
-            "NTEXT": pl.String,
-            "BPCHAR": pl.String,
-            "DATE": pl.Datetime,
-            "TIME": pl.Datetime,
+        jdbc_prefix_to_type: dict[str, pl.DataType] = {
+            "REAL": pl.Float64(),
+            "NUMERIC": pl.Float64(),
+            "NUMBER": pl.Float64(),
+            "DECIMAL": pl.Float64(),
+            "FLOAT": pl.Float64(),
+            "DECFLOAT": pl.Float64(),
+            "DOUBLE": pl.Float64(),
+            "INT128": pl.Decimal(),  # DuckDB / arrow doesn't support Int128
+            "INT": pl.Int64(),  # To cover INT2/4/8...
+            "SMALLINT": pl.Int64(),
+            "BIGINT": pl.Decimal(),  # DuckDB / arrow doesn't support Int128
+            "TINYINT": pl.Int64(),
+            "BYTEINT": pl.Int64(),
+            "BIT": pl.Boolean(),
+            "BOOL": pl.Boolean(),  # also covers "Boolean"
+            "BYTE": pl.Binary(),  # also covers BYTEA/BYTEARRAY
+            "VARBINARY": pl.Binary(),
+            "VARCHAR": pl.String(),
+            "NVARCHAR": pl.String(),
+            "CHAR": pl.String(),
+            "NCHAR": pl.String(),
+            "TEXT": pl.String(),
+            "NTEXT": pl.String(),
+            "BPCHAR": pl.String(),
+            "DATE": pl.Datetime(),
+            "TIME": pl.Datetime(),
         }
 
         matches = []
@@ -683,7 +654,7 @@ class BaseRecipe(abc.ABC):
             "No match found for DataRobot type '%s' defined.", datarobot_type
         )
 
-        return pl.String
+        return pl.String()
 
 
 def format_postgres_table(table_parts: list[str]) -> str:
@@ -709,6 +680,10 @@ class DataSourceRecipe(BaseRecipe):
     PROMPTS: dict[str, str] = {
         "postgres": SYSTEM_PROMPT_POSTGRES,
         "redshift": SYSTEM_PROMPT_REDSHIFT,
+    }
+    WARMUP_QUERIES: dict[str, str] = {
+        "postgres": "SELECT 1",
+        "redshift": "SELECT 1",
     }
     FORMAT_TABLE_NAME: dict[str, Callable[[list[str]], str]] = {
         "postgres": format_postgres_table,
@@ -827,7 +802,7 @@ class DataSourceRecipe(BaseRecipe):
                     results = await asyncio.gather(*tasks)
                 for res in results:
                     if res:
-                        cleaned_name = res.canonical_name.lower().strip()
+                        cleaned_name = res.canonical_name.strip()
                         DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[res.id] = (
                             cleaned_name
                         )
@@ -1042,7 +1017,7 @@ class DataSourceRecipe(BaseRecipe):
     @default_retry
     @telemetry.trace
     async def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
-        data_store_name = data_store_name.lower().strip()
+        data_store_name = data_store_name.strip()
         if data_store_name in DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE:
             return DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE[data_store_name]
         logger.debug(
@@ -1061,8 +1036,7 @@ class DataSourceRecipe(BaseRecipe):
         for store in stores:
             if (
                 store.canonical_name
-                and store.canonical_name.lower().strip()
-                == data_store_name.lower().strip()
+                and store.canonical_name.strip() == data_store_name.strip()
             ):
                 return store.id
         return None
@@ -1091,7 +1065,7 @@ class DataSourceRecipe(BaseRecipe):
                 store = await loop.run_in_executor(None, DataStore.get, data_store_id)
                 if store and store.canonical_name and store.id:
                     DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[store.id] = (
-                        store.canonical_name.lower().strip()
+                        store.canonical_name.strip()
                     )
             except ClientError as e:
                 if e.status_code in [404, 410]:
@@ -1447,6 +1421,9 @@ class DataSourceRecipe(BaseRecipe):
     def prompt(self) -> str:
         return DataSourceRecipe.PROMPTS[self._data_store.driver_class_type]
 
+    def warmup_query(self) -> str | None:
+        return DataSourceRecipe.WARMUP_QUERIES.get(self._data_store.driver_class_type)
+
     def query_friendly_name(self, dataset_name: str) -> str:
         return DataSourceRecipe.FORMAT_TABLE_NAME[self._data_store.driver_class_type](
             dataset_name.split(".")
@@ -1658,6 +1635,9 @@ class DatasetSparkRecipe(BaseRecipe):
     def prompt(self) -> str:
         return SYSTEM_PROMPT_SPARK_SQL
 
+    def warmup_query(self) -> str | None:
+        return "SELECT 1"
+
     def query_friendly_name(self, dataset_name: str) -> str:
         return f"`{dataset_name}`"
 
@@ -1675,81 +1655,3 @@ class DatasetSparkRecipe(BaseRecipe):
         """
         await self.set_query(f"SELECT * FROM `{dataset.name}` LIMIT {preview_limit}")
         return await self.retrieve_preview()
-
-
-class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
-    """A wrapper around DataRobot's DataWrangling
-
-    Args:
-        DatabaseOperator (_type_): _description_
-    """
-
-    def __init__(
-        self,
-        credentials: NoDatabaseCredentials,
-        recipe: BaseRecipe,
-        default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
-    ):
-        self.default_timeout = default_timeout
-        self.recipe = recipe
-
-    async def _run_sql(self, sql_query: str, timeout: int) -> DataFrameWrapper:
-        logger.debug("Running SQL on Recipe.", extra={"sql": sql_query})
-        await self.recipe.set_query(sql_query)
-        logger.debug("Set query SQL, awaiting results.", extra={"sql": sql_query})
-        return (await self.recipe.retrieve_preview(timeout_seconds=timeout)).response
-
-    async def execute_query(
-        self,
-        query: str,
-        timeout: int | None = None,
-        table_names: list[str] = [],
-        **kwargs: Any,
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
-        """Execute a SQL query using DataRobot's Data Wrangling platform"""
-
-        timeout = timeout if timeout is not None else self.default_timeout
-
-        try:
-            df = await self._run_sql(query, timeout)
-            return df.to_dict()  # TODO: this is silly as cast gets undone.
-
-        except Exception as e:
-            message = find_underlying_client_message(e)
-
-            raise InvalidGeneratedCode(
-                f"Query execution failed: {message}"
-                if message
-                else "Query execution failed.",
-                code=query,
-                exception=e,
-                traceback_str=str(e.__traceback__),
-            )
-
-    @contextmanager
-    def create_connection(self) -> Generator[None]:
-        yield None
-
-    @lru_cache(8)
-    async def get_data(self, *args, **kwargs) -> Any:  # type:ignore[no-untyped-def]
-        raise NotImplementedError()
-
-    async def get_tables(self, timeout: int | None = None) -> list[str]:
-        """Fetch list of available datasets from DataRobot"""
-        timeout = timeout if timeout is not None else self.default_timeout
-
-        try:
-            return await self.recipe.list_dataset_names()
-
-        except Exception as e:
-            logger.error(f"Failed to fetch DataRobot dataset info: {str(e)}")
-            return []
-
-    def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
-        return ChatCompletionSystemMessageParam(
-            role="system",
-            content=self.recipe.prompt,
-        )
-
-    def query_friendly_name(self, dataset_name: str) -> str:
-        return self.recipe.query_friendly_name(dataset_name)

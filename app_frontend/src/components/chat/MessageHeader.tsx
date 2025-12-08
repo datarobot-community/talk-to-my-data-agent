@@ -60,6 +60,7 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
   const isUserMessage = message.role === 'user';
   const avatar = isUserMessage ? UserAvatar : DataRobotAvatar;
   const name = isUserMessage ? t('You') : t('DataRobot');
+
   const date = formatMessageDate(message.created_at);
 
   const responseMessage = getResponseMessage(messages, messageId);

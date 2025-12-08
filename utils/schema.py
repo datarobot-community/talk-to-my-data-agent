@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -40,12 +41,60 @@ from pydantic import (
     GetJsonSchemaHandler,
     ValidationInfo,
     computed_field,
+    field_serializer,
     field_validator,
     model_validator,
 )
 from typing_extensions import Self, TypedDict
 
 from .code_execution import MaxReflectionAttempts
+
+
+class SanitizedJsonModel(BaseModel):
+    """Base class for models that sanitize JSON from LLM responses.
+
+    LLMs sometimes mimic non-breaking spaces and other control characters
+    from input data (especially from databases), which breaks JSON parsing.
+    This mixin provides automatic sanitization before validation.
+    """
+
+    @classmethod
+    def model_validate_json(
+        cls,
+        json_data: str | bytes | bytearray,
+        *,
+        strict: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        """Sanitize control characters from JSON before parsing.
+
+        Similar to DataRobot's log sanitizer (dr_libs.drlogs.sanitizer)
+        but stricter for JSON - removes non-breaking spaces which are
+        safe for logs but break JSON parsing.
+
+        Removes:
+        - C0 controls (0x00-0x1F) except tab, newline, CR (valid in JSON strings)
+        - DEL (0x7F)
+        - C1 controls (0x80-0x9F)
+        - Non-breaking space (0xA0) - breaks JSON even though it's "safe" Unicode
+        """
+        if isinstance(json_data, (bytes, bytearray)):
+            json_data = json_data.decode("utf-8", errors="replace")
+
+        # Check for empty LLM response before attempting to parse
+        if not json_data or not json_data.strip():
+            raise ValueError(
+                "The AI model returned an empty response. "
+                "This can happen due to high service load, network issues, "
+                "overly complex queries, or problematic data (e.g., unusual characters or formatting). "
+                "Please try again, simplify your question, or check your data. "
+                "If the issue persists, contact support."
+            )
+
+        # Replace problematic characters with regular space
+        # Keep \t (0x09), \n (0x0A), \r (0x0D) as they're valid in JSON strings
+        sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\xa0]", " ", json_data)
+        return super().model_validate_json(sanitized, strict=strict, context=context)
 
 
 class LLMDeploymentSettings(BaseModel):
@@ -351,7 +400,7 @@ class DataDictionaryResponse(DataDictionary):
     in_progress: bool = False
 
 
-class DictionaryGeneration(BaseModel):
+class DictionaryGeneration(SanitizedJsonModel):
     """Validates LLM responses for data dictionary generation
 
     Attributes:
@@ -543,10 +592,11 @@ class GetBusinessAnalysisMetadata(BaseModel):
     question: str | None = None
     rows_analyzed: int | None = None
     columns_analyzed: int | None = None
-    exception_str: str | None = None
+    exception_str: str | None = None  # Deprecated, use exception instead
+    exception: AnalysisError | None = None
 
 
-class BusinessAnalysisGeneration(BaseModel):
+class BusinessAnalysisGeneration(SanitizedJsonModel):
     bottom_line: str
     additional_insights: str
     follow_up_questions: list[str]
@@ -585,16 +635,16 @@ class RunDatabaseAnalysisRequest(BaseModel):
     question: str = Field(min_length=1)
 
 
-class DatabaseAnalysisCodeGeneration(BaseModel):
+class DatabaseAnalysisCodeGeneration(SanitizedJsonModel):
     code: str
     description: str
 
 
-class EnhancedQuestionGeneration(BaseModel):
+class EnhancedQuestionGeneration(SanitizedJsonModel):
     enhanced_user_message: str
 
 
-class CodeGeneration(BaseModel):
+class CodeGeneration(SanitizedJsonModel):
     code: str
     description: str
 
@@ -650,16 +700,66 @@ Component = Union[
     str,
 ]
 
+Steps = Literal[
+    "ANALYZING_QUESTION",
+    "TESTING_CONNECTION",
+    "GENERATING_QUERY",
+    "RUNNING_QUERY",
+    "ANALYZING_RESULTS",
+    "COMPLETE",
+    "ERROR",
+]
+
+
+class AnalystChatMessageStep(BaseModel):
+    step: Steps
+    reattempt: int = 0
+
 
 class AnalystChatMessage(BaseModel):
     role: UserRoleType
     content: str
     components: list[Component]
+    step: AnalystChatMessageStep | None = None
     in_progress: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     chat_id: str | None = None
     error: str | None = None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime) -> str:
+        return value.isoformat()
+
+    @property
+    def step_value(self) -> Steps | None:
+        if self.step:
+            return self.step.step
+        return None
+
+    @step_value.setter
+    def step_value(self, value: Steps | None) -> None:
+        if not value:
+            self.step = None
+        elif not self.step:
+            self.step = AnalystChatMessageStep(step=value)
+        else:
+            self.step.step = value
+
+    @property
+    def step_reattempt(self) -> int | None:
+        if self.step:
+            return self.step.reattempt
+        return None
+
+    @step_reattempt.setter
+    def step_reattempt(self, value: int) -> None:
+        if not self.step:
+            self.step = AnalystChatMessageStep(
+                step="ANALYZING_QUESTION", reattempt=value
+            )
+        else:
+            self.step.reattempt = value
 
     def to_openai_message_param(self) -> ChatCompletionMessageParam:
         if self.role == "user":

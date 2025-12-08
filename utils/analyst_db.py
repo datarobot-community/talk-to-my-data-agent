@@ -34,6 +34,7 @@ from typing import (
     cast,
 )
 
+import aiologic
 import duckdb
 import polars as pl
 from anyio import Path as AsyncPath
@@ -142,8 +143,7 @@ async def async_all(x: Generator[Awaitable[bool]]) -> bool:
     return True
 
 
-@dataclass
-class DatasetMetadata:
+class DatasetMetadata(BaseModel):
     name: str
     external_id: str | None
     dataset_type: DatasetType
@@ -158,6 +158,14 @@ class DatasetMetadata:
     row_count: int
     data_source: DataSourceType
     file_size: int = 0  # Size of the file in bytes
+
+    @field_serializer("created_at", "dataset_type")
+    def serialize_fields(self, value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, DatasetType):
+            return value.value
+        return str(value)
 
     @field_serializer("data_source")
     def serialize_data_source(self, ds: DataSourceType) -> str:
@@ -193,6 +201,7 @@ class BaseDuckDBHandler(ABC):
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
         self._async_path = AsyncPath(self.db_path)
         self._storage = PersistentStorage(user_id) if use_persistent_storage else None
+        self._write_lock = aiologic.Lock()
 
     async def _create_db_version_table(
         self,
@@ -390,16 +399,15 @@ class BaseDuckDBHandler(ABC):
 
     @asynccontextmanager
     async def _save_to_storage(
-        self, write_connection: bool = True
+        self,
     ) -> AsyncGenerator[None, None]:
-        if write_connection:
+        # Put this in lock so file doesn't change while being uploaded.
+        async with self._write_lock:
             yield
             if self._storage:
                 await self._storage.save_to_storage(
                     self.db_path.name, str(self.db_path.absolute())
                 )
-        else:
-            yield
 
     @telemetry.meter_and_trace
     async def execute_query(
@@ -623,7 +631,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     data_source=get_data_source_type(row[6]),
                     file_size=row[7],
                     external_id=row[8],
-                    original_column_types=row[9],
+                    original_column_types=json.loads(row[9]) if row[9] else None,
                 )
                 for row in rows
             ]
@@ -757,7 +765,7 @@ class DatasetHandler(BaseDuckDBHandler):
         Raises:
             ValueError: If dataset doesn't exist or is of wrong type
         """
-        logger.info(f"Retrieving dataframe {name}")
+        logger.debug(f"Retrieving dataframe {name}")
 
         # First verify the dataset exists and check its type
         if not await self.table_exists(name):
@@ -1978,7 +1986,7 @@ class AnalystDB:
                 clobber=clobber,
             )
         except Exception as e:
-            logger.warning(f"Error registering dataset: {e}")
+            logger.warning(f"Error registering dataset: {e}", exc_info=True)
 
     async def get_dataset(
         self, name: str, max_rows: int | None = 10000
@@ -2032,9 +2040,11 @@ class AnalystDB:
                 f"{name}_dict", expected_type=DatasetType.DICTIONARY
             )
             return DataDictionary.from_application_df(df, name=name)
-        except Exception as e:
-            logger.error(f"Failed to get data dictionary {name}: {e}")
-            return None
+        except ValueError:
+            logger.debug(f"Data dictionary not defined {name}")
+        except Exception:
+            logger.error(f"Failed to get data dictionary {name}", exc_info=True)
+        return None
 
     async def get_cleansing_report(
         self, dataset_name: str

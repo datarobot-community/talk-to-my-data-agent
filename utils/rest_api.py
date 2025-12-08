@@ -25,6 +25,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, List, Union, cast
 
+import chardet
 import datarobot as dr
 import pandas as pd
 import polars as pl
@@ -63,9 +64,15 @@ from utils.analyst_db import (
 from utils.api_exceptions import ExceptionBody
 from utils.chat_dataset_helper import cleanup_message_datasets
 from utils.data_analyst_telemetry import telemetry
-from utils.database_helpers import NoDatabaseOperator, get_external_database
+from utils.data_connections.database.database_implementations import (
+    get_external_database,
+)
+from utils.data_connections.database.database_interface import NoDatabaseOperator
+from utils.data_connections.datarobot.datarobot_dataset_handler import (
+    DatasetSparkRecipe,
+    DataSourceRecipe,
+)
 from utils.datarobot_client import use_user_token
-from utils.datarobot_dataset_handler import DatasetSparkRecipe, DataSourceRecipe
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -119,6 +126,112 @@ from utils.token_tracking import (
 logger = get_logger()
 
 MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
+
+
+def detect_and_decode_csv(raw_bytes: bytes, filename: str) -> str:
+    """
+    Detect encoding and decode CSV content with BOM handling.
+    Tries multiple strategies to ensure robust file handling.
+
+    Raises ValueError with descriptive message on failure.
+    """
+    # Strip UTF-8 BOM if present
+    if raw_bytes.startswith(b"\xef\xbb\xbf"):
+        logger.info(f"Stripped UTF-8 BOM from '{filename}'")
+        raw_bytes = raw_bytes[3:]
+
+    if not raw_bytes:
+        raise ValueError(f"File '{filename}' is empty or could not be read.")
+
+    # Detect encoding
+    detection_result = chardet.detect(raw_bytes)
+    detected_encoding = detection_result.get("encoding")
+    confidence = detection_result.get("confidence") or 0
+
+    if detected_encoding:
+        logger.info(
+            f"Detected encoding for '{filename}': {detected_encoding} "
+            f"(confidence: {confidence:.2f})"
+        )
+
+    # Try detected encoding first if confidence is reasonable
+    if detected_encoding and confidence >= 0.7:
+        try:
+            return raw_bytes.decode(detected_encoding)
+        except (UnicodeDecodeError, LookupError) as e:
+            logger.warning(
+                f"Failed to decode '{filename}' with detected encoding "
+                f"{detected_encoding}: {e}"
+            )
+
+    # Try UTF-8 as fallback
+    try:
+        decoded = raw_bytes.decode("utf-8")
+        if detected_encoding != "utf-8":
+            logger.info(f"Successfully decoded '{filename}' using fallback: utf-8")
+        return decoded
+    except UnicodeDecodeError:
+        pass
+
+    raise ValueError(
+        f"Unable to decode file '{filename}'. All encoding attempts failed."
+    )
+
+
+def detect_delimiter(content: str) -> str:
+    """Detect CSV delimiter by checking first few lines. Defaults to comma on any ambiguity."""
+    lines = content.split("\n")[:5]
+
+    delimiters = {",": 0, ";": 0, "\t": 0, "|": 0}
+    for line in lines:
+        if not line.strip():
+            continue
+        for d in delimiters:
+            delimiters[d] += line.count(d)
+
+    best = max(delimiters, key=lambda k: delimiters[k])
+    return best if delimiters[best] > 0 else ","
+
+
+def load_and_validate_csv(decoded_content: str, filename: str) -> pl.DataFrame:
+    """
+    Parse CSV content and validate the resulting DataFrame.
+
+    Raises ValueError with descriptive message on failure.
+    """
+    # Normalize line endings (old Mac CR → LF, Windows CRLF → LF)
+    if "\r" in decoded_content:
+        decoded_content = decoded_content.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Auto-detect delimiter
+    separator = detect_delimiter(decoded_content)
+    if separator != ",":
+        logger.info(f"Detected delimiter '{separator}' for '{filename}'")
+
+    try:
+        df = pl.read_csv(
+            io.StringIO(decoded_content),
+            infer_schema_length=10000,
+            low_memory=True,
+            separator=separator,
+        )
+    except pl.exceptions.ComputeError as e:
+        raise ValueError(f"Unable to parse CSV file '{filename}'. Error: {str(e)}")
+
+    if df.height == 0:
+        raise ValueError(f"CSV file '{filename}' contains only headers, no data rows.")
+
+    # Check if ragged lines were truncated
+    lines = [line for line in decoded_content.split("\n") if line.strip()]
+    if len(lines) > 1:
+        expected_rows = len(lines) - 1  # subtract header
+        if df.height < expected_rows * 0.9:  # More than 10% loss
+            logger.warning(
+                f"CSV file '{filename}' had inconsistent row lengths. "
+                f"Expected ~{expected_rows} rows, got {df.height}."
+            )
+
+    return df
 
 
 async def get_database(user_id: str) -> AnalystDB:
@@ -448,11 +561,18 @@ async def upload_files(
                 if file_extension == ".csv":
                     logger.info(f"Loading CSV: {file.filename}")
                     log_memory()
-                    df = pl.read_csv(
-                        io.StringIO(contents.decode("utf-8")),
-                        infer_schema_length=10000,
-                        low_memory=True,
-                    )
+
+                    try:
+                        decoded_content = detect_and_decode_csv(contents, file.filename)
+                        df = load_and_validate_csv(decoded_content, file.filename)
+                    except ValueError as e:
+                        raise HTTPException(status_code=400, detail=str(e))
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to read CSV file '{file.filename}': {str(e)}",
+                        )
+
                     log_memory()
                     dataset_name = os.path.splitext(file.filename)[0]
                     dataset = AnalystDataset(name=dataset_name, data=df)
@@ -475,9 +595,17 @@ async def upload_files(
 
                 elif file_extension in [".xlsx", ".xls"]:
                     base_name = os.path.splitext(file.filename)[0]
-                    excel_dataset = pl.read_excel(
-                        io.BytesIO(contents), sheet_id=None
-                    )  # Get available sheet names
+
+                    try:
+                        excel_dataset = pl.read_excel(
+                            io.BytesIO(contents), sheet_id=None
+                        )
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Unable to read Excel file '{file.filename}'. Error: {str(e)}",
+                        )
+
                     if isinstance(excel_dataset, dict):
                         for sheet_name, data in excel_dataset.items():
                             dataset_name = f"{base_name}_{sheet_name}"
@@ -568,27 +696,32 @@ async def load_from_database(
     data: LoadDatabaseRequest,
     background_tasks: BackgroundTasks,
     analyst_db: AnalystDB = Depends(get_initialized_db),
-    sample_size: int = 5000,
+    sample_size: int = 1_000,
 ) -> list[str]:
-    dataset_names = []
+    await asyncio.gather(
+        *[
+            analyst_db.register_dataset(
+                AnalystDataset(name=table), InternalDataSourceType.DATABASE
+            )
+            for table in data.table_names
+        ]
+    )
 
-    # Load the data from the database
     if data.table_names:
-        dataframes = await get_external_database().get_data(
-            *data.table_names, analyst_db=analyst_db, sample_size=sample_size
-        )
-        dataset_names.extend(dataframes)
-
-    # Process the data in the background (cleansing and dictionary generation)
-    if dataset_names:
         background_tasks.add_task(
-            process_and_update,
-            dataset_names,
-            analyst_db,
-            InternalDataSourceType.DATABASE,
+            get_and_process_tables, data.table_names, analyst_db, sample_size
         )
 
-    return dataset_names
+    return data.table_names
+
+
+async def get_and_process_tables(
+    table_names: list[str], analyst_db: AnalystDB, sample_size: int
+) -> None:
+    dataset_names = await get_external_database().get_data(
+        *table_names, analyst_db=analyst_db, sample_size=sample_size
+    )
+    await process_and_update(dataset_names, analyst_db, InternalDataSourceType.DATABASE)
 
 
 @router.get("/dictionaries")

@@ -41,7 +41,7 @@ from utils.api import (
     AnalysisGenerationError,
     run_complete_analysis,
 )
-from utils.database_helpers import load_app_infra
+from utils.data_connections.database.database_implementations import load_app_infra
 from utils.logging_helper import get_logger
 from utils.schema import (
     AnalysisError,

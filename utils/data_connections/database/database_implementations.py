@@ -1,4 +1,4 @@
-# Copyright 2024 DataRobot, Inc.
+# Copyright 2025 DataRobot, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-
+import asyncio
 import functools
 import json
+import logging
 import traceback
-from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from dataclasses import dataclass
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Generator, Generic, TypeVar, cast
+from typing import Any, AsyncGenerator, cast
 
 import pandas as pd
 import polars as pl
@@ -41,114 +39,25 @@ from utils.credentials import (
     SAPDatasphereCredentials,
     SnowflakeCredentials,
 )
-from utils.logging_helper import get_logger
+from utils.data_connections.database.database_interface import (
+    _DEFAULT_DB_QUERY_TIMEOUT,
+    BigQueryCredentialArgs,
+    DatabaseOperator,
+    NoDatabaseOperator,
+    SAPDatasphereCredentialArgs,
+    SnowflakeCredentialArgs,
+)
+from utils.data_connections.datarobot.datarobot_dataset_handler import (
+    BaseRecipe,
+)
 from utils.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
     SYSTEM_PROMPT_SAP_DATASPHERE,
     SYSTEM_PROMPT_SNOWFLAKE,
 )
-from utils.schema import (
-    AnalystDataset,
-    AppInfra,
-)
+from utils.schema import AnalystDataset, AppInfra
 
-logger = get_logger("DatabaseHelper")
-
-T = TypeVar("T")
-_DEFAULT_DB_QUERY_TIMEOUT = 300
-
-
-@dataclass
-class SnowflakeCredentialArgs:
-    credentials: SnowflakeCredentials
-
-
-@dataclass
-class BigQueryCredentialArgs:
-    credentials: GoogleCredentialsBQ
-
-
-@dataclass
-class SAPDatasphereCredentialArgs:
-    credentials: SAPDatasphereCredentials
-
-
-@dataclass
-class NoDatabaseCredentialArgs:
-    credentials: NoDatabaseCredentials
-
-
-class DatabaseOperator(ABC, Generic[T]):
-    @abstractmethod
-    def __init__(self, credentials: T, default_timeout: int): ...
-
-    @abstractmethod
-    @contextmanager
-    def create_connection(self) -> Any: ...
-
-    @abstractmethod
-    async def execute_query(
-        self, query: str, timeout: int | None = None
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]: ...
-
-    @abstractmethod
-    async def get_tables(self, timeout: int | None = None) -> list[str]:
-        return []
-
-    @functools.lru_cache(maxsize=8)
-    @abstractmethod
-    async def get_data(
-        self,
-        *table_names: str,
-        analyst_db: AnalystDB,
-        sample_size: int = 5000,
-        timeout: int | None = None,
-    ) -> list[str]:
-        return []
-
-    @abstractmethod
-    def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
-        return ChatCompletionSystemMessageParam(role="system", content="")
-
-    def query_friendly_name(self, dataset_name: str) -> str:
-        """Return a query-friendly version of the dataset name (e.g. quoted table name if that's required)."""
-        return dataset_name
-
-
-class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
-    def __init__(
-        self,
-        credentials: NoDatabaseCredentials,
-        default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
-    ):
-        self._credentials = credentials
-
-    @contextmanager
-    def create_connection(self) -> Generator[None]:
-        yield None
-
-    async def execute_query(
-        self,
-        query: str,
-        timeout: int | None = 300,
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
-        return []
-
-    async def get_tables(self, timeout: int | None = 300) -> list[str]:
-        return []
-
-    @functools.lru_cache(8)
-    async def get_data(
-        self,
-        *table_names: str,
-        analyst_db: AnalystDB,
-        sample_size: int = 5000,
-        timeout: int | None = 300,
-    ) -> list[str]:
-        return []
-
-    def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
-        return ChatCompletionSystemMessageParam(role="system", content="")
+logger = logging.getLogger(__name__)
 
 
 class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
@@ -162,8 +71,10 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
         self._credentials = credentials
         self.default_timeout = default_timeout
 
-    @contextmanager
-    def create_connection(self) -> Generator[snowflake.connector.SnowflakeConnection]:
+    @asynccontextmanager
+    async def create_connection(
+        self,
+    ) -> AsyncGenerator[snowflake.connector.SnowflakeConnection, None]:
         """Create a connection to Snowflake using environment variables"""
         if not self._credentials.is_configured():
             raise ValueError("Snowflake credentials not properly configured")
@@ -178,8 +89,7 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
         }
 
         # Try key file authentication first if configured
-        project_root = Path(__file__).resolve().parent.parent
-        if private_key := self._credentials.get_private_key(project_root=project_root):
+        if private_key := self._credentials.get_private_key():
             connect_params["private_key"] = private_key
         elif self._credentials.password:
             connect_params["password"] = self._credentials.password
@@ -190,9 +100,15 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
 
         # In some enviroments, the Snowflake client's platform detection crashes. This patch skips that detection.
         snowflake.connector.SnowflakeConnection.platform_detection_timeout_seconds = 0.0  # type: ignore[method-assign,assignment]
-        connection = snowflake.connector.connect(**connect_params)
-        yield connection
-        connection.close()
+
+        loop = asyncio.get_running_loop()
+        connection = await loop.run_in_executor(
+            None, lambda: snowflake.connector.connect(**connect_params)
+        )
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     async def execute_query(
         self, query: str, timeout: int | None = None
@@ -208,22 +124,27 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
             Tuple of (results, metadata)
         """
         timeout = timeout if timeout is not None else self.default_timeout
-        conn: snowflake.connector.SnowflakeConnection
+
+        loop = asyncio.get_running_loop()
+
         try:
-            with self.create_connection() as conn:
-                with conn.cursor(snowflake.connector.DictCursor) as cursor:
-                    cursor = conn.cursor(snowflake.connector.DictCursor)
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(
+                    None, conn.cursor, snowflake.connector.DictCursor
+                ) as cursor:
                     # Set query timeout at cursor level
-                    cursor.execute(
-                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
+                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}",
                     )
 
                     try:
                         # Execute query
-                        cursor.execute(query)
+                        await loop.run_in_executor(None, cursor.execute, query)
 
                         # Get results
-                        results = cursor.fetchall()
+                        results = await loop.run_in_executor(None, cursor.fetchall)
 
                         return results
 
@@ -247,47 +168,59 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
     async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from Snowflake schema"""
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
 
         conn: snowflake.connector.SnowflakeConnection
         try:
-            with self.create_connection() as conn:
-                with conn.cursor() as cursor:
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(None, conn.cursor) as cursor:
                     # Log current session info
                     logger.info("Checking current session settings...")
-                    cursor.execute(
-                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
+                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}",
                     )
 
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         "SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE(), CURRENT_WAREHOUSE()",
                     )
-                    current_settings = cursor.fetchone()
+                    current_settings = await loop.run_in_executor(None, cursor.fetchone)
+                    logger.info("Current settings %s.", current_settings)
                     logger.info(
                         f"Current settings - Database: {current_settings[0]}, Schema: {current_settings[1]}, Role: {current_settings[2]}, Warehouse: {current_settings[3]}"  # type: ignore[index]
                     )
 
                     # Check if schema exists
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         f"""
                         SELECT COUNT(*)
                         FROM {self._credentials.database}.INFORMATION_SCHEMA.SCHEMATA
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                     """,
                     )
-                    schema_exists = cursor.fetchone()[0]  # type: ignore[index]
+                    schema_exists = (await loop.run_in_executor(None, cursor.fetchone))[  # type: ignore[index]
+                        0
+                    ]
                     logger.info(f"Schema exists check: {schema_exists > 0}")
 
                     # Get all objects (tables and views)
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         f"""
                         SELECT table_name, table_type
                         FROM {self._credentials.database}.information_schema.tables
                         WHERE table_schema = '{self._credentials.db_schema}'
                         AND table_type IN ('BASE TABLE', 'VIEW')
                         ORDER BY table_type, table_name
-                    """
+                    """,
                     )
-                    results = cursor.fetchall()
+                    results = await loop.run_in_executor(None, cursor.fetchall)
                     tables = [row[0] for row in results]
 
                     # Log detailed results
@@ -296,22 +229,22 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         logger.info(f"Found {table_type}: {table_name}")
 
                     # Check schema privileges
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         f"""
                         SHOW GRANTS ON SCHEMA {self._credentials.database}.{self._credentials.db_schema}
-                    """
+                    """,
                     )
-                    privileges = cursor.fetchall()
+                    privileges = await loop.run_in_executor(None, cursor.fetchall)
                     logger.info("Schema privileges:")
                     for priv in privileges:
                         logger.info(f"Privilege: {priv}")
 
                     return tables
 
-        except Exception as e:
-            logger.error(f"Failed to fetch tables: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+        except Exception:
+            logger.error("Failed to fetch tables.", exc_info=True)
             return []
 
     @functools.lru_cache(maxsize=8)
@@ -333,57 +266,80 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
         """
 
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
 
         conn: snowflake.connector.SnowflakeConnection
 
         dataframes = []
         try:
-            with self.create_connection() as conn:
-                cursor = conn.cursor()
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(None, conn.cursor) as cursor:
+                    for table in table_names:
+                        try:
+                            qualified_table = f'{self._credentials.database}.{self._credentials.db_schema}."{table}"'
+                            logger.info(f"Fetching data from table: {qualified_table}")
+                            await loop.run_in_executor(
+                                None,
+                                cursor.execute,
+                                f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}",
+                            )
+                            await loop.run_in_executor(
+                                None,
+                                cursor.execute,
+                                f"DESCRIBE TABLE {qualified_table}",
+                            )
+                            column_response = await loop.run_in_executor(
+                                None, cursor.fetchall
+                            )
 
-                for table in table_names:
-                    try:
-                        qualified_table = f'{self._credentials.database}.{self._credentials.db_schema}."{table}"'
-                        logger.info(f"Fetching data from table: {qualified_table}")
-                        cursor.execute(
-                            f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
-                        )
-                        cursor.execute(
-                            f"""
-                            SELECT * FROM {qualified_table}
-                            SAMPLE ({sample_size} ROWS)
-                        """
-                        )
+                            column_types = {row[0]: row[1] for row in column_response}
 
-                        columns = [desc[0] for desc in cursor.description]
-                        data = cursor.fetchall()
-                        pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
-                        df = pl.DataFrame(
-                            data=pandas_df, schema={col: pl.String for col in columns}
-                        )
+                            await loop.run_in_executor(
+                                None,
+                                cursor.execute,
+                                f"""
+                                SELECT * FROM {qualified_table}
+                                SAMPLE ({sample_size} ROWS)
+                            """,
+                            )
 
-                        logger.info(
-                            f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
-                        )
-                        dataframes.append(AnalystDataset(name=table, data=df))
+                            columns = [desc[0] for desc in cursor.description]
+                            data = await loop.run_in_executor(None, cursor.fetchall)
+                            schema = [
+                                {
+                                    "name": col,
+                                    "dataType": column_types.get(col, "VARCHAR"),
+                                }
+                                for col in columns
+                            ]
 
-                    except Exception as e:
-                        logger.error(f"Error loading table {table}: {str(e)}")
-                        logger.error(f"Error type: {type(e)}")
-                        logger.error(f"Error details: {str(e)}")
-                        continue
+                            df = BaseRecipe.convert_preview_to_dataframe(schema, data)
+
+                            logger.info(
+                                f"Successfully loaded table {table}: {len(df.df)} rows, {len(df.df.columns)} columns"
+                            )
+                            dataframes.append(
+                                (AnalystDataset(name=table, data=df), column_types)
+                            )
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error loading table {table}: {str(e)}", exc_info=True
+                            )
+                            continue
                 names = []
-                for dataframe in dataframes:
+                for dataframe, column_types in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, InternalDataSourceType.DATABASE
+                        dataframe,
+                        InternalDataSourceType.DATABASE,
+                        original_column_types=column_types,
+                        clobber=True,
                     )
                     names.append(dataframe.name)
                 return names
 
         except Exception as e:
-            logger.error(f"Error fetching Snowflake data: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+            logger.error(f"Error fetching Snowflake data: {str(e)}", exc_info=True)
             return []
 
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
@@ -408,32 +364,37 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
         self._database = credentials.service_account_key["project_id"]
         self.default_timeout = default_timeout
 
-    @contextmanager
-    def create_connection(self) -> Generator[bigquery.Client]:
+    @asynccontextmanager
+    async def create_connection(self) -> AsyncGenerator[bigquery.Client, None]:
         from google.oauth2 import service_account
 
-        google_credentials = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
-            GoogleCredentialsBQ().service_account_key,
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        loop = asyncio.get_running_loop()
+        google_credentials = await loop.run_in_executor(
+            None,
+            lambda: service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
+                self._credentials.service_account_key,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            ),
         )
-        client = bigquery.Client(
+        with bigquery.Client(
             credentials=google_credentials,
-        )
-
-        yield client
-
-        client.close()  # type: ignore[no-untyped-call]
+        ) as client:
+            yield client
 
     async def execute_query(
         self, query: str, timeout: int | None = None
     ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
-        conn: bigquery.Client
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
         try:
-            with self.create_connection() as conn:
-                results = conn.query(query, timeout=timeout)
+            async with self.create_connection() as conn:
+                results = await loop.run_in_executor(
+                    None, lambda: conn.query(query, timeout=timeout)
+                )
 
-                sql_result: pd.DataFrame = results.to_dataframe()
+                sql_result: pd.DataFrame = await loop.run_in_executor(
+                    None, results.to_dataframe
+                )
 
                 sql_result_as_dicts = cast(
                     list[dict[str, Any]], sql_result.to_dict(orient="records")
@@ -451,15 +412,17 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
     async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from BigQuery schema"""
         timeout = timeout if timeout is not None else self.default_timeout
-
-        conn: bigquery.Client
+        loop = asyncio.get_running_loop()
 
         try:
-            with self.create_connection() as conn:
+            async with self.create_connection() as conn:
                 tables = [
                     i.table_id
-                    for i in conn.list_tables(
-                        str(self._credentials.db_schema), timeout=timeout
+                    for i in await loop.run_in_executor(
+                        None,
+                        lambda: conn.list_tables(
+                            str(self._credentials.db_schema), timeout=timeout
+                        ),
                     )
                 ]
 
@@ -470,9 +433,7 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
                 return tables
 
         except Exception as e:
-            logger.error(f"Failed to fetch tables: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+            logger.error(f"Failed to fetch tables: {str(e)}", exc_info=True)
             return []
 
     @functools.lru_cache(maxsize=8)
@@ -484,56 +445,75 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
         timeout: int | None = None,
     ) -> list[str]:
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
 
         dataframes = []
 
-        conn: bigquery.Client
-
         try:
-            with self.create_connection() as conn:
+            async with self.create_connection() as conn:
                 for table in table_names:
                     try:
                         qualified_table = (
                             f"{self._database}.{self._credentials.db_schema}.{table}"
                         )
                         logger.info(f"Fetching data from table: {qualified_table}")
-
-                        pandas_df: pd.DataFrame = conn.query(
+                        column_type_query = await loop.run_in_executor(
+                            None,
+                            conn.query,
                             f"""
-                            SELECT * FROM `{qualified_table}`
-                            LIMIT {sample_size}
+                            SELECT column_name, data_type FROM `{self._database}.{self._credentials.db_schema}.INFORMATION_SCHEMA.COLUMNS` 
+                            WHERE table_name = '{table}' ORDER BY ordinal_position
                         """,
-                            timeout=timeout,
-                        ).to_dataframe()
-                        df = pl.DataFrame(
-                            data=pandas_df,
-                            schema={col: pl.String for col in pandas_df.columns},
                         )
+                        column_type_results = await loop.run_in_executor(
+                            None, column_type_query.result
+                        )
+
+                        column_types = {row[0]: row[1] for row in column_type_results}
+
+                        results = await loop.run_in_executor(
+                            None,
+                            lambda: conn.query(
+                                f"""
+                                SELECT * FROM `{qualified_table}`
+                                LIMIT {sample_size}
+                            """,
+                                timeout=timeout,
+                            ),
+                        )
+
+                        pandas_df: pd.DataFrame = await loop.run_in_executor(
+                            None, results.to_dataframe
+                        )
+                        df = pl.from_pandas(pandas_df)
                         logger.info(
                             f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
                         )
 
-                        dataframes.append(AnalystDataset(name=table, data=df))
+                        dataframes.append(
+                            (AnalystDataset(name=table, data=df), column_types)
+                        )
 
                     except Exception as e:
-                        logger.error(f"Error loading table {table}: {str(e)}")
-                        logger.error(f"Error type: {type(e)}")
-                        logger.error(f"Error details: {str(e)}")
+                        logger.error(
+                            f"Error loading table {table}: {str(e)}", exc_info=True
+                        )
                         continue
 
                 names = []
-                for dataframe in dataframes:
+                for dataframe, column_types in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, InternalDataSourceType.DATABASE
+                        dataframe,
+                        InternalDataSourceType.DATABASE,
+                        clobber=True,
+                        original_column_types=column_types,
                     )
                     names.append(dataframe.name)
 
                 return names
 
         except Exception as e:
-            logger.error(f"Error fetching data: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+            logger.error(f"Error fetching data: {str(e)}", exc_info=True)
             return []
 
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
@@ -557,8 +537,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         self._credentials = credentials
         self.default_timeout = default_timeout
 
-    @contextmanager
-    def create_connection(self) -> Generator[dbapi.Connection]:
+    @asynccontextmanager
+    async def create_connection(self) -> AsyncGenerator[dbapi.Connection, None]:
         """Create a connection to SAP Data Sphere"""
         if not self._credentials.is_configured():
             raise ValueError("SAP Data Sphere credentials not properly configured")
@@ -570,12 +550,13 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
             "password": self._credentials.password,
         }
 
+        loop = asyncio.get_running_loop()
+
+        connection = await loop.run_in_executor(
+            None, lambda: dbapi.connect(**connect_params)
+        )
         try:
-            # Connect to SAP Data Sphere
-            connection = dbapi.connect(**connect_params)
             yield connection
-        except Exception:
-            raise
         finally:
             connection.close()
 
@@ -592,32 +573,30 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
             Query results
         """
         timeout = timeout if timeout is not None else self.default_timeout
-        conn: dbapi.Connection
+        loop = asyncio.get_running_loop()
         try:
-            with self.create_connection() as conn:
-                cursor = conn.cursor()
-                try:
-                    # Execute query
-                    cursor.execute(query)
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(None, conn.cursor) as cursor:
+                    try:
+                        # Execute query
+                        await loop.run_in_executor(None, cursor.execute, query)
 
-                    # Get results
-                    results = cursor.fetchall()
+                        # Get results
+                        results = await loop.run_in_executor(None, cursor.fetchall)
 
-                    return [
-                        dict(zip(row.column_names, row.column_values))
-                        for row in results
-                    ]
+                        return [
+                            dict(zip(row.column_names, row.column_values))
+                            for row in results
+                        ]
 
-                except Exception as e:
-                    # Handle SAP Data Sphere specific errors
-                    raise InvalidGeneratedCode(
-                        f"SAP Data Sphere error: {str(e)}",
-                        code=query,
-                        exception=None,
-                        traceback_str="",
-                    )
-                finally:
-                    cursor.close()
+                    except Exception as e:
+                        # Handle SAP Data Sphere specific errors
+                        raise InvalidGeneratedCode(
+                            f"SAP Data Sphere error: {str(e)}",
+                            code=query,
+                            exception=None,
+                            traceback_str="",
+                        )
 
         except Exception as e:
             raise InvalidGeneratedCode(
@@ -630,33 +609,42 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
     async def get_tables(self, timeout: int | None = None) -> list[str]:
         """Fetch list of tables from SAP Data Sphere schema"""
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
 
-        conn: dbapi.Connection
         try:
-            with self.create_connection() as conn:
-                cursor = conn.cursor()
-                try:
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(None, conn.cursor) as cursor:
                     # Get all tables and views in the schema
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         f"""
                         SELECT TABLE_NAME
                         FROM SYS.TABLES
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY TABLE_NAME
-                        """
+                        """,
                     )
-                    tables = [row[0] for row in cursor.fetchall()]
+                    tables = [
+                        row[0]
+                        for row in await loop.run_in_executor(None, cursor.fetchall)
+                    ]
 
                     # Get all views
-                    cursor.execute(
+                    await loop.run_in_executor(
+                        None,
+                        cursor.execute,
                         f"""
                         SELECT VIEW_NAME
                         FROM SYS.VIEWS
                         WHERE SCHEMA_NAME = '{self._credentials.db_schema}'
                         ORDER BY VIEW_NAME
-                        """
+                        """,
                     )
-                    views = [row[0] for row in cursor.fetchall()]
+                    views = [
+                        row[0]
+                        for row in await loop.run_in_executor(None, cursor.fetchall)
+                    ]
 
                     all_objects = tables + views
 
@@ -668,13 +656,10 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
 
                     return all_objects
 
-                finally:
-                    cursor.close()
-
         except Exception as e:
-            logger.error(f"Failed to fetch tables from SAP Data Sphere: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+            logger.error(
+                f"Failed to fetch tables from SAP Data Sphere: {str(e)}", exc_info=True
+            )
             return []
 
     @functools.lru_cache(maxsize=8)
@@ -696,61 +681,87 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         - List of registered dataset names
         """
         timeout = timeout if timeout is not None else self.default_timeout
+        loop = asyncio.get_running_loop()
         dataframes = []
 
         try:
-            with self.create_connection() as conn:
-                cursor = conn.cursor()
+            async with self.create_connection() as conn:
+                with await loop.run_in_executor(None, conn.cursor) as cursor:
+                    for table in table_names:
+                        try:
+                            qualified_table = (
+                                f'"{self._credentials.db_schema}"."{table}"'
+                            )
+                            logger.info(f"Fetching data from table: {qualified_table}")
+                            await loop.run_in_executor(
+                                None,
+                                cursor.execute,
+                                f"SELECT COLUMN_NAME, DATA_TYPE_NAME FROM SYS.TABLE_COLUMNS WHERE TABLE_NAME = '{table}' AND SCHEMA_NAME = '{self._credentials.db_schema}'",
+                            )
 
-                for table in table_names:
-                    try:
-                        qualified_table = f'"{self._credentials.db_schema}"."{table}"'
-                        logger.info(f"Fetching data from table: {qualified_table}")
+                            column_types = {
+                                row[0]: row[1]
+                                for row in await loop.run_in_executor(
+                                    None, cursor.fetchall
+                                )
+                            }
 
-                        # Execute query to get data with limit
-                        cursor.execute(
-                            f"""
-                            SELECT * FROM {qualified_table}
-                            LIMIT {sample_size}
-                            """
-                        )
+                            # Execute query to get data with limit
+                            await loop.run_in_executor(
+                                None,
+                                cursor.execute,
+                                f"""
+                                SELECT * FROM {qualified_table}
+                                LIMIT {sample_size}
+                                """,
+                            )
 
-                        # Get column names
-                        columns = [desc[0] for desc in cursor.description]
-                        data = cursor.fetchall()
+                            # Get column names
+                            columns = [desc[0] for desc in cursor.description]
+                            schema = [
+                                {
+                                    "name": col,
+                                    "dataType": column_types.get(col, "VARCHAR"),
+                                }
+                                for col in columns
+                            ]
 
-                        # Convert to pandas DataFrame
-                        pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
+                            data = await loop.run_in_executor(None, cursor.fetchall)
 
-                        # Convert to polars DataFrame
-                        df = pl.DataFrame(
-                            data=pandas_df, schema={col: pl.String for col in columns}
-                        )
+                            df = BaseRecipe.convert_preview_to_dataframe(
+                                schema,
+                                data,
+                            )
 
-                        logger.info(
-                            f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
-                        )
-                        dataframes.append(AnalystDataset(name=table, data=df))
+                            logger.info(
+                                f"Successfully loaded table {table}: {len(df.df)} rows, {len(df.df.columns)} columns"
+                            )
+                            dataframes.append(
+                                (AnalystDataset(name=table, data=df), column_types)
+                            )
 
-                    except Exception as e:
-                        logger.error(f"Error loading table {table}: {str(e)}")
-                        logger.error(f"Error type: {type(e)}")
-                        logger.error(f"Error details: {str(e)}")
-                        continue
+                        except Exception as e:
+                            logger.error(
+                                f"Error loading table {table}: {str(e)}", exc_info=True
+                            )
+                            continue
 
                 # Register datasets
                 names = []
-                for dataframe in dataframes:
+                for dataframe, column_types in dataframes:
                     await analyst_db.register_dataset(
-                        dataframe, InternalDataSourceType.DATABASE
+                        dataframe,
+                        InternalDataSourceType.DATABASE,
+                        original_column_types=column_types,
+                        clobber=True,
                     )
                     names.append(dataframe.name)
                 return names
 
         except Exception as e:
-            logger.error(f"Error fetching SAP Data Sphere data: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
-            logger.error(f"Error details: {str(e)}")
+            logger.error(
+                f"Error fetching SAP Data Sphere data: {str(e)}", exc_info=True
+            )
             return []
 
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
@@ -763,6 +774,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
 
 
 def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
+    logger.info("Loading database %s", app_infra.database)
     if app_infra.database == "bigquery":
         credentials: (
             GoogleCredentialsBQ
@@ -773,17 +785,18 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = GoogleCredentialsBQ()
             if credentials.service_account_key and credentials.db_schema:
-                return BigQueryOperator(credentials)
+                return cast(DatabaseOperator[Any], BigQueryOperator(credentials))
         except (ValidationError, ValueError):
             logger.warning(
-                "BigQuery credentials not properly configured, falling back to no database"
+                "BigQuery credentials not properly configured, falling back to no database",
+                exc_info=True,
             )
         return NoDatabaseOperator(NoDatabaseCredentials())
     elif app_infra.database == "snowflake":
         try:
             credentials = SnowflakeCredentials()
             if credentials.is_configured():
-                return SnowflakeOperator(credentials)
+                return cast(DatabaseOperator[Any], SnowflakeOperator(credentials))
         except (ValidationError, ValueError):
             logger.warning(
                 "Snowflake credentials not properly configured, falling back to no database"
@@ -793,7 +806,7 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = SAPDatasphereCredentials()
             if credentials.is_configured():
-                return SAPDatasphereOperator(credentials)
+                return cast(DatabaseOperator[Any], SAPDatasphereOperator(credentials))
         except (ValidationError, ValueError):
             logger.warning(
                 "SAP credentials not properly configured, falling back to no database"
