@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.24] - 2025-12-8
+## [0.5.0] - 2025-12-10
+
+### Improvements
+
+- Improved the text description in the upload modal.
+
+## [0.4.24] - 2025-12-8
 
 ### Fixes
 
@@ -25,13 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Track and display in UI current analysis step.
 - Bump pulumi-datarobot to version 0.10.22 and simplify resource injection into CustomApplications
 
-
 ## [0.3.22] - 2025-11-27
 
 ### Fixes
 
 - Fixed telemetry initialization in local development mode and in environments where OTLP endpoint is not configured.
-
 
 ## [0.3.21] - 2025-11-24
 

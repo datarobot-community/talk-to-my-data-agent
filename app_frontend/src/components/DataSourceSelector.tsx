@@ -17,24 +17,50 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
 
   return (
     <RadioGroup value={value} onValueChange={onChange}>
-      <div className="flex items-center space-x-2">
+      <div className="flex space-x-2">
         <RadioGroupItem value={DATA_SOURCES.FILE} id="r1" />
-        <Label htmlFor="r1">{t('Local file or Data Registry')}</Label>
+        <Label htmlFor="r1" className="font-bold min-w-[210px]">
+          {t('Local file or Data Registry')}:
+        </Label>
+        <p className="text-muted-foreground font-normal">
+          {t('Select to upload a local file or your DataRobot Data Registry file up to 200 MB.')}
+        </p>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex space-x-2">
         <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r2" />
-        <Label htmlFor="r2">{t('Remote Data Registry')}</Label>
+        <Label htmlFor="r2" className="font-bold min-w-[210px]">
+          {t('Remote Data Registry')}:
+        </Label>
         {dataSources?.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+        <p className="text-muted-foreground font-normal">
+          {t(
+            'Connect and add data from your remote data registry for files greater than 200 MB, up to a maximum of 10 GB. Processing large files may involve lengthy runtimes and increased costs.'
+          )}
+        </p>
       </div>
       {/* Not yet putting a conditional here, though probably in a future release. */}
-      <div className="flex items-center space-x-2">
+      <div className="flex space-x-2">
         <RadioGroupItem value={DATA_SOURCES.DATABASE} id="r3" />
-        <Label htmlFor="r3">{t('Database')}</Label>
+        <Label htmlFor="r3" className="font-bold min-w-[210px]">
+          {t('Database')}:
+        </Label>
+        <p className="text-muted-foreground font-normal">
+          {t(
+            'Select tables from the application-configured database. This option supports Snowflake, SAP DataSphere, and BigQuery.'
+          )}
+        </p>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex space-x-2">
         <RadioGroupItem value={NEW_DATA_STORE} id="r4" />
-        <Label htmlFor="r4">{t('Remote Data Connections')}</Label>
+        <Label htmlFor="r4" className="font-bold min-w-[210px]">
+          {t('Remote Data Connections')}:
+        </Label>
         {availableExternalDataStores?.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+        <p className="text-muted-foreground font-normal">
+          {t(
+            'Select tables from DataRobot supported data store connections, such as Redshift or PostgreSQL.'
+          )}
+        </p>
       </div>
     </RadioGroup>
   );

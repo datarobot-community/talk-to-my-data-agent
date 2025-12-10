@@ -151,16 +151,6 @@ Behind the scenes, the LLM configured for the application translates the user's 
 an LLM to generate analysis and visualizations. Because the dataset is loaded into the application itself, this limits the size of the data that can be analyzed.
 The application can support larger datasets and connect to remote data stores through the DataRobot platform, described below.
 
-### Connecting to Data Registry in the DataRobot Platform
-
-Large datasets can be uploaded to the DataRobot platform (see [this documentation](https://docs.datarobot.com/en/docs/workbench/wb-dataprep/wb-add-data/wb-data-registry.html)).
-Items from the user's data registry can be connected to the application (see screenshot below). These items are not downloaded into the application, but instead
-analysis is performed through DataRobot's data wrangling platform. This performs efficient queries that can support larger datasets (we have validated at least 5GB).
-Note there is a several minute cold start with the platform as it creates the analysis environment and loads data. These datasets can also be added locally,
-which will avoid this cold start, and is suitable for smaller files.
-
-![Remote Data Registry screenshot.](_docs/images/screenshot-remote-data-registry.png)
-
 ### Connecting to Data Stores in the DataRobot Platform
 
 When a user of the application is a DataRobot user (see [this documentation](https://docs.datarobot.com/en/docs/workbench/wb-apps/custom-apps/nxt-manage-custom-app.html#share-applications)
