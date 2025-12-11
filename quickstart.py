@@ -112,7 +112,12 @@ def is_conda_environment():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Infrastructure management script")
-    parser.add_argument("stack_name", help="Stack name to use")
+    parser.add_argument(
+        "stack_name",
+        nargs="?",
+        default=None,
+        help="Stack name to use",
+    )
     parser.add_argument(
         "--action",
         choices=["up", "destroy"],
@@ -286,12 +291,21 @@ def print_app_url():
 
 def main():
     args = parse_args()
-    if args.stack_name == "YOUR_PROJECT_NAME":
-        print("Please use a different project name")
-        sys.exit(0)
     check_dotenv_exists()
     # Load environment variables
     env_vars = load_dotenv()
+
+    # Prompt for stack_name if not provided
+    stack_name = args.stack_name
+    if not stack_name:
+        stack_name = input("Please enter a stack name: ").strip()
+        if not stack_name:
+            print("Stack name cannot be empty")
+            sys.exit(1)
+
+    if stack_name == "YOUR_PROJECT_NAME":
+        print("Please use a different project name")
+        sys.exit(0)
 
     check_pulumi_installed()
     check_pulumi_login()
@@ -301,7 +315,7 @@ def main():
         create_virtual_environment()
     setup_virtual_environment()
     # Setup Pulumi configuration
-    setup_pulumi_config(work_dir, args.stack_name, env_vars)
+    setup_pulumi_config(work_dir, stack_name, env_vars)
 
     # Refresh the stack
     print("\nRefreshing stack...")

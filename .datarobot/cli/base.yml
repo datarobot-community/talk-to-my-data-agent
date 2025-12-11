@@ -1,0 +1,196 @@
+---
+root:
+  - env: PULUMI_CONFIG_PASSPHRASE
+    type: secret_string
+    default: ""
+    optional: true
+    help: "The passphrase used to encrypt and decrypt the private key. This value is required if you're not using pulumi cloud."
+  - env: FRONTEND_TYPE
+    type: string
+    help: "Choose which frontend implementation to use (streamlit or react)"
+    multiple: false
+    default: "react"
+    options:
+      - name: "react"
+        value: "react"
+      - name: "streamlit"
+        value: "streamlit"
+  - env: USE_DATAROBOT_LLM_GATEWAY
+    type: "boolean"
+    help: "Use LLM Gateway instead of DataRobot-hosted LLM. If you select this, you do not need any credentials for your DataRobot-hosted LLM since it will use your DataRobot credentials instead."
+    default: "true"
+    multiple: false
+    options:
+      - name: "Yes"
+        value: "true"
+      - name: "No"
+        value: "false"
+        requires: "datarobot_hosted_llm"
+  - key: "enable_snowflake"
+    help: "Do you want to configure Snowflake?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "snowflake_config"
+  - key: "enable_bigquery"
+    help: "Do you want to configure BigQuery?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "bigquery_config"
+  - key: "enable_sap_datasphere"
+    help: "Do you want to configure SAP DataSphere?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "sap_datasphere_config"
+
+datarobot_hosted_llm:
+  - key: "enable_google_vertexai"
+    help: "Do you want to configure Google VertexAI?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "google_cloud_config"
+  - key: "enable_aws_bedrock"
+    help: "Do you want to configure AWS Bedrock?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "aws_config"
+  - key: "enable_openai"
+    help: "Do you want to configure OpenAI?"
+    options:
+      - name: "No"
+      - name: "Yes"
+        requires: "openai_config"
+
+google_cloud_config:
+  - env: GOOGLE_SERVICE_ACCOUNT
+    type: string
+    optional: false
+    help: "The Google Service Account JSON file content"
+  - env: GOOGLE_REGION
+    type: string
+    optional: false
+    help: "The Google Cloud Region"
+
+aws_config:
+  - env: AWS_ACCESS_KEY_ID
+    type: string
+    optional: false
+    help: "The AWS access key ID for Bedrock."
+  - env: AWS_SECRET_ACCESS_KEY
+    type: secret_string
+    optional: false
+    help: "The AWS secret access key for Bedrock."
+  - env: AWS_REGION
+    type: string
+    optional: false
+    help: "The AWS region name for Bedrock, e.g., us-east-1."
+  - env: AWS_SESSION_TOKEN
+    type: string
+    optional: true
+    help: "The AWS Session Token"
+
+openai_config:
+  - env: OPENAI_API_KEY
+    type: secret_string
+    optional: false
+    help: "The API key for OpenAI."
+  - env: OPENAI_API_BASE
+    type: string
+    optional: false
+    help: "The API base URL for OpenAI, usually in the format https://<your_custom_endpoint>.openai.azure.com"
+  - env: OPENAI_API_DEPLOYMENT_ID
+    type: string
+    optional: false
+    help: "The deployment ID for the OpenAI model."
+  - env: OPENAI_API_VERSION
+    type: string
+    optional: false
+    help: "The API version for OpenAI."
+
+snowflake_config:
+  - key: snowflake_authentication
+    help: "Choose which authentication method to use for Snowflake"
+    multiple: false
+    options:
+      - name: "password authentication"
+        requires: "snowflake_password_authentication_config"
+      - name: "key file authentication"
+        requires: "snowflake_key_file_authentication_config"
+  - env: SNOWFLAKE_ACCOUNT
+    type: string
+    optional: false
+    help: "The Snowflake account"
+  - env: SNOWFLAKE_WAREHOUSE
+    type: string
+    optional: false
+    help: "The Snowflake warehouse"
+  - env: SNOWFLAKE_DATABASE
+    type: string
+    optional: false
+    help: "The Snowflake database"
+  - env: SNOWFLAKE_SCHEMA
+    type: string
+    optional: false
+    help: "The Snowflake schema"
+  - env: SNOWFLAKE_ROLE
+    type: string
+    optional: false
+    help: "The Snowflake role"
+
+
+snowflake_password_authentication_config:
+  - env: SNOWFLAKE_USER
+    type: string
+    optional: false
+    help: "The Snowflake user"
+  - env: SNOWFLAKE_PASSWORD
+    type: secret_string
+    optional: false
+    help: "The Snowflake password"
+
+snowflake_key_file_authentication_config:
+  - env: SNOWFLAKE_KEY_PATH
+    type: string
+    optional: false
+    help: "The Snowflake key path"
+
+bigquery_config:
+  - env: GOOGLE_SERVICE_ACCOUNT_BQ
+    type: string
+    optional: false
+    help: "The Google Service Account JSON file content for BigQuery"
+  - env: GOOGLE_REGION_BQ
+    type: string
+    optional: false
+    help: "The Google Cloud Region for BigQuery"
+  - env: GOOGLE_DB_SCHEMA_BQ
+    type: string
+    optional: false
+    help: "The Google Cloud BigQuery schema"
+
+
+sap_datasphere_config:
+  - env: SAP_DATASPHERE_HOST
+    type: string
+    optional: false
+    help: "The SAP DataSphere host"
+  - env: SAP_DATASPHERE_PORT
+    type: string
+    optional: false
+    help: "The SAP DataSphere port"
+  - env: SAP_DATASPHERE_USER
+    type: string
+    optional: false
+    help: "The SAP DataSphere user"
+  - env: SAP_DATASPHERE_PASSWORD
+    type: secret_string
+    optional: false
+    help: "The SAP DataSphere password"
+  - env: SAP_DATASPHERE_SCHEMA
+    type: string
+    optional: false
+    help: "The SAP DataSphere schema"

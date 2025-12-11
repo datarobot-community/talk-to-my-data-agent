@@ -1,0 +1,15 @@
+---
+version: '3'
+tasks:
+  install:
+    desc: 🧱 Install Python dependencies
+    cmds:
+      - python -m pip install -r requirements.txt
+  dev:
+    desc: 🚀 Start local dev backend server
+    cmds:
+      - PYTHONPATH=./.. SERVE_STATIC_FRONTEND=False DEV_MODE=True ./start-app.sh
+  static:
+    desc: 🚀 Start local static backend server
+    cmds:
+      - PYTHONPATH=./.. SERVE_STATIC_FRONTEND=True DEV_MODE=True ./start-app.sh

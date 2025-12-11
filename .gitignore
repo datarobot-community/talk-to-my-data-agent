@@ -1,3 +1,5 @@
+/Taskfile.yml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -214,3 +216,5 @@ app_backend/app_infra.json
 !app_backend/deploy/dist
 
 !app_frontend/src/lib
+
+.datarobot/cli/state.yaml
