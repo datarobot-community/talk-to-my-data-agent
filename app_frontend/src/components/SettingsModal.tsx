@@ -17,6 +17,7 @@ import { useDataRobotInfo, useUpdateApiToken } from '@/api/user/hooks';
 import { fetchAndStoreDataRobotToken } from '@/api/user/api-requests';
 import { Input } from './ui/input';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -78,12 +79,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             <Label htmlFor="collapsible-default-open" className="cursor-pointer">
               {t('Expand data panels by default')}
             </Label>
-            <input
+            <Checkbox
               id="collapsible-default-open"
-              type="checkbox"
-              className="h-4 w-4"
               checked={localCollapsiblePanelDefaultOpen}
-              onChange={e => setLocalCollapsiblePanelDefaultOpen(e.target.checked)}
+              onCheckedChange={value => setLocalCollapsiblePanelDefaultOpen(value as boolean)}
             />
           </div>
 
@@ -137,7 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             <div className="flex justify-between items-center">
               <h3 className="font-semibold">{t('DataRobot Connection')}</h3>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 disabled={isRefreshingConnection}
                 onClick={async () => {
@@ -221,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                 />
                 <div className="flex justify-end">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     disabled={updateApiTokenMutation.isPending || !apiToken.trim()}
                     onClick={() => {
@@ -265,7 +264,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
         </div>
         <Separator className="border-t mt-2" />
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
             {t('Cancel')}
           </Button>
           <Button onClick={handleSaveSettings}>{t('Save changes')}</Button>

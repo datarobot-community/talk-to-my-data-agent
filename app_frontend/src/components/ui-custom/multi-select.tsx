@@ -137,7 +137,7 @@ export const MultiSelect = React.forwardRef<HTMLButtonElement, MultiSelectProps>
                         key={value}
                         className={cn(multiSelectVariants({ variant }))}
                         style={{ animationDuration: `${animation}s` }}
-                        variant="secondary"
+                        type="outline"
                       >
                         <TruncatedText>{option?.label}</TruncatedText>
                         {option?.postfix && <span className="ml-1">{option?.postfix}</span>}
@@ -157,8 +157,8 @@ export const MultiSelect = React.forwardRef<HTMLButtonElement, MultiSelectProps>
                         'bg-transparent text-foreground border-foreground/1 hover:bg-transparent',
                         multiSelectVariants({ variant })
                       )}
+                      type="outline"
                       style={{ animationDuration: `${animation}s` }}
-                      variant="secondary"
                     >
                       {`+ ${selectedValues.length - maxCount} more`}
                       <XIcon

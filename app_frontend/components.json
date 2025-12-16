@@ -15,7 +15,11 @@
     "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
-    "hooks": "@/hooks"
+    "hooks": "@/hooks",
+    "theme": "@/theme"
+  },
+  "registries": {
+    "@dr-ui": "https://dr-ui.datarobot.com/r/{name}.json"
   },
   "iconLibrary": "lucide"
 }

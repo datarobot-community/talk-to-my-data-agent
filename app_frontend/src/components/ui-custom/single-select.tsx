@@ -115,10 +115,10 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                     return (
                       <>
                         <Badge
+                          type="outline"
                           key={selectedValue}
                           className={cn(singleSelectVariants({ variant }))}
                           style={{ animationDuration: `${animation}s` }}
-                          variant="secondary"
                         >
                           <TruncatedText>{option?.label}</TruncatedText>
                           {option?.postfix && <span className="ml-1">{option?.postfix}</span>}

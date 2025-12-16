@@ -4,6 +4,7 @@ import './App.css';
 import Pages from './pages';
 import { useDataRobotInfo } from './api/user/hooks';
 import i18n, { getSavedLanguage } from './i18n';
+import { ThemeProvider } from './theme/theme-provider';
 
 function App() {
   const { data: dataRobotInfo } = useDataRobotInfo();
@@ -19,10 +20,12 @@ function App() {
   }, [dataRobotInfo]);
 
   return (
-    <>
-      {isReady && <Pages />}
-      <Toaster />
-    </>
+    <ThemeProvider>
+      <div className="h-screen">
+        {isReady && <Pages />}
+        <Toaster />
+      </div>
+    </ThemeProvider>
   );
 }
 

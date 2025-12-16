@@ -132,7 +132,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     >
       <DialogTrigger asChild>
         <Button
-          variant="outline"
+          variant="secondary"
           testId="add-data-button"
           className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]')}
         >
@@ -143,7 +143,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         <DialogHeader>
           <DialogTitle>{t('Add Data')}</DialogTitle>
           <Separator className="border-t" />
-          <DialogDescription></DialogDescription>
+          <DialogDescription />
         </DialogHeader>
         <DataSourceSelector value={dataSource} onChange={setDataSource} />
         <Separator className="my-4 border-t" />

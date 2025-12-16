@@ -57,9 +57,9 @@ const SidebarMenuOption = ({
         }
       }}
       className={cn(
-        'flex gap-2 pr-3 pl-2 py-2 rounded border-l-[5px] border-transparent overflow-hidden transition-colors cursor-pointer hover:bg-card',
+        'flex gap-2 pr-3 pl-2 py-2 rounded border-l-2 border-transparent overflow-hidden transition-colors cursor-pointer hover:bg-card',
         {
-          'rounded-l-none border-l-[5px] border-purple bg-card': active,
+          'rounded-l-none border-l-2 border-l-accent bg-card': active,
           'opacity-50 cursor-not-allowed': disabled,
         }
       )}

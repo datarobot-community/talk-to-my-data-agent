@@ -54,7 +54,7 @@ function ToggleGroupItem({
           variant: context.variant || variant,
           size: context.size || size,
         }),
-        'min-w-0 flex-1 shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 data-[variant=outline]:border-l-0 data-[variant=outline]:first:border-l cursor-pointer',
+        'min-w-0 flex-1 shrink-0 hover:bg-secondary hover:text-foreground rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 focus:bg-secondary data-[state=on]:bg-background data-[state=on]:text-foreground data-[variant=outline]:border-l-0 data-[variant=outline]:first:border-l cursor-pointer',
         className
       )}
       {...props}

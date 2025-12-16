@@ -1,0 +1,64 @@
+{
+  "midnight-gray": {
+    "midnight-gray-100": "#111519",
+    "midnight-gray-90": "#181D21",
+    "midnight-gray-80": "#1D2226",
+    "midnight-gray-70": "#22272B",
+    "midnight-gray-60": "#2A3036",
+    "midnight-gray-55": "#30373D",
+    "midnight-gray-50": "#3E454D",
+    "midnight-gray-40": "#727B84",
+    "midnight-gray-30": "#8F97A1",
+    "midnight-gray-20": "#B7BFC7",
+    "midnight-gray-10": "#E8EBED",
+    "midnight-gray-0": "#FFFFFF"
+  },
+  "alpine-light": {
+    "alpine-light-100": "#FFFFFF",
+    "alpine-light-90": "#F7F9FD",
+    "alpine-light-80": "#EFF3FB",
+    "alpine-light-70": "#E6ECF4",
+    "alpine-light-60": "#DEE3ED",
+    "alpine-light-55": "#D1D9E5",
+    "alpine-light-50": "#C4CEDE",
+    "alpine-light-40": "#8691A2",
+    "alpine-light-30": "#6B7380",
+    "alpine-light-20": "#474B52",
+    "alpine-light-10": "#1D1E21",
+    "alpine-light-0": "#1A1D20"
+  },
+  "accent": {
+    "purple-0": "#F6F8FE",
+    "purple-10": "#EDF1FF",
+    "purple-40": "#A7B0F7",
+    "purple-50": "#909BF5",
+    "purple-60": "#7770F9",
+    "purple-70": "#5C41FF"
+  },
+  "semantic": {
+    "red-40": "#F79797",
+    "red-50": "#ED7171",
+    "red-70": "#C24141",
+    "red-80": "#9A3131",
+    "green-40": "#56DF8A",
+    "green-50": "#2BC46F",
+    "green-70": "#008A48",
+    "green-80": "#016B3E",
+    "yellow-30": "#FBFB7C",
+    "yellow-40": "#E5D74C",
+    "yellow-70": "#966900",
+    "yellow-80": "#7E5400"
+  },
+  "data-viz": {
+    "azure-50": "#26A9F4",
+    "azure-80": "#0D57AD",
+    "orange-40": "#EDA769",
+    "orange-60": "#E3710D",
+    "turquoise-40": "#61BFC5",
+    "turquoise-60": "#00949F",
+    "pink-40": "#E98AD6",
+    "pink-60": "#D547B8",
+    "blue-40": "#87ADF8",
+    "blue-60": "#407CF3"
+  }
+}

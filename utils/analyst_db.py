@@ -121,7 +121,7 @@ def get_data_source_type(value: str) -> DataSourceType:
     Returns:
         DataSourceType: The corresponding data source type.
     """
-    if value in InternalDataSourceType:
+    if value in {s.value for s in InternalDataSourceType}:
         return InternalDataSourceType(value)
     elif DATA_STORE_TYPE_REGEX.match(value):
         return ExternalDataStoreNameDataSourceType(name=value)
@@ -370,44 +370,31 @@ class BaseDuckDBHandler(ABC):
 
     @asynccontextmanager
     async def _write_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        async with self._get_connection(write_connection=True) as x:
-            yield x
+        loop = asyncio.get_running_loop()
+        async with self._write_lock:
+            conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
+            try:
+                yield conn
+            finally:
+                await loop.run_in_executor(None, conn.close)
+            if self._storage:
+                read_conn = await loop.run_in_executor(
+                    None, duckdb.connect, self.db_path, False
+                )
+                try:
+                    await self._storage.save_to_storage(
+                        self.db_path.name, str(self.db_path.absolute())
+                    )
+                finally:
+                    await loop.run_in_executor(None, read_conn.close)
 
     @asynccontextmanager
     async def _read_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        async with self._get_connection(write_connection=False) as x:
-            yield x
-
-    @asynccontextmanager
-    async def _get_connection(
-        self, write_connection: bool = True
-    ) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        """Async context manager for database connections."""
         loop = asyncio.get_running_loop()
 
-        if write_connection:
-            async with self._save_to_storage():
-                conn = await loop.run_in_executor(
-                    None, duckdb.connect, self.db_path, False
-                )
-                yield conn
-                await loop.run_in_executor(None, conn.close)
-        else:
-            conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
-            yield conn
-            await loop.run_in_executor(None, conn.close)
-
-    @asynccontextmanager
-    async def _save_to_storage(
-        self,
-    ) -> AsyncGenerator[None, None]:
-        # Put this in lock so file doesn't change while being uploaded.
-        async with self._write_lock:
-            yield
-            if self._storage:
-                await self._storage.save_to_storage(
-                    self.db_path.name, str(self.db_path.absolute())
-                )
+        conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
+        yield conn
+        await loop.run_in_executor(None, conn.close)
 
     @telemetry.meter_and_trace
     async def execute_query(

@@ -1,73 +1,82 @@
-/* eslint-disable react-refresh/only-export-components */
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 focus-visible:ring-4 focus-visible:outline-1 aria-invalid:focus-visible:ring-0 cursor-pointer",
+const BUTTON_VARIANT = {
+  primary: 'primary',
+  secondary: 'secondary',
+  destructive: 'destructive',
+  ghost: 'ghost',
+  link: 'link',
+} as const;
+
+const BUTTON_SIZE = {
+  default: 'default',
+  sm: 'sm',
+  lg: 'lg',
+  icon: 'icon',
+  iconSm: 'icon-sm',
+} as const;
+
+const BUTTON_VARIANTS = cva(
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[1px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
-        destructive: 'bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90',
-        outline:
-          'border border-button bg-background shadow-xs hover:bg-accent hover:text-accent-foreground',
-        secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
-        'secondary-round':
-          'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 rounded-full h-9 w-9 p-0',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
-      },
-      // TODO: rounded-md shouldn't be part of size!, but of the variants
       size: {
-        default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-        sm: 'h-8 rounded-md px-3 has-[>svg]:px-2.5',
-        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-        icon: 'size-9',
+        [BUTTON_SIZE.default]: 'h-9 px-4 py-2 has-[>svg]:px-3',
+        [BUTTON_SIZE.sm]: 'h-8 gap-1.5 px-3 has-[>svg]:px-2.5',
+        [BUTTON_SIZE.lg]: 'h-10 px-6 has-[>svg]:px-4',
+        [BUTTON_SIZE.icon]: 'h-9 w-9',
+        [BUTTON_SIZE.iconSm]: 'h-5 w-5',
+      },
+      variant: {
+        [BUTTON_VARIANT.primary]:
+          'bg-primary text-primary-foreground hover:bg-accent disabled:bg-muted disabled:text-muted-foreground',
+        [BUTTON_VARIANT.destructive]:
+          'bg-destructive text-white hover:bg-destructive/90 disabled:brightness-70',
+        [BUTTON_VARIANT.secondary]:
+          'border border-foreground bg-background hover:text-accent hover:border-accent hover:bg-muted/50 disabled:border-foreground/50 disabled:text-foreground/50',
+        [BUTTON_VARIANT.ghost]: 'hover:bg-accent hover:bg-input px-2 disabled:text-foreground/50',
+        [BUTTON_VARIANT.link]: 'text-primary hover:text-accent p-0 disabled:text-foreground/50',
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: BUTTON_VARIANT.primary,
+      size: BUTTON_SIZE.default,
     },
   }
 );
 
-function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  testId,
-  title,
-  disabled,
-  ...props
-}: React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-    testId?: string;
-  }) {
+const Button = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<'button'> &
+    VariantProps<typeof BUTTON_VARIANTS> & {
+      asChild?: boolean;
+      testId?: string;
+    }
+>(({ className, variant, size, asChild = false, testId, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button';
 
   const buttonElement = (
     <Comp
-      data-slot="button"
       data-testid={testId}
-      className={cn(buttonVariants({ variant, size }), className)}
-      disabled={disabled}
-      title={title}
+      ref={ref}
+      data-slot="button"
+      className={cn(BUTTON_VARIANTS({ variant, size, className }))}
       {...props}
     />
   );
 
   /* wrap with span so the tooltip (title) will be shown even when disabled */
-  if (disabled && title) {
-    return <span title={title}>{buttonElement}</span>;
+  if (props.disabled && props.title) {
+    return <span title={props.title}>{buttonElement}</span>;
   }
 
   return buttonElement;
-}
+});
 
-export { Button, buttonVariants };
+Button.displayName = 'Button';
+
+export { Button, BUTTON_VARIANTS, BUTTON_VARIANT, BUTTON_SIZE };

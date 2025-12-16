@@ -20,7 +20,7 @@ interface ConfirmDialogProps {
   onCancel?: () => void;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'default' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'destructive';
   isLoading?: boolean;
 }
 
@@ -52,7 +52,7 @@ export function ConfirmDialog({
           <DialogDescription className="mb-2">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} testId="confirm-dialog-cancel">
+          <Button variant="secondary" onClick={handleCancel} testId="confirm-dialog-cancel">
             {cancelText}
           </Button>
           <Button

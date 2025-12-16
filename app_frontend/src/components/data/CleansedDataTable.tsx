@@ -93,7 +93,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
     <div className={`w-0 min-w-full ${className}`}>
       <div className={`overflow-auto ${maxHeight}`}>
         <table className="w-full caption-bottom text-sm">
-          <TableHeader className="bg-background sticky top-0 z-10">
+          <TableHeader className="sticky top-0 z-10">
             <TableRow>
               {columns.map(column => (
                 <TableHead key={column} className="whitespace-nowrap">

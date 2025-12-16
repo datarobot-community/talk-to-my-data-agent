@@ -106,29 +106,30 @@ export const DatasetCardDescriptionPanel = forwardRef<
         </h3>
         <div className="flex justify-between pt-1">
           <div className="flex gap-2 my-1">
-            <Badge variant="secondary" className="leading-tight text-sm">
+            <Badge type="outline" className="leading-tight text-sm">
               {isLoadingMetadata
                 ? t('Loading...')
                 : `${metadata?.columns?.length || 0} ${t('features')}`}
             </Badge>
-            <Badge variant="secondary" className="leading-tight text-sm">
+            <Badge type="outline" className="leading-tight text-sm">
               {isLoadingMetadata
                 ? t('Loading...')
                 : `${metadata?.row_count?.toLocaleString() || 0} ${t('rows')}`}
             </Badge>
-            <Badge variant="secondary" className="leading-tight text-sm">
+            <Badge type="outline" className="leading-tight text-sm">
               {isLoadingMetadata ? t('Loading...') : size}
             </Badge>
-            <Badge variant="secondary" className="leading-tight text-sm">
+            <Badge type="outline" className="leading-tight text-sm">
               {metadata?.data_source ? friendlySourceName(metadata.data_source) : t('file')}
             </Badge>
             {isProcessing ? (
-              <Badge variant="outline" className="leading-tight text-sm">
+              <Badge type="outline" className="leading-tight text-sm">
                 <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
                 {t('Processing...')}
               </Badge>
             ) : (
               <Badge
+                type="outline"
                 variant="success"
                 testId="data-processed-badge"
                 className="leading-tight text-sm"

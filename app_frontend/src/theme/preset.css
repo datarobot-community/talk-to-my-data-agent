@@ -1,0 +1,138 @@
+@import '@fontsource/inter/index.css';
+@import '@fontsource/roboto-mono/400.css';
+
+@config './tailwind.config.ts';
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --font-serif: 'Inter', sans-serif;
+  --font-mono: 'Roboto Mono';
+  --radius: 0.375rem;
+  --background: var(--alpine-light-90);
+  --foreground: var(--alpine-light-10);
+  --primary: var(--alpine-light-10);
+  --primary-foreground: var(--alpine-light-100);
+  --secondary: var(--purple-0);
+  --secondary-foreground: var(--alpine-light-20);
+  --muted: var(--alpine-light-60);
+  --muted-foreground: var(--alpine-light-30);
+  --accent: var(--purple-70);
+  --accent-foreground: var(--purple-70);
+  --destructive: var(--red-70);
+  --ring: var(--alpine-light-0);
+  --border: var(--alpine-light-50);
+  --input: var(--alpine-light-100);
+  --card: var(--alpine-light-100);
+  --card-foreground: var(--alpine-light-10);
+  --popover: var(--alpine-light-80);
+  --popover-foreground: var(--alpine-light-10);
+
+  --sidebar: var(--alpine-light-100);
+  --sidebar-foreground: var(--alpine-light-10);
+  --sidebar-primary: var(--purple-10);
+  --sidebar-primary-foreground: var(--alpine-light-20);
+  --sidebar-accent: var(--purple-10);
+  --sidebar-accent-foreground: var(--alpine-light-10);
+  --sidebar-border: var(--alpine-light-60);
+  --sidebar-ring: var(--alpine-light-0);
+
+  --chart-1: var(--purple-70);
+  --chart-2: var(--pink-60);
+  --chart-3: var(--turquoise-60);
+  --chart-4: var(--orange-60);
+  --chart-5: var(--blue-60);
+
+  --link: var(--azure-80);
+  --success: var(--green-70);
+  --warning: var(--yellow-70);
+}
+
+.dark {
+  --background: var(--midnight-gray-90);
+  --foreground: var(--midnight-gray-10);
+  --primary: var(--midnight-gray-0);
+  --secondary: var(--midnight-gray-55);
+  --secondary-foreground: var(--midnight-gray-20);
+  --primary-foreground: var(--midnight-gray-90);
+  --muted: var(--midnight-gray-50);
+  --muted-foreground: var(--midnight-gray-30);
+  --accent: var(--purple-40);
+  --accent-foreground: var(--purple-40);
+  --destructive: var(--red-70);
+  --ring: var(--midnight-gray-0);
+  --border: var(--midnight-gray-50);
+  --input: var(--midnight-gray-60);
+  --card: var(--midnight-gray-70);
+  --card-foreground: var(--midnight-gray-10);
+  --popover: var(--midnight-gray-60);
+  --popover-foreground: var(--midnight-gray-10);
+
+  --sidebar: var(--midnight-gray-80);
+  --sidebar-foreground: var(--midnight-gray-10);
+  --sidebar-primary: var(--midnight-gray-50);
+  --sidebar-primary-foreground: var(--midnight-gray-20);
+  --sidebar-accent: var(--midnight-gray-50);
+  --sidebar-accent-foreground: var(--midnight-gray-10);
+  --sidebar-border: var(--midnight-gray-60);
+  --sidebar-ring: var(--midnight-gray-50);
+
+  --chart-1: var(--purple-50);
+  --chart-2: var(--pink-40);
+  --chart-3: var(--turquoise-40);
+  --chart-4: var(--orange-40);
+  --chart-5: var(--blue-40);
+
+  --link: var(--azure-50);
+  --success: var(--green-40);
+  --warning: var(--yellow-40);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground body;
+    font-family: var(--font-serif);
+  }
+  * {
+    border-color: var(--border);
+    /* TODO do we ned this? */
+    /* @apply border-border outline-ring/50; */
+  }
+}

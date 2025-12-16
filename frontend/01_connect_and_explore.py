@@ -338,6 +338,16 @@ async def main() -> None:
     # Main content area
     display_page_logo()
     st.title("Explore")
+
+    # Display deprecation warning
+    st.warning(
+        "**Deprecation Notice:** The Streamlit frontend will be removed on March 20th, 2026. "
+        "Please migrate to the React frontend (default) for enhanced UI features and better performance. "
+        'To switch, remove `FRONTEND_TYPE="streamlit"` from your `.env` file and redeploy. '
+        "[Learn more](https://github.com/datarobot-community/talk-to-my-data-agent?tab=readme-ov-file#change-the-frontend)",
+        icon="⚠️",
+    )
+
     if "analyst_db" not in st.session_state:
         st.warning("Could not identify user, please provide your API token")
         return

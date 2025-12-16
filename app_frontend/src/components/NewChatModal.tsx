@@ -45,7 +45,7 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
       <DialogTrigger asChild>
         <Button
           className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]')}
-          variant="outline"
+          variant="secondary"
         >
           <FontAwesomeIcon icon={faPlus} /> {t('New chat')}
         </Button>

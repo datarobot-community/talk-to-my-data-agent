@@ -18,14 +18,11 @@ describe('Button Component', () => {
 
     expect(button).toHaveClass('bg-destructive');
 
-    rerender(<Button variant="outline">Outline</Button>);
-    expect(screen.getByRole('button', { name: /outline/i })).toHaveClass('border-button');
-
     rerender(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-secondary');
+    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-background');
 
     rerender(<Button variant="ghost">Ghost</Button>);
-    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-accent');
+    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-input');
 
     rerender(<Button variant="link">Link</Button>);
     expect(screen.getByRole('button', { name: /link/i })).toHaveClass('text-primary');
@@ -44,7 +41,7 @@ describe('Button Component', () => {
     expect(screen.getByRole('button', { name: /large/i })).toHaveClass('h-10');
 
     rerender(<Button size="icon">Icon</Button>);
-    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('size-9');
+    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('h-9 w-9');
   });
 
   test('applies custom className', () => {

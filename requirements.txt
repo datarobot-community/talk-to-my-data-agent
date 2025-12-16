@@ -1,5 +1,5 @@
 # infra
-pulumi==3.153.0
+pulumi>=3.153.0
 pulumi-command<1.1.0
 pulumi-datarobot>=0.10.22
 datarobot-pulumi-utils>=0.0.2.post8,<0.1

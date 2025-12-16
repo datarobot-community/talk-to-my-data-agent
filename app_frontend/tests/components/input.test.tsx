@@ -73,6 +73,7 @@ describe('Input Component', () => {
     const input = screen.getByRole('textbox');
 
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(input).toHaveClass('aria-invalid:border-destructive/60');
+
+    expect(input).toHaveClass('aria-invalid:border-destructive');
   });
 });

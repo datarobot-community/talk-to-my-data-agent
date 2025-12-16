@@ -82,8 +82,9 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
           'bg-transparent placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
           'text-base transition-[color,box-shadow]',
           'ring-ring/10 outline-ring/50',
+          !isFocused && 'hover:border-muted-foreground',
           isFocused &&
-            'ring-4 outline-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+            'border-accent outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
           sendButtonArrangement === 'prepend' ? 'flex-row-reverse' : 'flex-row',
           className
         )}

@@ -107,7 +107,7 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
 
   return (
     <Table>
-      <TableHeader className="bg-background">
+      <TableHeader>
         <TableRow>
           <TableHead className="w-[200px]">{t('Column')}</TableHead>
           <TableHead>{t('Type')}</TableHead>
