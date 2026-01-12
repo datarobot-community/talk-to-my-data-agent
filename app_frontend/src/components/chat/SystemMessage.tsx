@@ -25,31 +25,27 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message, testId })
           <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
             <Zap className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-sm font-semibold leading-tight">{t('Summarization')}</div>
+          <div className="mn-label-large">{t('Summarization')}</div>
           {message.created_at && (
-            <div className="text-xs font-normal leading-[17px]">
-              {formatMessageDate(message.created_at)}
-            </div>
+            <div className="body-secondary">{formatMessageDate(message.created_at)}</div>
           )}
         </div>
       </div>
-      <div className="self-stretch text-sm font-normal leading-tight">
+      <div className="self-stretch body">
         {message.in_progress ? (
           <Loading
             statusText={t("Condensing conversation history to stay within model's context limits")}
           />
         ) : message.error ? (
-          <div className="text-destructive text-sm">{message.error}</div>
+          <div className="text-destructive body">{message.error}</div>
         ) : (
           <div>
-            <div className="text-sm mb-2">
+            <div className="body mb-2">
               {t(
                 "Previous messages have been condensed to stay within model's context limits. Your full chat history is preserved."
               )}
             </div>
-            <div className="whitespace-pre-wrap text-xs text-muted-foreground">
-              {message.content}
-            </div>
+            <div className="whitespace-pre-wrap body-secondary">{message.content}</div>
           </div>
         )}
       </div>

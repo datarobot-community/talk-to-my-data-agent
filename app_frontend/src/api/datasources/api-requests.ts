@@ -1,6 +1,6 @@
 import apiClient from '../apiClient';
 
-export type ExternalDataSource = {
+type ExternalDataSource = {
   data_store_id: string;
   database_catalog: string | null;
   database_schema: string | null;
@@ -24,11 +24,6 @@ export type ExternalDataStore = {
 
 export async function listAvailableExternalDataStores(): Promise<ExternalDataStore[]> {
   const { data } = await apiClient.get<ExternalDataStore[]>('/v1/available-external-data-stores');
-  return data;
-}
-
-export async function listRegisteredExternalDataStores(): Promise<ExternalDataStore[]> {
-  const { data } = await apiClient.get<ExternalDataStore[]>('/v1/external-data-stores');
   return data;
 }
 

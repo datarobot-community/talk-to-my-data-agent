@@ -46,3 +46,7 @@ jobs:
       - name: Run Lint
         run: npm run lint
         working-directory: app_frontend
+
+      - name: Run Knip
+        run: npm run knip
+        working-directory: app_frontend

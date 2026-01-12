@@ -20,6 +20,7 @@ export const UserPrompt = ({
   activeChat?: IChat;
 }) => {
   const { t } = useTranslation();
+
   const {
     enableChartGeneration,
     enableBusinessInsights,
@@ -48,6 +49,7 @@ export const UserPrompt = ({
         })
       }
       isProcessing={hasInProgressMessages}
+      chatId={chatId}
       placeholder={
         isDataUploadRequired
           ? t('Please upload and process data using the sidebar before starting the chat')

@@ -232,25 +232,8 @@ export const useDeleteChat = ({ onSuccess }: { onSuccess?: () => void }) => {
   const queryClient = useQueryClient();
   const mutation = useMutation<void, Error, IDeleteChatParams, { previousChats: IChat[] }>({
     mutationFn: ({ chatId }) => deleteChat({ chatId }),
-    onMutate: async ({ chatId }) => {
-      await queryClient.cancelQueries({ queryKey: messageKeys.chats });
-
-      const previousChats = queryClient.getQueryData<IChat[]>(messageKeys.chats) || [];
-
-      queryClient.setQueryData<IChat[]>(messageKeys.chats, oldData => {
-        if (!oldData) return [];
-        return oldData.filter(chat => chat.id !== chatId);
-      });
-
-      return { previousChats };
-    },
-    onError: (_, __, context) => {
-      if (context?.previousChats) {
-        queryClient.setQueryData(messageKeys.chats, context.previousChats);
-      }
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: messageKeys.chats });
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: messageKeys.chats });
       // Invalidate the specific chat messages
       queryClient.invalidateQueries({
         queryKey: messageKeys.messages(variables.chatId),

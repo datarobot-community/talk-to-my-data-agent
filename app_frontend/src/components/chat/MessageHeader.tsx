@@ -97,8 +97,8 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
       <div className="self-stretch justify-between items-center gap-1 inline-flex">
         <div className="grow shrink basis-0 h-6 justify-start items-center gap-2 flex">
           {avatar()}
-          <div className="text-sm font-semibold leading-tight">{name}</div>
-          <div className="text-xs font-normal leading-[17px]">{date}</div>
+          <div className="mn-label-large">{name}</div>
+          <div className="body-secondary">{date}</div>
         </div>
         {isUserMessage && (
           <div className="flex items-center">

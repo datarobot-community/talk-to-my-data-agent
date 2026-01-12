@@ -38,8 +38,8 @@ export const WelcomeModal = () => {
               <div className="grid justify-center mb-3">
                 <img src={addData} alt="" />
               </div>
-              <p className="text-center text-base font-semibold">{t('Add data')}</p>
-              <DialogDescription className="text-center text-base text-muted-foreground leading-[20px] tracking-[-0.02px]">
+              <p className="text-center mn-label-large">{t('Add data')}</p>
+              <DialogDescription className="text-center body-secondary">
                 {t(
                   'Upload the datasets you want to analyze, no preprocessing or wrangling required!'
                 )}
@@ -49,8 +49,8 @@ export const WelcomeModal = () => {
               <div className="grid justify-center mb-3">
                 <img src={startChatting} alt="" />
               </div>
-              <p className="text-center text-base font-semibold">{t('Start chatting')}</p>
-              <DialogDescription className="text-center text-base text-muted-foreground leading-[20px] tracking-[-0.02px]">
+              <p className="text-center mn-label-large">{t('Start chatting')}</p>
+              <DialogDescription className="text-center body-secondary">
                 {t(
                   'Ask question and DataRobot automatically generates analytical code, datasets, and charts.'
                 )}

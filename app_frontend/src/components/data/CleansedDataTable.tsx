@@ -3,7 +3,7 @@ import { useInView } from 'react-intersection-observer';
 import { useInfiniteCleansedDataset } from '@/api/cleansed-datasets/hooks';
 import { useInfiniteDatasetById } from '@/api/datasets/hooks';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import loader from '@/assets/loader.svg';
+import { Loader2 } from 'lucide-react';
 import { Loading } from '@/components/ui-custom/loading';
 import { useTranslation } from '@/i18n';
 import { HighlightText } from '@/components/ui-custom/highlight-text';
@@ -92,7 +92,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
   return (
     <div className={`w-0 min-w-full ${className}`}>
       <div className={`overflow-auto ${maxHeight}`}>
-        <table className="w-full caption-bottom text-sm">
+        <table className="w-full caption-bottom body">
           <TableHeader className="sticky top-0 z-10">
             <TableRow>
               {columns.map(column => (
@@ -119,7 +119,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
         <div ref={ref} className="w-full text-center p-4">
           {isFetchingNextPage ? (
             <div className="flex justify-center items-center">
-              <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               <span className="ml-2">{t('Loading more...')}</span>
             </div>
           ) : (

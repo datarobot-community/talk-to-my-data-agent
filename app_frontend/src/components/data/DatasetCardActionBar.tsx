@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DATA_TABS } from '@/state/constants';
 import { SearchControl } from '@/components/ui-custom/search-control';
 import { cn } from '@/lib/utils';
-import loader from '@/assets/loader.svg';
+import { Loader2 } from 'lucide-react';
 
 interface DatasetCardActionBarProps {
   onSearch?: (searchText: string) => void;
@@ -54,7 +54,7 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
           disabled={isDisabled}
         >
           {isDownloading ? (
-            <img src={loader} alt={t('downloading')} className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <FontAwesomeIcon icon={faDownload} />
           )}

@@ -48,6 +48,7 @@ def try_simple_numeric_conversion(
     series: pl.Series,
     sample_series: pl.Series,
     original_nulls: pl.Series,
+    column_index: int,
 ) -> tuple[bool, pl.Series, list[str]]:
     simple_cleaned = sample_series.str.strip_chars().str.replace_all(
         r"['\s]+",
@@ -61,7 +62,10 @@ def try_simple_numeric_conversion(
 
     warnings = []
 
-    if simple_success_rate > 0.8:
+    # First column might be ids with alphanumerics
+    threshold = 1.0 if column_index == 0 else 0.9
+
+    if simple_success_rate >= threshold:
         warnings.append(
             f"Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
         )
@@ -142,6 +146,7 @@ def try_unit_conversion(
     series: pl.Series,
     sample_series: pl.Series,
     original_nulls: pl.Series,
+    column_index: int,
 ) -> tuple[bool, pl.Series, list[str]]:
     """
     Try to convert a series with units to numeric values, first testing on a sample.
@@ -179,7 +184,10 @@ def try_unit_conversion(
         sample_result
     )
 
-    if conversion_success_rate > 0.8:
+    # First column might be ids with alphanumerics
+    threshold = 1.0 if column_index == 0 else 0.9
+
+    if conversion_success_rate >= threshold:
         # If sample conversion was successful, convert full dataset using detected patterns
         warnings.append(
             f"Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
@@ -199,6 +207,7 @@ def try_datetime_conversion(
     series: pl.Series,
     sample_series: pl.Series,
     original_nulls: pl.Series,
+    column_index: int,
 ) -> tuple[bool, pl.Series, list[str]]:
     # try to convert to date
 
@@ -242,6 +251,7 @@ def try_string_trim(
     series: pl.Series,
     sample_series: pl.Series,
     original_nulls: pl.Series,
+    column_index: int,
 ) -> tuple[bool, pl.Series, list[str]]:
     """
     Trim leading and trailing whitespace from string values.
@@ -303,6 +313,9 @@ def process_column(
 
     if df[column_name].dtype == pl.String:
         column_report.original_dtype = "string"
+
+        column_index = list(df.columns).index(column_name)
+
         conversions = [
             ("simple_clean", try_simple_numeric_conversion),
             ("unit_conversion", try_unit_conversion),
@@ -320,6 +333,7 @@ def process_column(
                     df[column_name],
                     sample_df[column_name],
                     original_nulls,
+                    column_index,
                 )
 
                 logger.debug(

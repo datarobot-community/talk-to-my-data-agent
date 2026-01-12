@@ -44,7 +44,7 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
     >
       <DialogTrigger asChild>
         <Button
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]')}
+          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
           variant="secondary"
         >
           <FontAwesomeIcon icon={faPlus} /> {t('New chat')}
@@ -63,7 +63,7 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
+            <Label htmlFor="name" className="text-right mn-label">
               {t('Chat name')}
             </Label>
             <Input

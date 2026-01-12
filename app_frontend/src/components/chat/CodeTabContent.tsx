@@ -5,14 +5,14 @@ import { useTranslation } from '@/i18n';
 // @ts-expect-error ???
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 // @ts-expect-error ???
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './MarkdownContent.css';
 import { Button } from '@/components/ui/button';
 import { useDownloadDataset } from '@/api/datasets/hooks';
 import { useAppState } from '@/state';
-import loader from '@/assets/loader.svg';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { CopyToClipboardButton } from '@/components/ui-custom/copy-to-clipboard-button';
+import { useTheme } from '@/theme/theme-provider';
 
 interface CodeTabContentProps {
   code?: string | null;
@@ -23,6 +23,7 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId 
   const { t } = useTranslation();
   const { mutate: downloadDataset, isPending: isDownloadingDataset } = useDownloadDataset();
   const { includeCsvBom } = useAppState();
+  const { theme } = useTheme();
 
   const downloadTooltip = isDownloadingDataset ? t('Downloading...') : t('Download dataset as CSV');
 
@@ -39,7 +40,7 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId 
                 title={downloadTooltip}
               >
                 {isDownloadingDataset ? (
-                  <img src={loader} alt={t('downloading')} className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
@@ -59,7 +60,7 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId 
             <div className="markdown-content">
               <SyntaxHighlighter
                 language="python"
-                style={oneDark}
+                style={theme === 'dark' ? oneDark : oneLight}
                 customStyle={{
                   margin: 0,
                   borderRadius: '4px',

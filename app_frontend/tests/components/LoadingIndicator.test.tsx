@@ -7,19 +7,19 @@ vi.mock('@fortawesome/react-fontawesome', () => ({
   FontAwesomeIcon: () => <div data-testid="mock-icon" />,
 }));
 
-// Mock the loader SVG import
-vi.mock('@/assets/loader.svg', () => ({
-  default: 'mock-loader-path',
+// Mock the Loader2 component from lucide-react
+vi.mock('lucide-react', () => ({
+  Loader2: ({ className }: { className?: string }) => (
+    <svg data-testid="loader" className={className} />
+  ),
 }));
 
 describe('LoadingIndicator Component', () => {
   test('renders loader when isLoading is true', () => {
     render(<LoadingIndicator isLoading={true} />);
 
-    const loader = screen.getByRole('img');
+    const loader = screen.getByTestId('loader');
     expect(loader).toBeInTheDocument();
-    expect(loader).toHaveAttribute('src', 'mock-loader-path');
-    expect(loader).toHaveAttribute('alt', 'processing');
     expect(loader).toHaveClass('animate-spin');
 
     // Check that the icon is not rendered
@@ -30,7 +30,7 @@ describe('LoadingIndicator Component', () => {
     render(<LoadingIndicator isLoading={false} />);
 
     // Check that the loader is not rendered
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('loader')).not.toBeInTheDocument();
 
     // Check that the icon is rendered
     const icon = screen.getByTestId('mock-icon');

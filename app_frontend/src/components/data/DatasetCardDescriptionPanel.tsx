@@ -1,5 +1,5 @@
 import { useState, forwardRef, useEffect } from 'react';
-import { DictionaryTable as DT } from '@/api/dictionaries/types';
+import { DictionaryTable as DT, DictionaryRow } from '@/api/dictionaries/types';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -11,7 +11,7 @@ import { DatasetCardActionBar } from '@/components/data';
 import { useDatasetMetadata } from '@/api/cleansed-datasets/hooks';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
-import loader from '@/assets/loader.svg';
+import { Loader2 } from 'lucide-react';
 import { DictionaryTable } from './DictionaryTable';
 import { CleansedDataTable } from './CleansedDataTable';
 import { ValueOf } from '@/state/types';
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import { useDatasetDictionarySearch } from '@/hooks/useDatasetSearch';
 import { useAppState } from '@/state';
+import { toast } from 'sonner';
 
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
 import { friendlySourceName } from '@/api/datasources/utils';
@@ -81,11 +82,40 @@ export const DatasetCardDescriptionPanel = forwardRef<
 
   const size = metadata?.file_size ? formatFileSize(metadata.file_size) : '0 MB';
 
+  // Shared handler for dictionary cell updates
+  const handleUpdateCell = (rowIndex: number, field: keyof DictionaryRow, value: string) => {
+    const originalRowIndex = getOriginalRowIndex(rowIndex);
+
+    // Show warning when editing data type
+    if (field === 'data_type') {
+      toast.warning(
+        t(
+          "This type hint will guide the AI during analysis. It won't change the stored data, which was already processed during upload."
+        )
+      );
+    }
+
+    updateCell(
+      {
+        name: dictionary.name,
+        rowIndex: originalRowIndex,
+        field,
+        value,
+      },
+      {
+        onError: () => {
+          // Error handling is managed by React Query's
+          // automatic cache restoration
+        },
+      }
+    );
+  };
+
   return (
     <div
       ref={ref}
-      className={cn('flex flex-col w-full bg-card p-4', {
-        'h-[400px]': isProcessing,
+      className={cn('flex flex-col w-full bg-card p-4 shrink-0', {
+        'h-[300px]': isProcessing,
         'h-full overflow-hidden': fullHeight,
       })}
     >
@@ -101,7 +131,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
         onConfirm={() => deleteDictionary({ name: dictionary.name })}
       />
       <div>
-        <h3 className="text-lg">
+        <h3 className="heading-05 mb-2">
           <strong>{dictionary.name}</strong>
         </h3>
         <div className="flex justify-between pt-1">
@@ -124,7 +154,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
             </Badge>
             {isProcessing ? (
               <Badge type="outline" className="leading-tight text-sm">
-                <img src={loader} alt={t('processing')} className="mr-2 w-4 h-4 animate-spin" />
+                <Loader2 className="mr-2 w-4 h-4 animate-spin" />
                 {t('Processing...')}
               </Badge>
             ) : (
@@ -151,7 +181,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
           />
         </div>
       </div>
-      <div className="flex flex-col flex-1 text-lg min-h-0 overflow-hidden">
+      <div className="flex flex-col flex-1 mn-label-large min-h-0 overflow-hidden">
         {isProcessing ? (
           <div className="flex flex-col flex-1 items-center justify-center">
             {t('Processing the dataset may take a few minutes...')}
@@ -163,23 +193,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
               <DictionaryTable
                 data={filteredDictionary}
                 searchText={searchText}
-                onUpdateCell={(rowIndex, field, value) => {
-                  const originalRowIndex = getOriginalRowIndex(rowIndex);
-                  updateCell(
-                    {
-                      name: dictionary.name,
-                      rowIndex: originalRowIndex,
-                      field,
-                      value,
-                    },
-                    {
-                      onError: () => {
-                        // Error handling is managed by React Query's
-                        // automatic cache restoration
-                      },
-                    }
-                  );
-                }}
+                onUpdateCell={handleUpdateCell}
               />
             ) : (
               <CleansedDataTable
@@ -198,23 +212,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
                 <DictionaryTable
                   data={filteredDictionary}
                   searchText={searchText}
-                  onUpdateCell={(rowIndex, field, value) => {
-                    const originalRowIndex = getOriginalRowIndex(rowIndex);
-                    updateCell(
-                      {
-                        name: dictionary.name,
-                        rowIndex: originalRowIndex,
-                        field,
-                        value,
-                      },
-                      {
-                        onError: () => {
-                          // Error handling is managed by React Query's
-                          // automatic cache restoration
-                        },
-                      }
-                    );
-                  }}
+                  onUpdateCell={handleUpdateCell}
                 />
               </div>
             ) : (

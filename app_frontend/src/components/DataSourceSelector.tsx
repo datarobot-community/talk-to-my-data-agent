@@ -21,7 +21,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
       <RadioGroup value={value} onValueChange={onChange}>
         <div className="flex space-x-2">
           <RadioGroupItem value={DATA_SOURCES.FILE} id="r1" />
-          <Label htmlFor="r1" className="font-bold">
+          <Label htmlFor="r1" className="mn-label">
             {t('Local file or Data Registry')}
           </Label>
           <Tooltip>
@@ -29,7 +29,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
               <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-muted-foreground font-normal">
+              <p className="body">
                 {t(
                   'Select to upload a local file or your DataRobot Data Registry file up to 200 MB.'
                 )}
@@ -39,7 +39,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
         </div>
         <div className="flex space-x-2">
           <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r2" />
-          <Label htmlFor="r2" className="font-bold">
+          <Label htmlFor="r2" className="mn-label">
             {t('Remote Data Registry')}
           </Label>
           <Tooltip>
@@ -47,7 +47,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
               <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-muted-foreground font-normal">
+              <p className="body">
                 {t(
                   'Connect and add data from your remote data registry for files greater than 200 MB, up to a maximum of 10 GB. Processing large files may involve lengthy runtimes and increased costs.'
                 )}
@@ -59,7 +59,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
         {/* Not yet putting a conditional here, though probably in a future release. */}
         <div className="flex space-x-2">
           <RadioGroupItem value={DATA_SOURCES.DATABASE} id="r3" />
-          <Label htmlFor="r3" className="font-bold">
+          <Label htmlFor="r3" className="mn-label">
             {t('Database')}
           </Label>
           <Tooltip>
@@ -67,7 +67,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
               <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-muted-foreground font-normal">
+              <p className="body">
                 {t(
                   'Select tables from the application-configured database. This option supports Snowflake, SAP DataSphere, and BigQuery.'
                 )}
@@ -77,7 +77,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
         </div>
         <div className="flex space-x-2">
           <RadioGroupItem value={NEW_DATA_STORE} id="r4" />
-          <Label htmlFor="r4" className="font-bold">
+          <Label htmlFor="r4" className="mn-label">
             {t('Remote Data Connections')}
           </Label>
           <Tooltip>
@@ -85,7 +85,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
               <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-muted-foreground font-normal">
+              <p className="body">
                 {t(
                   'Select tables from DataRobot supported data store connections, such as Redshift or PostgreSQL.'
                 )}

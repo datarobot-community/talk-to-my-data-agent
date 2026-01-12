@@ -26,9 +26,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, chatId, messa
       key={message.id}
     >
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
-      <div className="self-stretch text-sm font-normal leading-tight whitespace-pre-line">
-        {message.content}
-      </div>
+      <div className="self-stretch body whitespace-pre-line">{message.content}</div>
       {message.in_progress && (
         <div className="flex w-full justify-start">
           <Loading />

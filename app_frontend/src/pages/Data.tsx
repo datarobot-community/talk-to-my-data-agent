@@ -59,9 +59,7 @@ export const Data: React.FC = () => {
 
   return (
     <div className="p-6 pr-0 flex flex-col h-full">
-      <h2 className="text-xl">
-        <strong>{t('Data')}</strong>
-      </h2>
+      <h2 className="heading-04">{t('Data')}</h2>
       <div className="flex justify-between gap-2">
         <div className="flex gap-2 items-center">
           <div className="text-sm">{t('View')}</div>

@@ -3,18 +3,43 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+const ALERT_VARIANT = {
+  destructive: 'destructive',
+  info: 'info',
+  warning: 'warning',
+  success: 'success',
+};
+
 const alertVariants = cva(
-  'relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
+  `
+    relative w-full rounded-lg border bg-popover px-4 pt-4 pb-2 text-sm
+    [&>svg]:absolute [&>svg]:top-4 [&>svg]:left-4 [&>svg]:h-[14] [&>svg]:w-[16]
+    [&>svg+div]:translate-y-[-3px]
+    [&>svg~*]:pl-6
+  `,
   {
     variants: {
       variant: {
-        default: 'bg-card text-card-foreground',
-        destructive:
-          'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
+        [ALERT_VARIANT.info]: `
+          border-primary
+          [&>svg]:text-primary
+        `,
+        [ALERT_VARIANT.destructive]: `
+          border-destructive/90
+          [&>svg]:text-destructive/90
+        `,
+        [ALERT_VARIANT.warning]: `
+          border-warning/75
+          [&>svg]:text-warning/75
+        `,
+        [ALERT_VARIANT.success]: `
+          border-success/75
+          [&>svg]:text-success/75
+        `,
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: ALERT_VARIANT.info,
     },
   }
 );
@@ -38,7 +63,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="alert-title"
-      className={cn('col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight', className)}
+      className={cn('mb-1 font-normal text-primary', className)}
       {...props}
     />
   );
@@ -47,9 +72,11 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
 function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
-      data-slot="alert-description"
       className={cn(
-        'text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed',
+        `
+          text-xs text-secondary-foreground
+          [&_p]:leading-relaxed
+        `,
         className
       )}
       {...props}
@@ -57,4 +84,21 @@ function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) 
   );
 }
 
-export { Alert, AlertTitle, AlertDescription };
+function AlertFooter({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="alert-footer"
+      className={cn(
+        `
+          mt-4 flex min-h-0 items-center gap-4 text-sm text-primary
+          [&>*:first-child]:pl-0
+          [&>a]:no-underline
+        `,
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+export { Alert, AlertTitle, AlertDescription, AlertFooter, ALERT_VARIANT };

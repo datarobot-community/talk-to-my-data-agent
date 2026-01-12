@@ -19,7 +19,10 @@ type PromptInputProps = Omit<
   isDisabled?: boolean;
   testId?: string;
   initialValue?: string;
+  chatId?: string;
 };
+
+export const getChatMessageKey = (chatId: string) => `chat-${chatId}-message`;
 
 const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
   (
@@ -31,13 +34,24 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
       isDisabled,
       testId = 'chat-prompt-input',
       initialValue = '',
+      chatId = 'initial',
       ...props
     },
     ref
   ) => {
     const { t } = useTranslation();
+    const chatMessageKey = getChatMessageKey(chatId);
     const internalRef = useRef<HTMLTextAreaElement>(null);
-    const [message, setMessage] = useState(initialValue);
+    const [message, setMessage] = useState(
+      initialValue || localStorage.getItem(chatMessageKey) || ''
+    );
+
+    useEffect(() => {
+      const timeout = setTimeout(() => {
+        localStorage.setItem(chatMessageKey, message);
+      }, 200);
+      return () => clearTimeout(timeout);
+    }, [message, chatMessageKey]);
 
     useImperativeHandle(ref, () => internalRef.current as HTMLTextAreaElement);
     useEffect(() => {
@@ -59,6 +73,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
       if (message.trim()) {
         onSend?.(message);
         setMessage('');
+        localStorage.removeItem(chatMessageKey);
       }
     };
 
@@ -78,7 +93,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
         data-testid={testId}
         className={cn(
           'flex gap-2 justify-start items-center px-3 py-3 w-full min-w-3xs mr-4',
-          'border-input rounded-md border shadow-xs',
+          'border-border rounded-md border shadow-xs',
           'bg-transparent placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
           'text-base transition-[color,box-shadow]',
           'ring-ring/10 outline-ring/50',

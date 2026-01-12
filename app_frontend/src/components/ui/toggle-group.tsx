@@ -1,66 +1,72 @@
+'use client';
+
 import * as React from 'react';
 import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group';
-import { type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
-import { toggleVariants } from '@/components/ui/toggle';
-
-const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariants>>({
-  size: 'default',
-  variant: 'default',
-});
 
 function ToggleGroup({
   className,
-  variant,
-  size,
-  children,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Root> & VariantProps<typeof toggleVariants>) {
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Root>) {
   return (
     <ToggleGroupPrimitive.Root
       data-slot="toggle-group"
-      data-variant={variant}
-      data-size={size}
       className={cn(
-        'group/toggle-group flex w-fit items-center rounded-md data-[variant=outline]:shadow-xs',
+        'inline-flex items-center rounded-lg border-2 border-sidebar-border bg-sidebar-border',
         className
       )}
       {...props}
-    >
-      <ToggleGroupContext.Provider value={{ variant, size }}>
-        {children}
-      </ToggleGroupContext.Provider>
-    </ToggleGroupPrimitive.Root>
+    />
   );
 }
 
 function ToggleGroupItem({
   className,
-  children,
-  variant,
-  size,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> & VariantProps<typeof toggleVariants>) {
-  const context = React.useContext(ToggleGroupContext);
-
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Item>) {
   return (
     <ToggleGroupPrimitive.Item
       data-slot="toggle-group-item"
-      data-variant={context.variant || variant}
-      data-size={context.size || size}
       className={cn(
-        toggleVariants({
-          variant: context.variant || variant,
-          size: context.size || size,
-        }),
-        'min-w-0 flex-1 shrink-0 hover:bg-secondary hover:text-foreground rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 focus:bg-secondary data-[state=on]:bg-background data-[state=on]:text-foreground data-[variant=outline]:border-l-0 data-[variant=outline]:first:border-l cursor-pointer',
+        // Base styles
+        'inline-flex items-center justify-center',
+        // Spacing
+        'px-4 py-1.5',
+        // Typography
+        'text-sm font-medium',
+        // Background & Text
+        'text-secondary-foreground',
+        // Shape & Border
+        'rounded-lg',
+        // Cursor & Interactivity
+        `
+          cursor-pointer
+          disabled:cursor-default
+        `,
+        // Focus state
+        `
+          outline-hidden
+          focus:bg-muted focus:text-accent
+          focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring
+        `,
+        // Hover state
+        'hover:bg-muted hover:text-accent',
+        // Active/Pressed state
+        `
+          focus:z-2
+          data-[state=on]:border-accent data-[state=on]:bg-sidebar-accent data-[state=on]:text-foreground
+        `,
+        // Disabled state
+        'data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground data-[disabled]:opacity-50',
+        // Text selection
+        'select-none',
+        // Transitions
+        'transition-colors',
         className
       )}
       {...props}
-    >
-      {children}
-    </ToggleGroupPrimitive.Item>
+    />
   );
 }
 

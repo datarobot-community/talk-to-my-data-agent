@@ -8,8 +8,8 @@ interface HeaderSectionProps {
 export const HeaderSection: React.FC<HeaderSectionProps> = ({ title, children }) => {
   return (
     <>
-      <div className="text-primary text-base font-semibold leading-tight">{title}</div>
-      <div className="text-primary text-sm font-normal leading-tight mt-1 mb-4">{children}</div>
+      <div className="text-primary mn-label-large">{title}</div>
+      <div className="text-primary body-secondary mt-1 mb-4">{children}</div>
     </>
   );
 };

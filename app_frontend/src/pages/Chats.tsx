@@ -23,8 +23,9 @@ import { DataSourceToggle } from '@/components/DataSourceToggle';
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
 import { useMultipleDatasetMetadata } from '@/api/cleansed-datasets/hooks';
 import { DATA_SOURCES, EXTERNAL_DATA_STORE_PREFIX } from '@/constants/dataSources';
-
+import { Loading as ChatLoading } from '@/components/chat/Loading';
 import { ConfirmDialog } from '@/components/ui-custom/confirm-dialog';
+import { getChatMessageKey } from '@/components/ui-custom/prompt-input';
 
 // Lazy load ResponseMessage for better performance
 const ResponseMessage = lazy(() =>
@@ -34,8 +35,11 @@ const ResponseMessage = lazy(() =>
 );
 
 const ComponentLoading = () => {
-  const { t } = useTranslation();
-  return <div className="p-4 text-sm">{t('Loading component...')}</div>;
+  return (
+    <div className="p-3 bg-card rounded flex mb-2.5 mr-2">
+      <ChatLoading />
+    </div>
+  );
 };
 
 export const Chats: React.FC = () => {
@@ -57,7 +61,7 @@ export const Chats: React.FC = () => {
   const { mutate: deleteChat, isPending: isDeleting } = useDeleteChat({
     onSuccess: () => {
       const otherChats = chats?.filter(chat => chat.id !== activeChat?.id) || [];
-
+      localStorage.removeItem(getChatMessageKey(activeChat?.id as string));
       setIsDeleteDialogOpen(false);
       if (otherChats.length > 0) {
         // Sort by creation date descending (newest first) to get the most recent chat
@@ -130,18 +134,7 @@ export const Chats: React.FC = () => {
 
     return (
       <>
-        <ConfirmDialog
-          open={isDeleteDialogOpen}
-          isLoading={isDeleting}
-          onOpenChange={setIsDeleteDialogOpen}
-          title={t('Delete chat')}
-          confirmText={t('Delete')}
-          cancelText={t('Cancel')}
-          description={t('Are you sure you want to delete this chat?')}
-          onConfirm={handleDeleteChat}
-          variant="destructive"
-        />
-        <h2 className="text-xl flex-1">
+        <h2 className="heading-04 flex-1">
           <strong>{activeChat.name || t('New Chat')}</strong>
           <RenameChatModal chatId={activeChat.id} currentName={activeChat.name} />
         </h2>
@@ -179,7 +172,17 @@ export const Chats: React.FC = () => {
     <div className="p-6 h-full flex flex-col">
       <div className="flex justify-between items-center gap-2 h-9">{renderChatHeader()}</div>
       <Separator className="my-4 border-t" />
-
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        isLoading={isDeleting}
+        onOpenChange={setIsDeleteDialogOpen}
+        title={t('Delete chat')}
+        confirmText={t('Delete')}
+        cancelText={t('Cancel')}
+        description={t('Are you sure you want to delete this chat?')}
+        onConfirm={handleDeleteChat}
+        variant="destructive"
+      />
       {messagesLoading && !messages?.length ? (
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loading />

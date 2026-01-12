@@ -21,16 +21,15 @@ export const useTheme = () => {
 const themeKey = 'app-theme';
 
 const getInitialTheme = (): Theme => {
-  // TODO: remove this once we have a way to persist the theme
-  return 'dark';
-  // if (typeof window !== 'undefined') {
-  //   const savedTheme = localStorage.getItem(themeKey);
-  //   if (savedTheme) {
-  //     return savedTheme as Theme;
-  //   }
-  //   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  // }
-  // return 'light';
+  if (typeof window !== 'undefined') {
+    const savedTheme = localStorage.getItem(themeKey);
+    if (savedTheme) {
+      return savedTheme as Theme;
+    }
+    // return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'dark';
+  }
+  return 'light';
 };
 
 export const ThemeProvider = ({

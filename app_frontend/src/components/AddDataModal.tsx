@@ -23,7 +23,7 @@ import { useFetchDatasets } from '@/api/datasets/hooks';
 import { useGetDatabaseTables, useLoadFromDatabaseMutation } from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
-import loader from '@/assets/loader.svg';
+import { Loader2 } from 'lucide-react';
 import { useAppState } from '@/state/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AxiosError } from 'axios';
@@ -134,7 +134,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         <Button
           variant="secondary"
           testId="add-data-button"
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]')}
+          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
         >
           <FontAwesomeIcon icon={faPlus} /> {t('Add Data')}
         </Button>
@@ -150,10 +150,8 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         {dataSource == DATA_SOURCES.FILE && (
           <>
             <div className="h-10 flex-col justify-start items-start inline-flex">
-              <div className="text-primary text-sm font-semibold leading-normal">
-                {t('Local files')}
-              </div>
-              <div className="text-muted-foreground text-sm font-normal leading-normal">
+              <div className="mn-label-large">{t('Local files')}</div>
+              <div className="body-secondary">
                 {t('Select one or more CSV, XLSX, XLS files, up to 200MB.')}
               </div>
             </div>
@@ -324,9 +322,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                 }
               }}
             >
-              {isPending && (
-                <img src={loader} alt={t('downloading')} className="w-4 h-4 animate-spin" />
-              )}
+              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {t('Save selections')}
             </Button>
           </div>

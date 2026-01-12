@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { CircleIcon } from 'lucide-react';
@@ -19,25 +21,45 @@ function RadioGroup({
 
 function RadioGroupItem({
   className,
-  disabled,
   ...props
 }: React.ComponentProps<typeof RadioGroupPrimitive.Item>) {
   return (
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        'border-input text-primary ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 aspect-square size-4 shrink-0 rounded-full border shadow-xs transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:focus-visible:ring-0',
-        !disabled && 'cursor-pointer',
+        // base
+        'peer aspect-square size-4 shrink-0 rounded-full text-accent outline-none',
+        // borders
+        'border border-primary shadow-xs transition-[color,box-shadow]',
+        // focus
+        'focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring',
+        // invalid
+        `
+          aria-invalid:border-destructive aria-invalid:ring-destructive/20
+          dark:aria-invalid:ring-destructive/40
+        `,
+        // disabled
+        `
+          disabled:cursor-not-allowed disabled:border-muted-foreground disabled:text-muted-foreground
+          disabled:[&_[data-slot=radio-group-indicator]_svg]:fill-muted-foreground
+        `,
+        // checked
+        'enabled:data-[state=checked]:border-accent',
+        // hover
+        `
+          enabled:hover:border-[color-mix(in_srgb,var(--accent)_80%,white)] enabled:hover:text-[color-mix(in_srgb,var(--accent)_80%,white)]
+          enabled:hover:data-[state=checked]:border-[color-mix(in_srgb,var(--accent)_80%,white)]
+          enabled:hover:[&_[data-slot=radio-group-indicator]_svg]:fill-[color-mix(in_srgb,var(--accent)_80%,white)]
+        `,
         className
       )}
-      disabled={disabled}
       {...props}
     >
       <RadioGroupPrimitive.Indicator
         data-slot="radio-group-indicator"
         className="relative flex items-center justify-center"
       >
-        <CircleIcon className="fill-primary absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2" />
+        <CircleIcon className="absolute top-1/2 left-1/2 size-2 -translate-1/2 fill-accent" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   );

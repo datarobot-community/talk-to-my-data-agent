@@ -20,11 +20,6 @@ export interface ICodeExecutionError {
   traceback_str?: string | null;
 }
 
-export interface IDataset {
-  name: string;
-  data_records: Record<string, unknown>[];
-}
-
 export interface IMessageComponent {
   enhanced_user_message?: string;
 }
@@ -50,7 +45,7 @@ export interface IBusinessComponent extends IComponent {
   follow_up_questions?: string[] | null;
 }
 
-export interface ITokenUsageInfo {
+interface ITokenUsageInfo {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -68,7 +63,7 @@ interface IComponent {
   metadata?: IMetadata;
 }
 
-export interface IChatMessageStep {
+interface IChatMessageStep {
   step: string;
   reattempt: number;
 }

@@ -8,7 +8,7 @@ export const DataRobotAvatar = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="text-center text-sm font-normal leading-tight text-primary-foreground">
+    <div className="text-center body text-primary-foreground">
       <img
         src={DataRobotLogo}
         alt=""
@@ -21,7 +21,7 @@ export const DataRobotAvatar = () => {
 
 export const UserAvatar = () => (
   <div className="w-6 h-6 p-2.5 bg-[#7c97f8] rounded-[100px] flex-col justify-center items-center gap-2.5 inline-flex overflow-hidden">
-    <div className="text-center text-sm font-normal leading-tight text-primary-foreground">
+    <div className="text-center body text-primary-foreground">
       <FontAwesomeIcon icon={faComment} />
     </div>
   </div>

@@ -174,7 +174,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   return (
     <MessageContainer testId={testId} ref={ref} key={message.id}>
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
-      <div className="self-stretch text-sm font-normal leading-tight min-w-0">
+      <div className="self-stretch body min-w-0">
         {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
 
         {messageStep && (

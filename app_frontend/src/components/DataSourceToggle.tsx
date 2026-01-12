@@ -79,13 +79,13 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
         {dataByDataSource && dataByDataSource?.length > 0 ? (
           <ul className="list-disc pl-5">
             {dataByDataSource.map(item => (
-              <li key={item} className="text-sm">
+              <li key={item} className="body">
                 {item}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="text-sm">{t('No data sources selected.')}</div>
+          <div className="body">{t('No data sources selected.')}</div>
         )}
       </div>
     );
@@ -100,17 +100,17 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
     >
       {getTooltip()}
       {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.DATABASE) && (
-        <ToggleGroupItem value={DATA_SOURCES.DATABASE} className="text-sm">
+        <ToggleGroupItem value={DATA_SOURCES.DATABASE} className="body">
           <div className="m-2">{t('Database')}</div>
         </ToggleGroupItem>
       )}
       {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.REMOTE_CATALOG) && (
-        <ToggleGroupItem value={DATA_SOURCES.REMOTE_CATALOG} className="text-sm">
+        <ToggleGroupItem value={DATA_SOURCES.REMOTE_CATALOG} className="body">
           <div className="m-2">{t('Remote Registry')}</div>
         </ToggleGroupItem>
       )}
       {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.FILE) && (
-        <ToggleGroupItem value={DATA_SOURCES.FILE} className="text-sm">
+        <ToggleGroupItem value={DATA_SOURCES.FILE} className="body">
           <div className="m-2">{t('Local Registry / File')}</div>
         </ToggleGroupItem>
       )}
@@ -120,7 +120,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
           const dsFriendly = friendlySourceName(ds);
           return (
             <>
-              <ToggleGroupItem value={ds} className="text-sm">
+              <ToggleGroupItem value={ds} className="body">
                 <div className="m-2">{dsFriendly}</div>
               </ToggleGroupItem>
             </>

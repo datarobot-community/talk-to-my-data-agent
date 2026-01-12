@@ -18,7 +18,7 @@ import { fetchAndStoreDataRobotToken } from '@/api/user/api-requests';
 import { Input } from './ui/input';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Checkbox } from '@/components/ui/checkbox';
-
+import { useTheme } from '@/theme/theme-provider';
 interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,6 +65,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     onOpenChange(false);
   };
 
+  const { theme, setTheme } = useTheme();
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -110,8 +112,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
           <>
             <Separator className="border-t my-2" />
             <div className="my-4 space-y-4 flex justify-between items-center">
-              <h3 className="font-semibold m-0">{t('Language')}</h3>
+              <p className="mn-label">{t('Language')}</p>
               <LanguageSwitcher />
+            </div>
+            <div className="my-4 space-y-4 flex justify-between items-center">
+              <p className="mn-label">{t('Dark Theme')}</p>
+              <Switch
+                id="theme"
+                checked={theme === 'dark'}
+                onCheckedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              />
             </div>
             <div
               className="flex items-center justify-between gap-4 py-2"
@@ -134,7 +144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
 
           <div className="mt-4 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold">{t('DataRobot Connection')}</h3>
+              <h3 className="mn-label">{t('DataRobot Connection')}</h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -159,7 +169,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
               </Button>
             </div>
             {isLoadingDataRobotInfo || isRefreshingConnection ? (
-              <p className="text-sm">{t('Loading DataRobot info...')}</p>
+              <p className="body">{t('Loading DataRobot info...')}</p>
             ) : dataRobotInfo?.datarobot_account_info ? (
               <div className="space-y-1">
                 <p>
@@ -255,7 +265,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                   </p>
                 )}
 
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="body-secondary mt-1">
                   {t('Manually enter your DataRobot API token to authenticate with the service.')}
                 </p>
               </div>

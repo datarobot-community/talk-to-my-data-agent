@@ -37,8 +37,9 @@ const BUTTON_VARIANTS = cva(
         [BUTTON_VARIANT.destructive]:
           'bg-destructive text-white hover:bg-destructive/90 disabled:brightness-70',
         [BUTTON_VARIANT.secondary]:
-          'border border-foreground bg-background hover:text-accent hover:border-accent hover:bg-muted/50 disabled:border-foreground/50 disabled:text-foreground/50',
-        [BUTTON_VARIANT.ghost]: 'hover:bg-accent hover:bg-input px-2 disabled:text-foreground/50',
+          'border border-muted-foreground bg-transparent hover:text-accent hover:border-accent hover:bg-muted/50 disabled:border-foreground/50 disabled:text-foreground/50',
+        [BUTTON_VARIANT.ghost]:
+          'hover:bg-sidebar-primary hover:text-accent px-2 disabled:text-foreground/50',
         [BUTTON_VARIANT.link]: 'text-primary hover:text-accent p-0 disabled:text-foreground/50',
       },
     },

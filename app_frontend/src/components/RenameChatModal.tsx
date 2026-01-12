@@ -39,7 +39,7 @@ export const RenameChatModal = ({ chatId, currentName }: RenameChatModalProps) =
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="link" className="ml-2">
+        <Button variant="ghost" className="ml-2">
           <FontAwesomeIcon icon={faPencil} />
         </Button>
       </DialogTrigger>
@@ -50,7 +50,7 @@ export const RenameChatModal = ({ chatId, currentName }: RenameChatModalProps) =
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="rename" className="text-right">
+            <Label htmlFor="rename" className="text-right mn-label">
               {t('Chat name')}
             </Label>
             <Input
