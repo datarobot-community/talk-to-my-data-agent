@@ -231,6 +231,7 @@ app_source = datarobot.ApplicationSource(
     resources=datarobot.ApplicationSourceResourcesArgs(
         resource_label=CustomAppResourceBundles.CPU_XL.value.id,
     ),
+    required_key_scope_level="admin",
     **settings_app_infra.app_source_args,
 )
 

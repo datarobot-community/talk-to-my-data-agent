@@ -21,6 +21,7 @@ interface ResponseTabsProps {
 
 export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange, tabStates }) => {
   const { t } = useTranslation();
+
   const states = tabStates || {
     summary: {
       isLoading: false,
@@ -41,9 +42,9 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
       defaultValue={RESPONSE_TABS.SUMMARY}
       value={value}
       onValueChange={onValueChange}
-      className="w-fit py-4"
+      className="w-full py-4"
     >
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList variant="underline" className="w-full">
         <TabsTrigger value={RESPONSE_TABS.SUMMARY}>
           <LoadingIndicator
             isLoading={states.summary.isLoading}

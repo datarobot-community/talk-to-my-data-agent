@@ -38,7 +38,7 @@ datarobot-asgi-middleware>=0.1.0
 fastapi>=0.115.6,<1.0
 httpx>=0.28.1
 python-dotenv>=1.0.1
-datarobot>=3.9.1,<4.0
+datarobot>=3.10.0,<4.0
 python-multipart>=0.0.20,<1.0
 uvicorn==0.34.0,<1
 psutil>=6.1.1,<7.0

@@ -168,19 +168,21 @@ class File:
         )
 
 
+def get_visitors_token(request: Request) -> str | None:
+    if request.state.session.datarobot_api_scoped_token:
+        return cast(str, request.state.session.datarobot_api_scoped_token)
+
+    return request.headers.get("x-datarobot-api-key")
+
+
 @contextmanager
 def use_user_token(request: Request) -> Generator[None, None, None]:
     """Context manager to temporarily use the user's DataRobot token."""
-    if request.state.session.datarobot_api_token:
+    token = get_visitors_token(request)
+    if token:
         with dr.Client(
-            token=request.state.session.datarobot_api_token,
-            endpoint=request.state.session.datarobot_endpoint,
-        ):
-            yield
-    elif request.state.session.datarobot_api_skoped_token:
-        with dr.Client(
-            token=request.state.session.datarobot_api_skoped_token,
-            endpoint=request.state.session.datarobot_endpoint,
+            token=token,
+            endpoint=os.environ.get("DATAROBOT_ENDPOINT"),
         ):
             yield
     elif not os.environ.get(

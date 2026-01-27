@@ -93,6 +93,7 @@ from utils.data_connections.datarobot.helpers import (
 )
 from utils.logging_helper import get_logger
 from utils.prompts import (
+    SYSTEM_PROMPT_DATABRICKS,
     SYSTEM_PROMPT_POSTGRES,
     SYSTEM_PROMPT_REDSHIFT,
     SYSTEM_PROMPT_SPARK_SQL,
@@ -205,7 +206,6 @@ async def create_new_recipe(
         recipe = Recipe.from_dataset(
             use_case=use_case,
             dataset=dataset,
-            inputs=[],
             dialect=DataWranglingDialect.SPARK,
             recipe_type=RecipeType.SQL,
         )
@@ -439,62 +439,34 @@ class BaseRecipe(abc.ABC):
         logger.debug(
             "Retrieving preview of recipe.", extra={"recipe_id": self._recipe.id}
         )
-        preview = await loop.run_in_executor(
-            None, self._recipe.retrieve_preview, timeout_seconds
+        preview: dr.models.recipe.RecipePreview = await loop.run_in_executor(
+            None, self._recipe.get_preview, timeout_seconds
         )
-        schema: list[dict[str, Any]] = preview["resultSchema"]
+        schema: list[dict[str, Any]] = preview.result_schema
 
         # Unfortunately the Python SDK currently doesn't have a nice API for Previews
-        all_rows: list[Any] = preview["data"]
+        all_rows: list[Any] = preview.data
 
-        if preview.get("next"):
+        next_page: dr.models.recipe.RecipePreview | None = preview
+
+        while next_page := await loop.run_in_executor(
+            None, lambda: next_page.next if next_page else None
+        ):
             logger.debug(
                 "Fetching additional pages of preview.",
                 extra={"recipe_id": self._recipe.id},
             )
-            async for row in self._unpaginate(
-                loop,
-                preview["next"],
-                initial_params=None,
-                client=dr.client.get_client(),
-            ):
-                all_rows.append(row)
-                # Normally queries should be limited in how much data they return, this serves as a backstop.
-                if len(all_rows) >= BaseRecipe.MAX_ROWS:
-                    break
+            all_rows.extend(next_page.data)
+            # Normally queries should be limited in how much data they return, this serves as a backstop.
+            if len(all_rows) >= BaseRecipe.MAX_ROWS:
+                break
 
-        original_types = {col["name"]: col["dataType"] for col in schema}
+        # Casing changed between SDK versions
+        original_types = {
+            col["name"]: BaseRecipe.get_column_data_type(col) for col in schema
+        }
         dataframe = DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
         return RunSqlResponse(dataframe, original_types)
-
-    async def _unpaginate(
-        self,
-        loop: asyncio.AbstractEventLoop,
-        initial_url: str,
-        initial_params: None | dict[Any, Any],
-        client: dr.client.RESTClientObject,
-    ) -> AsyncGenerator[Any, None]:
-        """Iterate over a paginated endpoint and get all results
-
-        Assumes the endpoint follows the "standard" pagination interface (data stored under "data",
-        "next" used to link next page, "offset" and "limit" accepted as query parameters).
-
-        Yields
-        ------
-        data : dict
-            a series of objects from the endpoint's data, as raw server data
-        """
-
-        resp_data = (
-            await loop.run_in_executor(None, client.get, initial_url, initial_params)
-        ).json()
-        for data in resp_data["data"]:
-            yield data
-        while resp_data["next"] is not None:
-            next_url = resp_data["next"]
-            resp_data = (await loop.run_in_executor(None, client.get, next_url)).json()
-            for data in resp_data["data"]:
-                yield data
 
     @telemetry.meter_and_trace
     async def retrieve_preview(self, timeout_seconds: int = 900) -> RunSqlResponse:
@@ -522,12 +494,28 @@ class BaseRecipe(abc.ABC):
         return DataRobotOperator(NoDatabaseCredentials(), self)
 
     @staticmethod
+    def get_column_data_type(column: dict[str, Any]) -> str:
+        if data_type := column.get("data_type", column.get("dataType")):
+            if not isinstance(data_type, str):
+                logger.error(
+                    "DataType field present in schema but was not a string! Value: %s",
+                    data_type,
+                )
+                raise RuntimeError("Data type present in schema but not a string.")
+            return data_type
+        logger.error(
+            "Column in schema did not have a `data_type` or `dataType` field! Fields: %s",
+            column.keys(),
+        )
+        raise RuntimeError("Column in schema did not have a dataType field.")
+
+    @staticmethod
     def convert_preview_to_dataframe(
         schema: list[dict[str, Any]], all_rows: list[Any]
     ) -> DataFrameWrapper:
         polars_schema = {
             col["name"]: DatasetSparkRecipe.map_datarobot_type_to_polars_type(
-                col["dataType"]
+                BaseRecipe.get_column_data_type(col)
             )
             for col in schema
         }
@@ -628,7 +616,9 @@ class BaseRecipe(abc.ABC):
             "BYTEINT": pl.Int64(),
             "BIT": pl.Boolean(),
             "BOOL": pl.Boolean(),  # also covers "Boolean"
+            "BOOLEAN": pl.Boolean(),
             "BYTE": pl.Binary(),  # also covers BYTEA/BYTEARRAY
+            "BINARY": pl.Binary(),
             "VARBINARY": pl.Binary(),
             "VARCHAR": pl.String(),
             "NVARCHAR": pl.String(),
@@ -639,6 +629,7 @@ class BaseRecipe(abc.ABC):
             "BPCHAR": pl.String(),
             "DATE": pl.Datetime(),
             "TIME": pl.Datetime(),
+            "STRING": pl.String(),
         }
 
         matches = []
@@ -672,22 +663,26 @@ class DataSourceRecipe(BaseRecipe):
 
     # In order to add support for a new driver, there's two steps
     # 1. Create a corresponding `PromptFactory` in `prompts.py`.
-    SUPPORTED_DRIVER_CLASS_TYPES: list[str] = ["postgres", "redshift"]
+    SUPPORTED_DRIVER_CLASS_TYPES: list[str] = ["postgres", "redshift", "databricks-v1"]
     DRIVER_CLASS_TYPE_TO_DIALECT: dict[str, DataWranglingDialect] = {
         "postgres": DataWranglingDialect.POSTGRES,
         "redshift": DataWranglingDialect.POSTGRES,
+        "databricks-v1": DataWranglingDialect.DATABRICKS,
     }
     PROMPTS: dict[str, str] = {
         "postgres": SYSTEM_PROMPT_POSTGRES,
         "redshift": SYSTEM_PROMPT_REDSHIFT,
+        "databricks-v1": SYSTEM_PROMPT_DATABRICKS,
     }
     WARMUP_QUERIES: dict[str, str] = {
         "postgres": "SELECT 1",
         "redshift": "SELECT 1",
+        "databricks-v1": "SELECT 1",
     }
     FORMAT_TABLE_NAME: dict[str, Callable[[list[str]], str]] = {
         "postgres": format_postgres_table,
         "redshift": format_postgres_table,
+        "databricks-v1": format_spark_table,
     }
     INSTANCE_CACHE: dict[tuple[str, str], DataSourceRecipe] = {}
     EXTERNAL_DATA_STORE_CACHE: dict[

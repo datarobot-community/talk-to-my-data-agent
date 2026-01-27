@@ -12,30 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
-import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator, Optional, cast
+from typing import Any, Dict, Iterator, Optional
 
 import datarobot as dr
 import streamlit as st
+from datarobot.rest import RESTClientObject
 from helpers import state_init
 from streamlit.delta_generator import DeltaGenerator
-from streamlit_javascript import st_javascript
 
 from utils.logging_helper import get_logger
 
 logger = get_logger("DR Connect")
-
-
-@dataclass
-class DataRobotCredentials:
-    """Container for DataRobot credentials."""
-
-    token: Optional[str] = None
-    endpoint: Optional[str] = None
 
 
 class DataRobotTokenManager:
@@ -43,148 +33,101 @@ class DataRobotTokenManager:
 
     _API_URLS = {
         "account": "/api/v2/account/info/",
-        "apikeys": "/api/v2/account/apiKeys/?isScoped=false",
     }
-
-    _JS_COMMAND_TEMPLATE = """fetch(
-        "URL"
-    ).then((response) => {
-        if (response.ok) {
-            return response.text();
-        } else {
-            return response.status + " : " + response.statusText;
-        }
-    }).then((data) => {
-        return data;
-    });"""
 
     def __init__(self) -> None:
         logger.info("dr_connect_init")
-        """Initialize the token manager and set up initial credentials."""
-        self._original_creds = self._get_current_credentials()
-        self._set_user_credentials()
-        self._set_user_info()
+        """Initialize the token manager."""
+        self.provided_user_token: Optional[str] = None
+        self.user_info = self._get_user_info()
 
-    def _get_current_credentials(self) -> DataRobotCredentials:
-        """Get the current DataRobot credentials from the client."""
-        client = dr.Client()
-        return DataRobotCredentials(token=client.token, endpoint=client.endpoint)
-
-    def _get_contents_from_url(self, url: str) -> dict[str, Any]:
-        """Fetch data from DataRobot API using JavaScript."""
-        js_command = self._JS_COMMAND_TEMPLATE.replace("URL", url)
-        result = st_javascript(js_command)
-        time.sleep(1)
-        data = {}
-        try:
-            data = json.loads(result)
-            data = cast(dict[str, Any], data)
-            data["info_ok"] = True
-        except Exception:
-            data = {"info_ok": False, "reply": str(result)}
-        return data
-
-    def _set_user_credentials(self) -> None:
-        """Set user-specific DataRobot credentials."""
-        if (
-            "datarobot_api_token_provided" in st.session_state
-            and st.session_state.datarobot_api_token_provided
-        ):
-            self._user_creds = DataRobotCredentials(
-                token=st.session_state.datarobot_api_token_provided,
-                endpoint=self._original_creds.endpoint,
-            )
-            return
-        if not os.environ.get("DR_CUSTOM_APP_EXTERNAL_URL"):
-            self._user_creds = self._original_creds
+    @contextmanager
+    def use_user_token(self) -> Iterator[Optional[RESTClientObject]]:
+        """Context manager to temporarily use the user's DataRobot token."""
+        user_token = self._get_user_token()
+        if not user_token:
+            yield None
             return
 
-        # Fetch API keys
-        apikeys_data = self._get_contents_from_url(self._API_URLS["apikeys"])
+        with dr.Client(token=user_token, endpoint=self._get_dr_endpoint()) as client:
+            yield client
 
-        api_token = None
-        if "data" in apikeys_data:
-            # Find first non-expiring key
-            keys = [
-                key["key"] for key in apikeys_data["data"] if key["expireAt"] is None
-            ]
-            if len(keys) > 0:
-                api_token = keys[0]
-
-        self._user_creds = DataRobotCredentials(
-            token=api_token, endpoint=os.environ.get("DATAROBOT_ENDPOINT")
-        )
-
-        # Store in session state for compatibility
-        st.session_state["datarobot_api_token"] = api_token
-        st.session_state["datarobot_api_endpoint"] = os.environ.get(
-            "DATAROBOT_ENDPOINT"
-        )
-
-    def _set_user_info(self) -> None:
-        """Set user information in session state."""
-        if self._user_creds.token:
-            with dr.Client(
-                endpoint=self._user_creds.endpoint,
-                token=self._user_creds.token,
-            ) as client:
-                reply = client.get("account/info/")
-                user_info = reply.json()
-                user_info["info_ok"] = reply.ok
-        else:
-            user_info = self._get_contents_from_url(self._API_URLS["account"])
-
-        if "uid" in user_info:
-            for k, v in user_info.items():
-                st.session_state[f"datarobot_{k}"] = v
+    @contextmanager
+    def use_app_token(self) -> Iterator[RESTClientObject]:
+        """Context manager to temporarily use the app's DataRobot token."""
+        app_token = os.environ.get("DATAROBOT_API_TOKEN")
+        with dr.Client(token=app_token, endpoint=self._get_dr_endpoint()) as client:
+            yield client
 
     async def display_info(self, stc: DeltaGenerator) -> None:
-        # stc.subheader("DataRobot Connect", divider="rainbow")
-        first_name = st.session_state.get("datarobot_firstName", "") or ""
-        last_name = st.session_state.get("datarobot_lastName", "") or ""
-        username = (first_name + " " + last_name).strip()
-        if len(username) > 0:
-            stc.write(f"Hello {username}")
-
-        if not self._user_creds.token:
-            stc.warning("Data Registry disabled. Please provide your API token")
-            token = stc.text_input(
-                "API Token",
-                key="datarobot_api_token_provided",
-                type="password",
-                placeholder="DataRobot API Token",
-                label_visibility="collapsed",
-            )
-            if token:
-                logger.info(f"Setting Token {token}")
-                self._user_creds = DataRobotCredentials(
-                    token=token, endpoint=self._original_creds.endpoint
-                )
-                self._set_user_info()
-                await state_init()
-                st.rerun()
-
-    @contextmanager
-    def use_user_token(self) -> Generator[None, None, None]:
-        """Context manager to temporarily use the user's DataRobot token."""
-        if not self._user_creds.token:
-            yield
+        if self.user_info:
+            stc.write(f"Hello {self.user_info.username}")
             return
 
-        with dr.Client(
-            token=self._user_creds.token, endpoint=self._user_creds.endpoint
-        ):
-            yield
+        if self._get_user_token():
+            self.user_info = self._get_user_info()
+            if self.user_info:
+                stc.write(f"Hello {self.user_info.username}")
+                return
 
-    @contextmanager
-    def use_app_token(self) -> Generator[None, None, None]:
-        """Context manager to temporarily use the app's DataRobot token."""
-        with dr.Client(
-            token=self._original_creds.token, endpoint=self._original_creds.endpoint
-        ):
-            yield
+        stc.warning("Data Registry disabled. Please provide your API token")
+        token = stc.text_input(
+            "API Token",
+            key="datarobot_api_token_provided",
+            type="password",
+            placeholder="DataRobot API Token",
+            label_visibility="collapsed",
+        )
+
+        if token:
+            logger.info(f"Setting Token {token}")
+            self.provided_user_token = token
+            self.user_info = self._get_user_info()
+            await state_init()
+            st.rerun()
+
+    @staticmethod
+    def _get_dr_endpoint() -> str:
+        # It should be done during dr.Client creation automatically,
+        # but we want to have an explicit error message.
+        endpoint = os.environ.get("DATAROBOT_ENDPOINT")
+        if not endpoint:
+            raise ValueError("DATAROBOT_ENDPOINT env variable is not set.")
+        return endpoint
+
+    def _get_user_token(self) -> Optional[str]:
+        return self.provided_user_token or st.context.headers.get("x-datarobot-api-key")
+
+    def _get_user_info(self) -> Optional["UserInfo"]:
+        """Set user information in session state."""
+        with self.use_user_token() as client:
+            if not client:
+                return None
+
+            response = client.get("account/info/")
+
+            if not response.ok:
+                logger.warning(
+                    f"Cannot get user info from {response.url}",
+                    extra={"code": response.status_code, "message": response.text},
+                )
+                return None
+
+            return UserInfo.from_api(response.json())
+
+
+@dataclass
+class UserInfo:
+    first_name: str
+    last_name: str | None
 
     @property
-    def has_valid_user_token(self) -> bool:
-        """Check if there's a valid user token available."""
-        return bool(self._user_creds.token and self._user_creds.endpoint)
+    def username(self) -> str:
+        return (self.first_name + " " + str(self.last_name or "")).strip()
+
+    @classmethod
+    def from_api(cls, data: Dict[str, Any]) -> "UserInfo":
+        return cls(
+            first_name=data["firstName"],
+            last_name=data.get("lastName"),
+        )

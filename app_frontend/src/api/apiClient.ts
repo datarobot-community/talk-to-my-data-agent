@@ -33,14 +33,4 @@ const apiClient = axios.create({
 
 export default apiClient;
 
-const drClient = axios.create({
-  // DATAROBOT_ENDPOINT on STS and onPrem is internal API URL which is not working from frontend
-  baseURL: `${window.location.origin}/api/v2`,
-  headers: {
-    Accept: 'application/json',
-    'Content-type': 'application/json',
-  },
-  withCredentials: true,
-});
-
-export { drClient, apiClient };
+export { apiClient };

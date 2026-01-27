@@ -20,7 +20,7 @@ export const DataViewTabs: React.FC<DataViewTabsProps> = ({
   const { t } = useTranslation();
   return (
     <Tabs defaultValue={defaultValue} onValueChange={onChange} className="w-fit py-4">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList>
         <TabsTrigger value={DATA_TABS.DESCRIPTION} data-testid="description-tab">
           <FontAwesomeIcon className="mr-2" icon={faQuoteLeft} />
           {t('Description')}

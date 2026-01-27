@@ -143,30 +143,30 @@ def clear_data_callback() -> None:
 # Add callback for Data Registry dataset selection
 async def registry_download_callback() -> None:
     """Callback function for Data Registry dataset download"""
-    if (
-        "selected_registry_datasets" in st.session_state
-        and st.session_state.selected_registry_datasets
-    ):
-        st.session_state.data_source = InternalDataSourceType.REGISTRY
+    selected_registry_datasets = st.session_state.get("selected_registry_datasets")
+    if not selected_registry_datasets:
+        return
 
-        with st.sidebar:  # Use sidebar context
-            with st.spinner("Loading selected datasets..."):
-                selected_ids = [
-                    ds["id"] for ds in st.session_state.selected_registry_datasets
-                ]
-                with st.session_state.datarobot_connect.use_user_token():
-                    dataframes = await load_registry_datasets(
-                        selected_ids, st.session_state.analyst_db
-                    )
-                dataset_names = [
-                    dataset.name for dataset in dataframes if not dataset.error
-                ]
-                async for message in process_data_and_update_state(
-                    dataset_names,
-                    st.session_state.analyst_db,
-                    st.session_state.data_source,
-                ):
-                    st.toast(message)
+    st.session_state.data_source = InternalDataSourceType.REGISTRY
+
+    with st.sidebar:  # Use sidebar context
+        with st.spinner("Loading selected datasets..."):
+            selected_ids = [
+                ds["id"] for ds in st.session_state.selected_registry_datasets
+            ]
+            with st.session_state.datarobot_connect.use_user_token():
+                dataframes = await load_registry_datasets(
+                    selected_ids, st.session_state.analyst_db
+                )
+            dataset_names = [
+                dataset.name for dataset in dataframes if not dataset.error
+            ]
+            async for message in process_data_and_update_state(
+                dataset_names,
+                st.session_state.analyst_db,
+                st.session_state.data_source,
+            ):
+                st.toast(message)
 
 
 async def load_from_database_callback() -> None:
@@ -278,10 +278,7 @@ async def main() -> None:
                     format_func=lambda x: f"{x['name']} ({x['size']})",
                     help="You can select multiple datasets",
                     key="selected_registry_datasets",
-                    disabled=(
-                        "analyst_db" not in st.session_state
-                        or "datarobot_uid" not in st.session_state
-                    ),
+                    disabled=("analyst_db" not in st.session_state),
                 )
 
                 # Form submit button

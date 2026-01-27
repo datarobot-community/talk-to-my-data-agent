@@ -1,7 +1,7 @@
 # infra
 pulumi>=3.153.0
 pulumi-command<1.1.0
-pulumi-datarobot>=0.10.22
+pulumi-datarobot>=0.10.27
 datarobot-pulumi-utils>=0.0.2.post8,<0.1
 # OpenTelemetry dependencies for telemetry (compatible with protobuf <5.0)
 opentelemetry-api>=1.20.0,<1.30.0
@@ -75,7 +75,7 @@ nest-asyncio>=1.6.0,<2.0
 
 # backend
 aiologic>=0.16,<1.0
-datarobot>=3.9.1,<4.0
+datarobot>=3.10.0,<4.0
 fastapi>=0.115.6,<1.0
 python-multipart>=0.0.20,<1.0
 uvicorn==0.34.2,<1.0

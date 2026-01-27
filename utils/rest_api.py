@@ -72,7 +72,7 @@ from utils.data_connections.datarobot.datarobot_dataset_handler import (
     DatasetSparkRecipe,
     DataSourceRecipe,
 )
-from utils.datarobot_client import use_user_token
+from utils.datarobot_client import get_visitors_token, use_user_token
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -369,28 +369,18 @@ async def add_session_middleware(request: Request, call_next):  # type: ignore[n
         session_state, session_id, user_id = await _initialize_session(request)
         request.state.session = session_state
 
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "")
-            if request.state.session.datarobot_api_skoped_token != token:
-                request.state.session.datarobot_api_skoped_token = token
-
-        account_info = {}
         if not request.state.session.datarobot_account_info:
+            request.state.session.datarobot_account_info = {}
             try:
-                if (
-                    request.state.session.datarobot_api_token
-                    or request.state.session.datarobot_api_skoped_token
-                ):
+                if request.headers.get("x-user-email"):
+                    # do not try to fetch user info for prob requests
                     with use_user_token(request):
                         reply = dr.client.get_client().get("account/info/")
                         account_info = reply.json()
+                    request.state.session.datarobot_account_info = account_info
             except Exception as e:
                 logger.info(f"Error fetching account info: {e}")
-        else:
-            account_info = request.state.session.datarobot_account_info
 
-        request.state.session.datarobot_account_info = account_info
         dr_uid = request.state.session.datarobot_account_info.get("uid")
         if session_id is None and dr_uid is not None:
             session_id = base64.b64encode(dr_uid.encode()).decode()
@@ -428,11 +418,9 @@ async def _initialize_session(
     session_state = SessionState()
     empty_session_state: dict[str, Any] = {
         "datarobot_account_info": None,
-        "datarobot_endpoint": os.environ.get("DATAROBOT_ENDPOINT"),
-        "datarobot_api_token": os.environ.get("DATAROBOT_API_TOKEN")
+        "datarobot_api_scoped_token": os.environ.get("DATAROBOT_API_TOKEN")
         if is_local_dev
         else None,
-        "datarobot_api_skoped_token": None,
         "analyst_db": None,
     }
     session_state.update(deepcopy(empty_session_state))
@@ -1899,21 +1887,21 @@ async def get_supported_datasource_types(request: Request) -> SupportedDataSourc
 async def get_datarobot_account(
     request: Request,
 ) -> dict[str, Any]:
-    api_token = request.state.session.datarobot_api_token
-    skoped_token = request.state.session.datarobot_api_skoped_token
+    api_token = os.environ.get("DATAROBOT_API_TOKEN")
+    scoped_token = get_visitors_token(request)
 
     truncated_api_token = None
     if api_token:
         truncated_api_token = f"****{api_token[-4:]}"
 
-    truncated_skoped_token = None
-    if skoped_token:
-        truncated_skoped_token = f"****{skoped_token[-4:]}"
+    truncated_scoped_token = None
+    if scoped_token:
+        truncated_scoped_token = f"****{scoped_token[-4:]}"
 
     return {
         "datarobot_account_info": request.state.session.datarobot_account_info,
         "datarobot_api_token": truncated_api_token,
-        "datarobot_api_skoped_token": truncated_skoped_token,
+        "datarobot_api_scoped_token": truncated_scoped_token,
     }
 
 
@@ -1924,7 +1912,7 @@ async def store_datarobot_account(
     request_data = await request.json()
 
     if "api_token" in request_data and request_data["api_token"]:
-        request.state.session.datarobot_api_token = request_data["api_token"]
+        request.state.session.datarobot_api_scoped_token = request_data["api_token"]
 
     return {"success": True}
 

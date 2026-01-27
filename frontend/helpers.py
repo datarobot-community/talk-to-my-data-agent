@@ -73,21 +73,17 @@ def state_empty() -> None:
 
 def generate_user_id() -> str | None:
     email_header = st.context.headers.get("x-user-email")
-    if email_header:
-        new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, email_header))[:36]
-        return new_user_id
-    else:
+    if not email_header:
         return None
+    new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, email_header))[:36]
+    return new_user_id
 
 
 async def state_init() -> None:
     if "initialized" not in st.session_state:
         state_empty()
-    user_id = None
-    if "datarobot_uid" not in st.session_state:
-        user_id = generate_user_id()
-    else:
-        user_id = st.session_state.datarobot_uid
+
+    user_id = generate_user_id()
     if user_id:
         analyst_db = await AnalystDB.create(
             user_id=user_id,
@@ -99,5 +95,4 @@ async def state_init() -> None:
 
         st.session_state.analyst_db = analyst_db
     else:
-        logger.warning("datarobot-connect not initialised")
-        pass
+        logger.warning("analyst_db not initialised")

@@ -188,23 +188,27 @@ class AsyncDataRobotClient:
         await self._client.delete(urljoin(File._path, f"{catalog_id}/"))
 
 
-async_client = AsyncDataRobotClient(
-    endpoint=os.environ["DATAROBOT_ENDPOINT"], token=os.environ["DATAROBOT_API_TOKEN"]
-)
-
-
 class PersistentStorage:
     def __init__(self, user_id: Optional[str]):
         self.app_id: str = os.environ.get("APPLICATION_ID")  # type: ignore[assignment]
         if not self.app_id:
             raise ValueError("APPLICATION_ID env variable is not set.")
+
+        endpoint = os.environ.get("DATAROBOT_ENDPOINT")
+        token = os.environ.get("DATAROBOT_API_TOKEN")
+        if not (endpoint and token):
+            raise ValueError(
+                "DATAROBOT_ENDPOINT and DATAROBOT_API_TOKEN env variables are not set."
+            )
+        self._async_client = AsyncDataRobotClient(endpoint=endpoint, token=token)
+
         self.name_prefix = f"{user_id}_"
 
     @telemetry.meter_and_trace
     async def files(self) -> List[str]:
         relevant_files = []
 
-        async for v in async_client.iter_key_values(
+        async for v in self._async_client.iter_key_values(
             self.app_id, KeyValueEntityType.CUSTOM_APPLICATION
         ):
             if (
@@ -218,7 +222,7 @@ class PersistentStorage:
 
     async def fetch_from_storage(self, file_name: str, local_path: str) -> None:
         logger.info(f"Fetching file {file_name} from storage")
-        storage_link = await async_client.find_key_value(
+        storage_link = await self._async_client.find_key_value(
             self.app_id,
             KeyValueEntityType.CUSTOM_APPLICATION,
             f"{self.name_prefix}{file_name}",
@@ -226,7 +230,7 @@ class PersistentStorage:
         if not storage_link:
             return
         data = json.loads(storage_link.value)
-        await async_client.download_file(data["catalogId"], local_path)
+        await self._async_client.download_file(data["catalogId"], local_path)
 
     @telemetry.meter_and_trace
     async def save_to_storage(self, file_name: str, local_path: str) -> None:
@@ -234,16 +238,16 @@ class PersistentStorage:
         storing_label = f"{self.name_prefix}{file_name}"
         timestamp = time.time_ns()
 
-        catalog_info = await async_client.upload_file(local_path)
+        catalog_info = await self._async_client.upload_file(local_path)
         file_data = {**catalog_info, "timestamp": timestamp}
 
-        storage_link = await async_client.find_key_value(
+        storage_link = await self._async_client.find_key_value(
             self.app_id, KeyValueEntityType.CUSTOM_APPLICATION, storing_label
         )
         data = json.loads(storage_link.value) if storage_link else {}
         if not data:
             # there is no previous version of this file
-            await async_client.create_key_value(
+            await self._async_client.create_key_value(
                 entity_id=self.app_id,
                 entity_type=KeyValueEntityType.CUSTOM_APPLICATION,
                 name=storing_label,
@@ -256,7 +260,7 @@ class PersistentStorage:
         if timestamp > data["timestamp"]:
             assert storage_link is not None
             # uploaded file is newer version and storage link needs to be updated and old file to be removed
-            await async_client.update_key_value(
+            await self._async_client.update_key_value(
                 id=storage_link.id,
                 entity_id=storage_link.entity_id,
                 entity_type=KeyValueEntityType(storage_link.entity_type.value),
@@ -267,14 +271,14 @@ class PersistentStorage:
                 description=storage_link.description,
                 comment=None,
             )
-            await async_client.delete_file(data["catalogId"])
+            await self._async_client.delete_file(data["catalogId"])
         else:
             # there is a newer file in storage and we drop just uploaded one
-            await async_client.delete_file(catalog_info["catalogId"])
+            await self._async_client.delete_file(catalog_info["catalogId"])
 
     @telemetry.meter_and_trace
     async def delete_file(self, file_name: str) -> None:
-        storage_link = await async_client.find_key_value(
+        storage_link = await self._async_client.find_key_value(
             self.app_id,
             KeyValueEntityType.CUSTOM_APPLICATION,
             f"{self.name_prefix}{file_name}",
@@ -282,5 +286,5 @@ class PersistentStorage:
         if not storage_link:
             return
         data = json.loads(storage_link.value)
-        await async_client.delete_file(data["catalogId"])
-        await async_client.delete_key_value(storage_link.id)
+        await self._async_client.delete_file(data["catalogId"])
+        await self._async_client.delete_key_value(storage_link.id)

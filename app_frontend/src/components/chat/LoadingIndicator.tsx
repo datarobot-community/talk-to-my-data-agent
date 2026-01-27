@@ -31,10 +31,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   return isLoading ? (
     <Loader2 className="mr-2 w-4 h-4 animate-spin" />
   ) : (
-    <FontAwesomeIcon
-      className="mr-2 w-4 h-4 text-success"
-      data-testid={successTestId}
-      icon={faCheck}
-    />
+    <FontAwesomeIcon className="mr-2 w-4 h-4" data-testid={successTestId} icon={faCheck} />
   );
 };
