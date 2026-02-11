@@ -1,5 +1,6 @@
 @import '@fontsource/inter/index.css';
 @import '@fontsource/roboto-mono/400.css';
+@import '@fontsource/inter/600.css';
 
 @config './tailwind.config.ts';
 @custom-variant dark (&:is(.dark *));

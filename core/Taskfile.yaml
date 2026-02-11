@@ -1,0 +1,40 @@
+---
+# https://taskfile.dev
+version: '3'
+
+env:
+  SRCDIR: ./src/
+
+tasks:
+  install:
+    desc: "🔧 Install dependencies"
+    cmds:
+      - echo "🔧 Installing dependencies.."
+      - uv sync --all-extras --dev
+  build:
+    desc: "🏗️  Build React code"
+    cmds:
+      - uv build
+  lint:
+    silent: true
+    desc: "🧹 Run linters"
+    cmds:
+      - echo "🧹 Running linters.."
+      - uv run ruff format "$SRCDIR"
+      - uv run ruff check "$SRCDIR" --fix
+      - uv run mypy --pretty "$SRCDIR"
+
+  lint-check:
+    desc: 🧹 Check whether the codebase is linted
+    cmds:
+      - echo "🧹 Linting"
+      - uv run ruff format --check "$SRCDIR"
+      - uv run ruff check "$SRCDIR"
+      - uv run mypy --pretty "$SRCDIR"
+
+  test:
+    silent: true
+    desc: "🧪 Run tests"
+    cmds:
+      - echo "🧪 Running tests.."
+      - uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml

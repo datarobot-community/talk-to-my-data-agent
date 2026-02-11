@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.5.1] - 2026-02-10
+
+This release significantly overhauls the developer experience of this application template. For previous users, the major important new commands are:
+
+- Running locally: `task dev` (instead of `source ./set_env.sh && make run-local-dev-backend` + `npm run dev`).
+- Deploying: `task deploy` (instead of `python quickstart.py`).
+
+For further details, refer to the `README.md`.
+
+### Changed
+
+- Switched to af-component-llm and replaced all client calls with litellm
+- Switched default model to Claude Sonnet 4.5
+- Replaced quickstart with task start and dr task compose
+- Updated af-component-base and migrate util to core
+
+### Added
+
+- Added flexible LLM options
+- Added dev-deploy task to deploy the LLM and Use case
+
 ## [11.5.0] - 2026-01-27
 
 ### Changed
@@ -19,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed compatibility with latest version of Datarobot PySDK
+
+### Changed
+
+- Updated LLM configuration system to be more flexible and easier to use with newer LLMs
+- Simplified LLM selection with configuration-based approach supporting multiple deployment options (LLM Gateway, External LLMs, Registered Models, and Deployed Models)
 
 ## [0.5.3] - 2026-01-12
 
@@ -42,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.2] - 2025-12-16
 
 ### Fixes
+
 - Fixed data loading bug affecting Python version <3.12.
 - Fixed intermittent concurrency-related failures in persisting DB.
 
@@ -53,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The React frontend is already the default; this only affects users who explicitly configured Streamlit
   - See [React Frontend Development Guide](app_frontend/README.md) for more information
   - Support and bug fixes for Streamlit will be limited during the deprecation period
+- Migrated Pulumi stack into new location. To update run `dr run infra:migrate` or `task migrate` inside the `infra` folder
 
 ## [0.5.1] - 2025-12-10
 

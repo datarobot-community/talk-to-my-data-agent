@@ -60,3 +60,7 @@
   border-top: 1px solid #ccc;
   margin: 1rem 0;
 }
+
+.markdown-content strong {
+  font-weight: 600;
+}

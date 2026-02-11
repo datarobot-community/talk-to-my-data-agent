@@ -7,21 +7,14 @@ import '@fontsource/dm-sans/400.css';
 import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/700.css';
-import { isServedStatic } from '@/lib/utils.ts';
+import { getBaseUrl } from '@/lib/utils.ts';
 import './index.css';
 import App from './App.tsx';
 import { AppStateProvider } from './state';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18n from './i18n';
 
-let basename = window.ENV?.APP_BASE_URL ?? undefined;
-if (
-  window.ENV?.APP_BASE_URL?.includes('notebook-sessions') &&
-  window.ENV?.API_PORT &&
-  isServedStatic()
-) {
-  basename += `/ports/` + window.ENV.API_PORT;
-}
+const basename = getBaseUrl();
 
 const queryClient = new QueryClient();
 

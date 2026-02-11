@@ -1,3 +1,5 @@
+/Taskfile.yaml
+
 /Taskfile.yml
 
 # Byte-compiled / optimized / DLL files
@@ -217,4 +219,12 @@ app_backend/app_infra.json
 
 !app_frontend/src/lib
 
+# DataRobot CLI stuff:
+#  .dr/state contains user-specific history and audit-trail while working with the CLI
+.datarobot/state/
 .datarobot/cli/state.yaml
+
+# Pulumi output from the latest stack apply
+pulumi_config.json
+
+Taskfile.gen.yaml

@@ -1,0 +1,53 @@
+---
+name: Python unit tests
+
+on:
+  pull_request:
+
+
+jobs:
+  test:
+    name: Unit tests on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values needed for tests
+      DATAROBOT_API_TOKEN: token
+      DATAROBOT_ENDPOINT: endpoint
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: frontend
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Taskfile
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: task install
+
+      - name: Run Static Checks
+        working-directory: frontend
+        run: task lint-check
+
+      - name: Test
+        working-directory: frontend
+        run: task test
+
+      - name: Get Cover
+        uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: frontend/.coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,7 @@
 pulumi>=3.153.0
 pulumi-command<1.1.0
 pulumi-datarobot>=0.10.27
-datarobot-pulumi-utils>=0.0.2.post8,<0.1
+datarobot-pulumi-utils>=0.1.1
 # OpenTelemetry dependencies for telemetry (compatible with protobuf <5.0)
 opentelemetry-api>=1.20.0,<1.30.0
 opentelemetry-sdk>=1.20.0,<1.30.0
@@ -24,7 +24,7 @@ pytest>=8.3.4,<9.0
 pytest-cov>=6.0.0,<7.0
 pytest-mock>=3.14.0,<4.0
 pytest-asyncio>=0.25.2,<1.0
-pytest-httpx>=0.30.0,<0.31.0
+pytest-httpx>=0.31.0,<1.0
 
 # genai testing
 rich>=13.9.4,<14.0
@@ -63,9 +63,10 @@ hdbcli>=2.23.27,<3.0
 
 # genai
 openai>=1.60.0,<2
-instructor>=1.3.4,<2.0
+instructor[litellm]>=1.3.4,<2.0
 boto3>=1.36.2,<2.0
 tiktoken>=0.11.0,<1.0
+litellm>=1.72.1
 
 # frontend
 streamlit==1.44.1
@@ -75,13 +76,13 @@ nest-asyncio>=1.6.0,<2.0
 
 # backend
 aiologic>=0.16,<1.0
-datarobot>=3.10.0,<4.0
+datarobot[auth-authlib,core]>=3.10.0,<4.0
 fastapi>=0.115.6,<1.0
 python-multipart>=0.0.20,<1.0
 uvicorn==0.34.2,<1.0
 psutil>=6.1.1,<7.0
-pydantic==2.7.4,<3.0
-pydantic-settings==2.4.0,<3.0
+pydantic>=2.7.4,<3.0
+pydantic-settings>=2.4.0,<3.0
 joblib>=1.4.2,<2.0
 duckdb>=1.2.0,<1.3
 fastexcel>=0.12.1,<1.0

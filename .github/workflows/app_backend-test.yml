@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: "actions/checkout@v5"
@@ -36,9 +36,15 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: ${{ matrix.python-version }}
 
+      - name: Install Taskfile
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Dependencies
         working-directory: app_backend
-        run: uv sync --all-extras --dev
+        run: task install
 
       - name: Install Frontend Dependencies
         working-directory: app_frontend
@@ -50,14 +56,11 @@ jobs:
 
       - name: Run Static Checks
         working-directory: app_backend
-        run: |
-          uv run ruff format --check .
-          uv run ruff check .
-          uv run mypy --pretty --explicit-package-bases .
+        run: task lint-check
 
       - name: Test
         working-directory: app_backend
-        run: uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+        run: task test
 
       - name: Get Cover
         uses: orgoro/coverage@v3.2

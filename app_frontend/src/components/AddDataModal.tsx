@@ -311,12 +311,20 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                 if (dataSource === DATA_SOURCES.DATABASE) {
                   if (selectedTables.length > 0) {
                     loadFromDatabase({ tableNames: selectedTables });
+                  } else {
+                    setIsOpen(false);
+                    setIsPending(false);
                   }
-                } else if (dataSource === NEW_DATA_STORE && selectedAvailableDataStore) {
-                  selectDataSources({
-                    selectedDataStore: selectedAvailableDataStore,
-                    selectedDataSourceNames: selectedExternalDataSources,
-                  });
+                } else if (dataSource === NEW_DATA_STORE) {
+                  if (selectedAvailableDataStore) {
+                    selectDataSources({
+                      selectedDataStore: selectedAvailableDataStore,
+                      selectedDataSourceNames: selectedExternalDataSources,
+                    });
+                  } else {
+                    setIsOpen(false);
+                    setIsPending(false);
+                  }
                 } else {
                   mutate({ files, catalogIds: selectedDatasets, dataSource: dataSource });
                 }

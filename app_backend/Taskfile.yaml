@@ -1,15 +1,81 @@
 ---
+# https://taskfile.dev
 version: '3'
+
+# In Notebooks, drop PYTHONPATH to avoid dependency collisions
+env:
+  CALCULATED_PYTHONPATH: "{{ if and .PYTHONPATH .NOTEBOOK_ID }}{{ else }}{{ .PYTHONPATH }}{{ end }}"
+  TEST_USER_EMAIL: "dev@example.com"
+
 tasks:
+
+  auth-check:
+    silent: true
+    desc: "🔐 Check authentication prerequisites"
+    cmds:
+      - |
+        if command -v dr &> /dev/null && dr auth help 2>&1 | grep -q "check"; then
+          echo "🔐 Checking authentication.."
+          dr auth check
+        else
+          echo "ℹ️  Skipping auth check (not available)"
+        fi
+
   install:
-    desc: 🧱 Install Python dependencies
+    desc: "🔧 Install dependencies"
     cmds:
-      - python -m pip install -r requirements.txt
+      - echo "🔧 Installing dependencies.."
+      - uv sync --all-extras --dev
+
   dev:
-    desc: 🚀 Start local dev backend server
+    silent: true
+    desc: "🔨 Run the development server"
+    deps:
+      - auth-check
+    env:
+      DISABLE_TELEMETRY: true
+      TEST_USER_EMAIL: "dev@example.com"
     cmds:
-      - PYTHONPATH=./.. SERVE_STATIC_FRONTEND=False DEV_MODE=True ./start-app.sh
-  static:
-    desc: 🚀 Start local static backend server
+      - echo "🔨 Starting development server"
+      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --reload-dir .
+        --reload-dir '../core'
+
+  lint:
+    silent: true
+    desc: "🧹 Run linters"
     cmds:
-      - PYTHONPATH=./.. SERVE_STATIC_FRONTEND=True DEV_MODE=True ./start-app.sh
+      - echo "🧹 Running linters.."
+      - uv run ruff format .
+      - uv run ruff check . --fix
+      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run mypy --pretty .
+
+  lint-check:
+    silent: true
+    desc: "🧹 Check whether the codebase is linted"
+    cmds:
+      - uv run ruff format --check .
+      - uv run ruff check .
+      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run mypy --pretty .
+
+  test:
+    silent: true
+    desc: "🧪 Run tests"
+    cmds:
+      - echo "🧪 Running tests.."
+      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+
+  copyright:
+    aliases: [license]
+    desc: 📜 Apply license headers
+    cmds:
+      - echo "📜 Applying license headers"
+      - docker run  --rm -v $PWD:/github/workspace ghcr.io/apache/skywalking-eyes/license-eye:eb0e0b091ea41213f712f622797e37526ca1e5d6
+        -v info -c .licenserc.yaml header fix
+
+  copyright-check:
+    aliases: [license-check]
+    desc: 📜 Checking for license headers
+    cmds:
+      - echo "📜 Checking license headers"
+      - docker run  --rm -v $PWD:/github/workspace ghcr.io/apache/skywalking-eyes/license-eye:eb0e0b091ea41213f712f622797e37526ca1e5d6
+        -v info -c .licenserc.yaml header check

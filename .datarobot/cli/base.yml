@@ -4,7 +4,9 @@ root:
     type: secret_string
     default: ""
     optional: true
-    help: "The passphrase used to encrypt and decrypt the private key. This value is required if you're not using pulumi cloud."
+    help: >
+      Enter the passphrase used to encrypt and decrypt the private key. This value is required if you're not using Pulumi
+      Cloud.
   - env: FRONTEND_TYPE
     type: string
     help: "Choose which frontend implementation to use (streamlit or react)"
@@ -15,6 +17,11 @@ root:
         value: "react"
       - name: "streamlit"
         value: "streamlit"
+  - env: DATAROBOT_DEFAULT_USE_CASE
+    type: string
+    default:
+    optional: true
+    help: "Enter the default use case for this application. If not set, a new use case will be created automatically."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: "boolean"
     help: "Use LLM Gateway instead of DataRobot-hosted LLM. If you select this, you do not need any credentials for your DataRobot-hosted LLM since it will use your DataRobot credentials instead."
@@ -26,24 +33,22 @@ root:
       - name: "No"
         value: "false"
         requires: "datarobot_hosted_llm"
-  - key: "enable_snowflake"
-    help: "Do you want to configure Snowflake?"
+  - env: DATABASE_CONNECTION_TYPE
+    type: string
+    help: Do you want to enable an external database connection?
+    default: None
     options:
-      - name: "No"
-      - name: "Yes"
-        requires: "snowflake_config"
-  - key: "enable_bigquery"
-    help: "Do you want to configure BigQuery?"
-    options:
-      - name: "No"
-      - name: "Yes"
-        requires: "bigquery_config"
-  - key: "enable_sap_datasphere"
-    help: "Do you want to configure SAP DataSphere?"
-    options:
-      - name: "No"
-      - name: "Yes"
-        requires: "sap_datasphere_config"
+      - name: None
+      - name: Snowflake
+        value: snowflake
+        requires: snowflake_config
+      - name: BigQuery
+        value: bigquery
+        requires: bigquery_config
+      - name: SAP Datasphere
+        value: sap
+        requires: sap_datasphere_config
+
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"

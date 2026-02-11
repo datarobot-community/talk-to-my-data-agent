@@ -19,7 +19,7 @@ describe('MessageHeader Component', () => {
     id: 'msg-1',
     role: 'user' as const,
     content: 'Test message',
-    created_at: '2024-01-01T00:00:00Z',
+    created_at: '2024-01-15T12:00:00Z',
     components: [],
   } as IChatMessage;
 
@@ -27,7 +27,7 @@ describe('MessageHeader Component', () => {
     id: 'resp-1',
     role: 'assistant' as const,
     content: 'Test response',
-    created_at: '2024-01-01T00:01:00Z',
+    created_at: '2024-01-15T12:01:00Z',
     components: [],
   } as IChatMessage;
 
@@ -55,7 +55,7 @@ describe('MessageHeader Component', () => {
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
     expect(screen.getByText('You')).toBeInTheDocument();
-    expect(screen.getByText(/Jan/)).toBeInTheDocument(); // Formatted date
+    expect(screen.getByText(/Jan/)).toBeInTheDocument();
   });
 
   test('renders action buttons for user message', () => {

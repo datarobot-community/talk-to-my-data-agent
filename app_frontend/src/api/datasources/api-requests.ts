@@ -23,7 +23,7 @@ export type ExternalDataStore = {
 };
 
 export async function listAvailableExternalDataStores(): Promise<ExternalDataStore[]> {
-  const { data } = await apiClient.get<ExternalDataStore[]>('/v1/available-external-data-stores');
+  const { data } = await apiClient.get<ExternalDataStore[]>('/v1/external-data-stores/available/');
   return data;
 }
 

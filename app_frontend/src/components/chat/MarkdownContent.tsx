@@ -20,6 +20,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
           ul: ({ ...props }) => <ul className="list-disc pl-5 my-2" {...props} />,
           ol: ({ ...props }) => <ol className="list-decimal pl-5 my-2" {...props} />,
           li: ({ ...props }) => <li className="my-1" {...props} />,
+          strong: ({ ...props }) => <strong {...props} />,
         }}
       />
     </div>

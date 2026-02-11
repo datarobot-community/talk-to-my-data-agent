@@ -3,18 +3,15 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'path';
-import { VITE_DEFAULT_PORT, VITE_STATIC_DEFAULT_PORT } from './src/constants/dev';
+import { VITE_DEFAULT_PORT } from './src/constants/dev';
 
 let base: string = '';
 // 1. if NOTEBOOK_ID is set, use /notebook-sessions/${NOTEBOOK_ID}/ports/5173/ for dev server
-// 2. if NOTEBOOK_ID and NODE_ENV === 'development' are set, use /notebook-sessions/${NOTEBOOK_ID}/ports/8080/ for static codespace server
 if (process.env.NOTEBOOK_ID && process.env.NODE_ENV === 'development') {
   const notebookId = process.env.NOTEBOOK_ID;
-  const defaultPort = process.env.STATIC_CODESPACE ? VITE_STATIC_DEFAULT_PORT : VITE_DEFAULT_PORT;
-  base = `/notebook-sessions/${notebookId}/ports/${defaultPort}/`;
+  base = `/notebook-sessions/${notebookId}/ports/${VITE_DEFAULT_PORT}/`;
 }
-// Proxy base for development server (local + codespaces)
-const devProxyBase: string = base === '' ? '/' : base;
+const proxyBase: string = base === '' ? '/' : base;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -59,15 +56,10 @@ export default defineConfig({
     host: true,
     allowedHosts: ['localhost', '127.0.0.1', '.datarobot.com'],
     proxy: {
-      [`${devProxyBase}api/`]: {
+      [`${proxyBase}api/`]: {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: path => path.replace(new RegExp(`^${devProxyBase}`), ''),
-      },
-      [`${devProxyBase}_dr_env.js`]: {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: path => path.replace(new RegExp(`^${devProxyBase}`), ''),
+        rewrite: path => path.replace(new RegExp(`^${proxyBase}`), ''),
       },
     },
   },
