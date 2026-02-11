@@ -36,9 +36,10 @@ root:
   - env: DATABASE_CONNECTION_TYPE
     type: string
     help: Do you want to enable an external database connection?
-    default: None
+    default: no_database
     options:
       - name: None
+        value: no_database
       - name: Snowflake
         value: snowflake
         requires: snowflake_config
@@ -48,7 +49,6 @@ root:
       - name: SAP Datasphere
         value: sap
         requires: sap_datasphere_config
-
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"
@@ -146,7 +146,6 @@ snowflake_config:
     optional: false
     help: "The Snowflake role"
 
-
 snowflake_password_authentication_config:
   - env: SNOWFLAKE_USER
     type: string
@@ -176,7 +175,6 @@ bigquery_config:
     type: string
     optional: false
     help: "The Google Cloud BigQuery schema"
-
 
 sap_datasphere_config:
   - env: SAP_DATASPHERE_HOST

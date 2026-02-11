@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.5.2] - 2026-02-11
+
+### Fixed
+
+- Fixed the default value for DATABASE_CONNECTION_TYPE in the CLI dotenv setup.
+
 ## [11.5.1] - 2026-02-10
 
 This release significantly overhauls the developer experience of this application template. For previous users, the major important new commands are:
@@ -85,9 +91,11 @@ For further details, refer to the `README.md`.
 ## [0.5.1] - 2025-12-10
 
 ### Added
+
 - DataRobot CLI integration: Introduced CLI-driven quickstart and configuration via `dr start`.
 
 ### Improvements
+
 - Updated `README.md` to prioritize CLI-based quickstart (`dr start`), improved setup flow and Codespace instructions.
 - Enhanced `quickstart.py` UX: made `stack_name` optional and interactive;
 
