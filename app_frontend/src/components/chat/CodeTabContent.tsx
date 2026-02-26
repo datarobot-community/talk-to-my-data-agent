@@ -28,7 +28,7 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId 
   const downloadTooltip = isDownloadingDataset ? t('Downloading...') : t('Download dataset as CSV');
 
   return (
-    <div className="flex flex-col gap-2.5 min-w-0">
+    <div className="flex min-w-0 flex-col gap-2.5">
       {datasetId && (
         <CollapsiblePanel header={t('Analysis Dataset')}>
           <div className="flex flex-col gap-2">
@@ -40,9 +40,9 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({ code, datasetId 
                 title={downloadTooltip}
               >
                 {isDownloadingDataset ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  <Download className="w-4 h-4" />
+                  <Download className="size-4" />
                 )}
                 {t('Download dataset')}
               </Button>

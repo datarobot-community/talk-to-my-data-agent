@@ -5,13 +5,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DATA_SOURCES, NEW_DATA_STORE } from '@/constants/dataSources';
 import { useTranslation } from '@/i18n';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, MessageCircleQuestion } from 'lucide-react';
+import { Loader2, MessageCircleQuestion, TriangleAlert } from 'lucide-react';
 interface DataSourceSelectorProps {
   value: string;
   onChange: (value: string) => void;
+  accessDenied: {
+    datasetRegistry: boolean;
+    dataStore: boolean;
+  };
 }
 
-export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, onChange }) => {
+export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
+  value,
+  onChange,
+  accessDenied,
+}) => {
   const { t } = useTranslation();
   const dataSources = useGetSupportedDataSourceTypes();
   const availableExternalDataStores = useListAvailableDataStores();
@@ -26,7 +34,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
+              <MessageCircleQuestion className="size-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
               <p className="body">
@@ -38,23 +46,35 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Tooltip>
         </div>
         <div className="flex space-x-2">
-          <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r2" />
+          <RadioGroupItem
+            value={DATA_SOURCES.REMOTE_CATALOG}
+            id="r2"
+            disabled={accessDenied.datasetRegistry}
+          />
           <Label htmlFor="r2" className="mn-label">
             {t('Remote Data Registry')}
           </Label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
+              {accessDenied.datasetRegistry ? (
+                <TriangleAlert className="size-3 text-muted-foreground" />
+              ) : (
+                <MessageCircleQuestion className="size-3 text-muted-foreground" />
+              )}
             </TooltipTrigger>
             <TooltipContent>
-              <p className="body">
-                {t(
-                  'Connect and add data from your remote data registry for files greater than 200 MB, up to a maximum of 10 GB. Processing large files may involve lengthy runtimes and increased costs.'
-                )}
-              </p>
+              {accessDenied.datasetRegistry ? (
+                <p className="body">{t('Feature unavailable due to seat license restrictions.')}</p>
+              ) : (
+                <p className="body">
+                  {t(
+                    'Connect and add data from your remote data registry for files greater than 200 MB, up to a maximum of 10 GB. Processing large files may involve lengthy runtimes and increased costs.'
+                  )}
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
-          {dataSources?.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {dataSources?.isLoading && <Loader2 className="size-4 animate-spin" />}
         </div>
         {/* Not yet putting a conditional here, though probably in a future release. */}
         <div className="flex space-x-2">
@@ -64,7 +84,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
+              <MessageCircleQuestion className="size-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
               <p className="body">
@@ -76,23 +96,31 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Tooltip>
         </div>
         <div className="flex space-x-2">
-          <RadioGroupItem value={NEW_DATA_STORE} id="r4" />
+          <RadioGroupItem value={NEW_DATA_STORE} id="r4" disabled={accessDenied.dataStore} />
           <Label htmlFor="r4" className="mn-label">
             {t('Remote Data Connections')}
           </Label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <MessageCircleQuestion className="h-3 w-3 text-muted-foreground" />
+              {accessDenied.dataStore ? (
+                <TriangleAlert className="size-3 text-muted-foreground" />
+              ) : (
+                <MessageCircleQuestion className="size-3 text-muted-foreground" />
+              )}
             </TooltipTrigger>
             <TooltipContent>
-              <p className="body">
-                {t(
-                  'Select tables from DataRobot supported data store connections, such as Redshift or PostgreSQL.'
-                )}
-              </p>
+              {accessDenied.dataStore ? (
+                <p className="body">{t('Feature unavailable due to seat license restrictions.')}</p>
+              ) : (
+                <p className="body">
+                  {t(
+                    'Select tables from DataRobot supported data store connections, such as Redshift or PostgreSQL.'
+                  )}
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
-          {availableExternalDataStores?.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {availableExternalDataStores?.isLoading && <Loader2 className="size-4 animate-spin" />}
         </div>
       </RadioGroup>
     </TooltipProvider>

@@ -1,5 +1,4 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faComment } from '@fortawesome/free-regular-svg-icons/faComment';
+import { MessageCircle } from 'lucide-react';
 import DataRobotLogo from '@/assets/DataRobotLogo_black.svg';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/pages/routes';
@@ -8,7 +7,7 @@ export const DataRobotAvatar = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="text-center body text-primary-foreground">
+    <div className="body text-center text-primary-foreground">
       <img
         src={DataRobotLogo}
         alt=""
@@ -20,9 +19,9 @@ export const DataRobotAvatar = () => {
 };
 
 export const UserAvatar = () => (
-  <div className="w-6 h-6 p-2.5 bg-[#7c97f8] rounded-[100px] flex-col justify-center items-center gap-2.5 inline-flex overflow-hidden">
-    <div className="text-center body text-primary-foreground">
-      <FontAwesomeIcon icon={faComment} />
+  <div className="inline-flex size-6 flex-col items-center justify-center gap-2.5 overflow-hidden rounded-[100px] bg-[#7c97f8] p-2.5">
+    <div className="body text-center text-primary-foreground">
+      <MessageCircle className="size-4" />
     </div>
   </div>
 );

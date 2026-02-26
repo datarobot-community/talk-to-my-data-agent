@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
+import { Trash2 } from 'lucide-react';
 import { useDeleteAllDatasets } from '@/api/datasets/hooks';
 import { useTranslation } from '@/i18n';
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
@@ -32,7 +31,7 @@ export const ClearDatasetsButton = () => {
         variant="destructive"
       />
       <Button testId="clear-datasets-button" variant="ghost" onClick={handleClick}>
-        <FontAwesomeIcon icon={faTrash} />
+        <Trash2 />
         {t('Clear all datasets')}
       </Button>
     </>

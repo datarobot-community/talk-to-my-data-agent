@@ -44,6 +44,12 @@ import scipy
 import sklearn
 import statsmodels as sm
 from datarobot.models.dataset import Dataset
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+    estimate_csv_rows_for_token_limit,
+)
 from fastapi import Request
 from joblib import Memory
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -79,14 +85,9 @@ from core.data_connections.datarobot.datarobot_dataset_handler import (
     DataSourceRecipe,
     load_or_create_spark_recipe,
 )
+from core.data_connections.datarobot.helpers import handle_datarobot_error
 from core.datarobot_client import use_user_token
 from core.llm_client import AsyncLLMClient
-from core.token_tracking import (
-    TiktokenCountingStrategy,
-    TokenUsageTracker,
-    count_messages_tokens,
-    estimate_csv_rows_for_token_limit,
-)
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from core import prompts, tools
@@ -212,9 +213,8 @@ def list_registry_datasets(
     Returns:
         list[DataRegistryDataset]: _description_
     """
-
-    datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
-
+    with handle_datarobot_error("Dataset.iterate()"):
+        datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
     return [
         DataRegistryDataset(
             id=ds.id,
@@ -260,7 +260,8 @@ async def register_remote_registry_datasets(
 
     Raises:
         ValueError: If the loading cannot be performed. This can be either (a) the small datasets exceed
-                    our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)."""
+                    our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted).
+    """
     if not DatasetSparkRecipe.should_use_spark_recipe():
         logger.warning(
             "Attempted to register remote datasets in an unsupported feature (should be unreachable through UI)."
@@ -293,7 +294,7 @@ async def register_remote_registry_datasets(
     downloaded_datasets = []
 
     if dataset_ids:
-        with use_user_token(request):
+        with use_user_token(request, allow_use_builder_token=True):
             recipe = await load_or_create_spark_recipe(analyst_db, dataset_ids)
 
             await recipe.refresh()  # Clear out any removed datasets.
@@ -335,7 +336,7 @@ async def register_remote_datasets(
     datasets: list[Dataset],
 ) -> None:
     for dataset in datasets:
-        with use_user_token(request):
+        with use_user_token(request, allow_use_builder_token=True):
             preview = await recipe.preview_dataset(dataset)
         analyst_dataset = AnalystDataset(name=dataset.name, data=preview.response)
 
@@ -426,7 +427,7 @@ async def register_datasource(
     data_store_id: str,
     datasources: list[ExternalDataSource],
 ) -> None:
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         recipe = await DataSourceRecipe.load_or_create(analyst_db, data_store_id)
         for ds in datasources:
             preview = await recipe.preview_datasource(ds)
@@ -1269,9 +1270,7 @@ async def get_business_analysis(
 
         initial_rows = 750
 
-        df_csv, _ = estimate_csv_rows_for_token_limit(
-            df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
-        )
+        df_csv, _ = estimate_csv_rows_for_token_limit(df, MAX_CSV_TOKENS, initial_rows)
 
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [
@@ -1835,7 +1834,7 @@ async def run_complete_analysis(
         user_message_id=message_id,
         enable_business_insights=enable_business_insights,
         enable_chart_generation=enable_chart_generation,
-        token_tracker=TokenUsageTracker(TiktokenCountingStrategy()),
+        token_tracker=TokenUsageTracker(HeuristicTokenCountingStrategy()),
     )
 
     analysis_context.user_message = await analyst_db.get_chat_message(
@@ -1964,7 +1963,7 @@ async def run_complete_analysis(
         analysis_context.database = get_external_database()
     elif data_source == InternalDataSourceType.REMOTE_REGISTRY:
         if analysis_context.request:
-            with use_user_token(analysis_context.request):
+            with use_user_token(analysis_context.request, allow_use_builder_token=True):
                 logger.debug("Initializing SPARK recipe with a user token.")
                 analysis_context.recipe = await load_or_create_spark_recipe(
                     analyst_db=analyst_db
@@ -2005,7 +2004,7 @@ async def run_complete_analysis(
             return
 
         if request:
-            with use_user_token(request):
+            with use_user_token(request, allow_use_builder_token=True):
                 logger.debug("Initializing Data Source recipe with a user token.")
                 analysis_context.recipe = await DataSourceRecipe.load_or_create(
                     analyst_db, data_store_id

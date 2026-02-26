@@ -11,7 +11,7 @@ const Plot = lazy(() => {
 const PlotLoading = () => {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-center p-4 h-[200px]">
+    <div className="flex h-[200px] items-center justify-center p-4">
       <div>{t('Loading visualization...')}</div>
     </div>
   );

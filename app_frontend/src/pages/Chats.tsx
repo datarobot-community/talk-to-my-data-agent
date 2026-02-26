@@ -3,9 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@radix-ui/react-separator';
 import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
-import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
+import { Trash2, FileDown } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import {
   useDeleteChat,
@@ -36,7 +34,7 @@ const ResponseMessage = lazy(() =>
 
 const ComponentLoading = () => {
   return (
-    <div className="p-3 bg-card rounded flex mb-2.5 mr-2">
+    <div className="mr-2 mb-2.5 flex rounded bg-card p-3">
       <ChatLoading />
     </div>
   );
@@ -134,8 +132,10 @@ export const Chats: React.FC = () => {
 
     return (
       <>
-        <h2 className="heading-04 flex-1">
-          <strong>{activeChat.name || t('New Chat')}</strong>
+        <h2 className="flex min-w-0 flex-1 items-center heading-04">
+          <strong className="truncate" title={activeChat.name}>
+            {activeChat.name || t('New Chat')}
+          </strong>
           <RenameChatModal chatId={activeChat.id} currentName={activeChat.name} />
         </h2>
         <div>
@@ -153,7 +153,7 @@ export const Chats: React.FC = () => {
           title={exportButtonTooltip}
           testId="export-chat-button"
         >
-          <FontAwesomeIcon icon={faFileArrowDown} />
+          <FileDown />
           <span className="ml-2">{isExporting ? t('Exporting...') : t('Export chat')}</span>
         </Button>
         <Button
@@ -161,7 +161,7 @@ export const Chats: React.FC = () => {
           onClick={() => setIsDeleteDialogOpen(true)}
           testId="delete-all-chats-button"
         >
-          <FontAwesomeIcon icon={faTrash} />
+          <Trash2 />
           <span className="ml-2">{t('Delete chat')}</span>
         </Button>
       </>
@@ -169,8 +169,8 @@ export const Chats: React.FC = () => {
   };
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="flex justify-between items-center gap-2 h-9">{renderChatHeader()}</div>
+    <div className="flex h-full flex-col p-6">
+      <div className="flex h-9 items-center justify-between gap-2">{renderChatHeader()}</div>
       <Separator className="my-4 border-t" />
       <ConfirmDialog
         open={isDeleteDialogOpen}
@@ -184,7 +184,7 @@ export const Chats: React.FC = () => {
         variant="destructive"
       />
       {messagesLoading && !messages?.length ? (
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
           <Loading />
         </div>
       ) : !chatId || messages?.length === 0 ? (
@@ -200,7 +200,7 @@ export const Chats: React.FC = () => {
           <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
             {activeChat?.id &&
               messages?.map(message => (
-                <div key={message.id} className="flex flex-col w-full">
+                <div key={message.id} className="flex w-full flex-col">
                   {message.role === 'user' && (
                     <UserMessage
                       message={message}

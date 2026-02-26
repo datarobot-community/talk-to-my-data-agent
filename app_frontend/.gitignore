@@ -10,10 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
-
-# No locking for npm deps:
-package-lock.json
 
 # Editor directories and files
 .vscode/*

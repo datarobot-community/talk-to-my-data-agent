@@ -16,18 +16,14 @@ const Checkbox = React.forwardRef<
     <CheckboxPrimitive.Root
       ref={ref}
       className={cn(
-        'peer group h-4 w-4 shrink-0 hover:not-disabled:border-transparent hover:not-disabled:data-[state=unchecked]:border-accent/80 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 disabled:border-muted-foreground transition-all duration-200 ease-in data-[state=checked]:bg-accent  data-[state=checked]:border-accent hover:data-[state=checked]:bg-accent/80 disabled:data-[state=checked]:bg-muted-foreground disabled:data-[state=indeterminate]:bg-muted-foreground disabled:data-[state=checked]:border-muted-foreground disabled:data-[state=indeterminate]:border-muted-foreground text-primary-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent hover:data-[state=indeterminate]:bg-accent/80 data-[state=indeterminate]:text-primary-foreground',
+        'peer group size-4 shrink-0 rounded-sm border border-primary text-primary-foreground ring-offset-background transition-all duration-200 ease-in hover:not-disabled:border-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:border-muted-foreground disabled:opacity-70 data-[state=checked]:border-accent data-[state=checked]:bg-accent hover:data-[state=checked]:bg-accent/80 disabled:data-[state=checked]:border-muted-foreground disabled:data-[state=checked]:bg-muted-foreground data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-primary-foreground hover:data-[state=indeterminate]:bg-accent/80 disabled:data-[state=indeterminate]:border-muted-foreground disabled:data-[state=indeterminate]:bg-muted-foreground hover:not-disabled:data-[state=unchecked]:border-accent/80',
         className
       )}
       checked={checked}
       {...props}
     >
       <CheckboxPrimitive.Indicator className={cn('flex items-center justify-center')}>
-        {isIndeterminate ? (
-          <Minus className="h-full w-full" />
-        ) : (
-          <Check className="h-full w-full" />
-        )}
+        {isIndeterminate ? <Minus className="size-full" /> : <Check className="size-full" />}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

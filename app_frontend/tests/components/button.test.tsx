@@ -41,7 +41,7 @@ describe('Button Component', () => {
     expect(screen.getByRole('button', { name: /large/i })).toHaveClass('h-10');
 
     rerender(<Button size="icon">Icon</Button>);
-    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('h-9 w-9');
+    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('size-9');
   });
 
   test('applies custom className', () => {

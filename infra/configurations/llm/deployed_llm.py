@@ -53,6 +53,7 @@ llm_resource_name: str = "[llm]"
 default_model: str = os.environ.get(
     "LLM_DEFAULT_MODEL", "datarobot/datarobot-deployed-llm"
 )
+default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is working
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
@@ -85,6 +86,11 @@ app_runtime_parameters = [
         type="string",
         value=proxy_llm_deployment.label,
     ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=default_use_builder_api_token,
+    ),
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
@@ -103,3 +109,4 @@ pulumi.export("Deployment ID " + llm_resource_name, proxy_llm_deployment.id)
 export("LLM_DEPLOYMENT_ID", proxy_llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
 export("LLM_DEFAULT_MODEL_FRIENDLY_NAME", proxy_llm_deployment.label)
+export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)

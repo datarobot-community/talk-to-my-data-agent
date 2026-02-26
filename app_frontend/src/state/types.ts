@@ -27,3 +27,10 @@ export type Action =
   | { type: 'SET_ENABLE_BUSINESS_INSIGHTS'; payload: boolean }
   | { type: 'SET_INCLUDE_CSV_BOM'; payload: boolean }
   | { type: 'SET_DATA_SOURCE'; payload: string };
+
+export type ApiError = {
+  detail?: {
+    code?: string;
+    message?: string;
+  };
+};

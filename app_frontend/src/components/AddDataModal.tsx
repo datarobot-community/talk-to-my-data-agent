@@ -12,8 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
+import { ExternalLink, Plus } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { DATA_SOURCES, NEW_DATA_STORE } from '@/constants/dataSources';
 import { MultiSelect } from '@/components/ui-custom/multi-select';
@@ -33,7 +32,7 @@ import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api
 import { SingleSelect } from './ui-custom/single-select';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
-  const { data, isLoading: isLoadingDatasets } = useFetchDatasets();
+  const { data, isLoading: isLoadingDatasets, error: datasetRegistryError } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const { data: dbTables } = useGetDatabaseTables();
@@ -46,6 +45,13 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
+
+  const accessDenied = useMemo(() => {
+    return {
+      datasetRegistry: datasetRegistryError?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
+      dataStore: availableDataStores?.error?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
+    };
+  }, [datasetRegistryError, availableDataStores?.error]);
 
   const selectedAvailableDataStore: ExternalDataStore | null = useMemo(() => {
     if (availableDataStores?.data) {
@@ -134,9 +140,10 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         <Button
           variant="secondary"
           testId="add-data-button"
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
+          data-highlight={highlight || undefined}
+          className={cn(highlight && 'animate-(--animation-blink-border-and-shadow)', 'mr-2')}
         >
-          <FontAwesomeIcon icon={faPlus} /> {t('Add Data')}
+          <Plus /> {t('Add Data')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
@@ -145,37 +152,57 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
           <Separator className="border-t" />
           <DialogDescription />
         </DialogHeader>
-        <DataSourceSelector value={dataSource} onChange={setDataSource} />
+        <DataSourceSelector
+          accessDenied={accessDenied}
+          onChange={setDataSource}
+          value={dataSource}
+        />
         <Separator className="my-4 border-t" />
         {dataSource == DATA_SOURCES.FILE && (
           <>
-            <div className="h-10 flex-col justify-start items-start inline-flex">
-              <div className="mn-label-large">{t('Local files')}</div>
-              <div className="body-secondary">
-                {t('Select one or more CSV, XLSX, XLS files, up to 200MB.')}
-              </div>
-            </div>
+            <h3 className="not-prose heading-05">{t('Local files')}</h3>
+            <p className="body-secondary">
+              {t('Select one or more CSV, XLSX, XLS files, up to 200MB.')}
+            </p>
             <FileUploader onFilesChange={setFiles} progress={progress} />
-            <h4>{t('Data Registry')}</h4>
-            <h6>{t('Select one or more catalog items')}</h6>
-            <MultiSelect
-              options={
-                data && data.local
-                  ? data.local.map(i => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            <p className="caption-01">
+              {t(
+                'Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.'
+              )}
+              <a
+                href="https://www.datarobot.com/privacy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 anchor text-xs leading-4"
+              >
+                {t('Privacy Policy')}
+                <ExternalLink className="ml-0.5 inline size-2.5 align-[-1px]" />
+              </a>
+            </p>
+            {!accessDenied.datasetRegistry && (
+              <>
+                <h3 className="not-prose mt-4 heading-05">{t('Data Registry')}</h3>
+                <p className="body-secondary">{t('Select one or more catalog items')}</p>
+                <MultiSelect
+                  options={
+                    data && data.local
+                      ? data.local.map(i => ({
+                          label: i.name,
+                          value: i.id,
+                          postfix: i.size,
+                        }))
+                      : []
+                  }
+                  onValueChange={setSelectedDatasets}
+                  defaultValue={selectedDatasets}
+                  placeholder={t('Select one or more items.')}
+                  variant="inverted"
+                  modalPopover
+                  animation={2}
+                  maxCount={3}
+                />
+              </>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
@@ -186,8 +213,8 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == DATA_SOURCES.DATABASE && (
           <>
-            <h4>{t('Databases')}</h4>
-            <h6>{t('Select one or more tables')}</h6>
+            <h3 className="not-prose heading-05">{t('Databases')}</h3>
+            <p className="body-secondary">{t('Select one or more tables')}</p>
             <MultiSelect
               options={
                 dbTables
@@ -211,8 +238,8 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == DATA_SOURCES.REMOTE_CATALOG && (
           <>
-            <h4>{t('Data Registry')}</h4>
-            <h6>{t('Select one or more catalog items')}</h6>
+            <h3 className="not-prose heading-05">{t('Data Registry')}</h3>
+            <p className="body-secondary">{t('Select one or more catalog items')}</p>
             <MultiSelect
               isLoading={isLoadingDatasets}
               options={
@@ -242,8 +269,8 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == NEW_DATA_STORE && availableDataStores && (
           <>
-            <h4>{t('Add External Data Source')}</h4>
-            <h6>{t('Select a data store')}</h6>
+            <h3 className="not-prose heading-05">{t('Add External Data Source')}</h3>
+            <p className="body-secondary">{t('Select a data store')}</p>
             <SingleSelect
               isLoading={availableDataStores.isLoading}
               options={
@@ -261,7 +288,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
               modalPopover
               animation={2}
             />
-            <h6>{t('Select one or more data sources')}</h6>
+            <p className="body-secondary">{t('Select one or more data sources')}</p>
             <MultiSelect
               options={
                 selectedAvailableDataStore && selectedAvailableDataStore.defined_data_sources
@@ -293,11 +320,16 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             )}
           </>
         )}
-        <Separator className="border-t mt-6" />
+        <Separator className="mt-6 border-t" />
         <DialogFooter>
-          <div className="flex gap-2 w-full items-center">
+          <div className="flex w-full items-center gap-2">
             <div className="flex-1" />
-            <Button disabled={isPending} variant={'ghost'} onClick={() => setIsOpen(false)}>
+            <Button
+              testId="add-data-modal-cancel-button"
+              disabled={isPending}
+              variant={'ghost'}
+              onClick={() => setIsOpen(false)}
+            >
               {t('Cancel')}
             </Button>
             <Button
@@ -330,7 +362,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                 }
               }}
             >
-              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isPending && <Loader2 className="size-4 animate-spin" />}
               {t('Save selections')}
             </Button>
           </div>

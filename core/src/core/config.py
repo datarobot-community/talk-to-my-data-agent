@@ -22,6 +22,8 @@ class Config(DataRobotAppFrameworkBaseSettings):
     datarobot_endpoint: str
     datarobot_api_token: str
 
+    use_builder_api_token: bool | None = False
+
     llm_deployment_id: str | None = None
     use_datarobot_llm_gateway: bool = False
     llm_default_model: str = "custom-model"

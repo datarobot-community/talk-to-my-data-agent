@@ -14,6 +14,7 @@
 
 import os
 import re
+import subprocess
 import textwrap
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -37,7 +38,7 @@ from .components.dr_credential import (
 )
 from .llm import app_runtime_parameters as llm_app_runtime_parameters
 
-required_key_scope_level: str = "user"
+required_key_scope_level: str = "admin"
 
 DATABASE_CONNECTION_TYPE = os.getenv("DATABASE_CONNECTION_TYPE", "no_database")
 
@@ -161,6 +162,25 @@ def _prep_metadata_yaml(
     )
 
 
+def _write_version_file() -> None:
+    """Write a VERSION file with the git describe output for deployed environments."""
+    version_file = app_backend_application_path / "VERSION"
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            version_file.write_text(result.stdout.strip())
+            pulumi.info(f"Wrote VERSION file: {result.stdout.strip()}")
+            return
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        pulumi.warn(f"Failed to determine version via git: {e}")
+    version_file.unlink(missing_ok=True)
+
+
 def get_app_backend_app_files(
     runtime_parameter_values: Sequence[
         pulumi_datarobot.ApplicationSourceRuntimeParameterValueArgs
@@ -168,6 +188,7 @@ def get_app_backend_app_files(
     ],
 ) -> list[tuple[str, str]]:
     _prep_metadata_yaml(runtime_parameter_values)
+    _write_version_file()
     # Get all files from application path, following symlinks
     # When we've upgraded to Python 3.13 we can use Path.glob(resuce_symlinks=True)
     # https://docs.python.org/3.13/library/pathlib.html#pathlib.Path.glob

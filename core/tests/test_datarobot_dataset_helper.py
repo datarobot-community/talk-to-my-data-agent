@@ -63,6 +63,95 @@ def test_handle_datarobot_error() -> None:
             raise RuntimeError()
 
 
+def test_handle_datarobot_error_404() -> None:
+    """Test that 404 errors are handled and converted to RecipeError"""
+    with pytest.raises(RecipeError, match="test_resource not found"):
+        with handle_datarobot_error("test_resource"):
+            raise datarobot.errors.ClientError("Not found", 404)
+
+
+def test_handle_datarobot_error_403_seat_license() -> None:
+    """Test that 403 seat license errors raise ApplicationUsageException"""
+    # Create a proper ClientError with json property
+    error = datarobot.errors.ClientError("Access denied", 403)
+    error.json = {"message": "Access denied due to seat license restrictions"}
+
+    with pytest.raises(
+        ApplicationUsageException,
+        match="Feature unavailable due to seat license restrictions",
+    ):
+        with handle_datarobot_error("test_resource"):
+            raise error
+
+
+def test_handle_datarobot_error_403_other() -> None:
+    """Test that 403 errors without seat license are re-raised"""
+    error = datarobot.errors.ClientError("Access denied", 403)
+    error.json = {"message": "Access denied for other reason"}
+
+    with pytest.raises(datarobot.errors.ClientError):
+        with handle_datarobot_error("test_resource"):
+            raise error
+
+
+def test_handle_datarobot_error_wrapped_in_valueerror_403_seat_license() -> None:
+    """Test that ValueError-wrapped ClientError with 403 seat license is handled"""
+    client_error = datarobot.errors.ClientError("Access denied", 403)
+    client_error.json = {"message": "Access denied due to seat license restrictions"}
+
+    # Simulate the wrapping pattern: ValueError(('message', ClientError(...)))
+    wrapped_error = ValueError("Current use case is invalid.", client_error)
+
+    with pytest.raises(
+        ApplicationUsageException,
+        match="Feature unavailable due to seat license restrictions",
+    ):
+        with handle_datarobot_error("test_resource"):
+            raise wrapped_error
+
+
+def test_handle_datarobot_error_wrapped_in_valueerror_404() -> None:
+    """Test that ValueError-wrapped ClientError with 404 is converted to RecipeError"""
+    client_error = datarobot.errors.ClientError("Not found", 404)
+    client_error.json = {}
+
+    wrapped_error = ValueError("Current use case is invalid.", client_error)
+
+    with pytest.raises(RecipeError, match="test_resource not found"):
+        with handle_datarobot_error("test_resource"):
+            raise wrapped_error
+
+
+def test_handle_datarobot_error_wrapped_in_valueerror_other_status() -> None:
+    """Test that ValueError-wrapped ClientError with other status codes is handled"""
+    client_error = datarobot.errors.ClientError("Internal server error", 500)
+    client_error.json = {"message": "Internal server error"}
+
+    wrapped_error = ValueError("Current use case is invalid.", client_error)
+
+    with pytest.raises(RecipeError, match="Exception in retrieving test_resource"):
+        with handle_datarobot_error("test_resource"):
+            raise wrapped_error
+
+
+def test_handle_datarobot_error_valueerror_without_clienterror() -> None:
+    """Test that regular ValueError without ClientError is wrapped in RecipeError"""
+    regular_error = ValueError("This is just a regular ValueError")
+
+    with pytest.raises(
+        RecipeError, match="Unexpected exception in retrieving test_resource"
+    ):
+        with handle_datarobot_error("test_resource"):
+            raise regular_error
+
+
+def test_handle_datarobot_error_no_exception_type() -> None:
+    """Test that when exception_type is None, the original exception is re-raised"""
+    with pytest.raises(datarobot.errors.ClientError):
+        with handle_datarobot_error("test_resource", exception_type=None):
+            raise datarobot.errors.ClientError("Internal error", 500)
+
+
 @dataclass
 class Mocks:
     analyst_db: Mock

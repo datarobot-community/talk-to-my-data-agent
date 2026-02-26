@@ -1,22 +1,6 @@
 import { AxiosProgressEvent } from 'axios';
 import apiClient from '../apiClient';
-
-type Dataset = {
-  id: string;
-  name: string;
-  created: string;
-  size: string;
-  file_size?: number;
-};
-
-type DatasetResponse = {
-  dataset: {
-    name: string;
-    data_records: Record<string, unknown>[];
-  };
-  cleaning_report?: unknown[];
-  dataset_name?: string;
-};
+import { DatasetResponse, Dataset } from './types';
 
 export const getDatasets = async ({
   limit,

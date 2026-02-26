@@ -58,10 +58,10 @@ export const Data: React.FC = () => {
   }, 100);
 
   return (
-    <div className="p-6 pr-0 flex flex-col h-full">
+    <div className="flex h-full flex-col p-6 pr-0">
       <h2 className="heading-04">{t('Data')}</h2>
       <div className="flex justify-between gap-2">
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center gap-2">
           <div className="text-sm">{t('View')}</div>
           <DataViewTabs
             defaultValue={viewMode}
@@ -72,7 +72,7 @@ export const Data: React.FC = () => {
       </div>
       <Separator className="my-4 border-t" />
       {status === 'pending' ? (
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
           <Loading />
         </div>
       ) : (

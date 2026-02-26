@@ -164,7 +164,10 @@ async def test_use_user_token_from_request_header(mock_request: MagicMockType) -
         patch("datarobot.Client") as mock_dr_client,
         patch.dict(
             os.environ,
-            {"DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2"},
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
             clear=True,
         ),
     ):
@@ -190,7 +193,10 @@ async def test_use_user_token_from_session_if_set(mock_request: MagicMockType) -
     with (
         patch.dict(
             os.environ,
-            {"DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2"},
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
             clear=True,
         ),
         patch("datarobot.Client") as mock_dr_client,
@@ -203,6 +209,165 @@ async def test_use_user_token_from_session_if_set(mock_request: MagicMockType) -
         mock_dr_client.assert_called_once_with(
             token="token_in_session", endpoint="https://app.datarobot.com/api/v2"
         )
+
+
+@pytest.mark.asyncio
+async def test_use_user_token_using_builder_api_token_from_env_var(
+    mock_request: MagicMockType
+) -> None:
+    mock_request.state.session = MagicMock()
+    mock_request.state.session.datarobot_api_scoped_token = "token_in_session"
+    mock_request.headers = {"x-datarobot-api-key": "visitor_token"}
+
+    # Mock dr.Client with builder api token
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "USE_BUILDER_API_TOKEN": "true",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
+            clear=True,
+        ),
+        patch("datarobot.Client") as mock_dr_client,
+    ):
+        # Use the context manager
+        with use_user_token(mock_request, allow_use_builder_token=True):
+            pass
+
+        # Check that dr.Client was called with the app builder's token
+        mock_dr_client.assert_called_once_with(
+            token="BuilderApiToken", endpoint="https://app.datarobot.com/api/v2"
+        )
+
+
+@pytest.mark.asyncio
+async def test_use_user_token_using_builder_api_token_from_runtime_param(
+    mock_request: MagicMockType
+) -> None:
+    mock_request.state.session = MagicMock()
+    mock_request.state.session.datarobot_api_scoped_token = "token_in_session"
+    mock_request.headers = {"x-datarobot-api-key": "visitor_token"}
+
+    # Mock dr.Client with builder api token
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN": "true",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
+            clear=True,
+        ),
+        patch("datarobot.Client") as mock_dr_client,
+    ):
+        # Use the context manager
+        with use_user_token(mock_request, allow_use_builder_token=True):
+            pass
+
+        # Check that dr.Client was called with the app builder's token
+        mock_dr_client.assert_called_once_with(
+            token="BuilderApiToken", endpoint="https://app.datarobot.com/api/v2"
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'env_var', ["NO", "N", "n", "no", "False"]
+)
+async def test_use_user_token_using_builder_api_token_from_wrong_env_var(
+    env_var: str,
+    mock_request: MagicMockType
+) -> None:
+    """
+    At each run should use 'token_in_session', because failed to parse
+    environment variable's value.
+    """
+    mock_request.state.session = MagicMock()
+    mock_request.state.session.datarobot_api_scoped_token = "token_in_session"
+    mock_request.headers = {"x-datarobot-api-key": "visitor_token"}
+
+    # Mock dr.Client with builder api token
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "USE_BUILDER_API_TOKEN": env_var,
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
+            clear=True,
+        ),
+        patch("datarobot.Client") as mock_dr_client,
+    ):
+        # Use the context manager
+        with use_user_token(mock_request, allow_use_builder_token=True):
+            pass
+
+        # Check that dr.Client was called with the app builder's token
+        mock_dr_client.assert_called_once_with(
+            token="token_in_session", endpoint="https://app.datarobot.com/api/v2"
+        )
+
+
+@pytest.mark.usefixtures("clean_environ")
+@pytest.mark.asyncio
+async def test_use_user_token_localhost_with_empty_use_case(
+    mock_request: MagicMockType,
+) -> None:
+    """Test that on localhost with empty DATAROBOT_DEFAULT_USE_CASE, the use case context is cleared."""
+    mock_request.state.session = MagicMock()
+    mock_request.state.session.datarobot_api_scoped_token = None
+    mock_request.headers = {}
+
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+                "DATAROBOT_DEFAULT_USE_CASE": "",
+            },
+            clear=True,
+        ),
+        patch("datarobot.client.client_configuration") as mock_client_config,
+    ):
+        mock_client_config.return_value.__enter__ = MagicMock()
+        mock_client_config.return_value.__exit__ = MagicMock(return_value=False)
+
+        with use_user_token(mock_request):
+            pass
+
+        mock_client_config.assert_called_once_with(default_use_case=[])
+
+
+@pytest.mark.usefixtures("clean_environ")
+@pytest.mark.asyncio
+async def test_use_user_token_localhost_without_empty_use_case(
+    mock_request: MagicMockType,
+) -> None:
+    """Test that on localhost without empty DATAROBOT_DEFAULT_USE_CASE, no extra client is created."""
+    mock_request.state.session = MagicMock()
+    mock_request.state.session.datarobot_api_scoped_token = None
+    mock_request.headers = {}
+
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+                "DATAROBOT_API_TOKEN": "BuilderApiToken",
+            },
+            clear=True,
+        ),
+        patch("datarobot.client.client_configuration") as mock_client_config,
+    ):
+        with use_user_token(mock_request):
+            pass
+
+        mock_client_config.assert_not_called()
 
 
 @pytest.mark.usefixtures("clean_environ")
@@ -219,7 +384,12 @@ async def test_get_datarobot_account_includes_scoped_token(
 
     # Call the endpoint function directly
     with patch.dict(
-        os.environ, {"DATAROBOT_API_TOKEN": "creator_token_123456789"}, clear=True
+        os.environ,
+        {
+            "DATAROBOT_ENDPOINT": "https://app.datarobot.com/api/v2",
+            "DATAROBOT_API_TOKEN": "creator_token_123456789",
+        },
+        clear=True,
     ):
         response = await get_datarobot_account(mock_request)
 

@@ -3,7 +3,8 @@ import { apiClient } from '../apiClient';
 interface DataRobotInfoResponse {
   datarobot_account_info: {
     uid: string;
-    username: string;
+    firstName?: string;
+    lastName?: string;
     email: string;
     language: string;
     [key: string]: string | number | boolean | null | undefined;

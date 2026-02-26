@@ -9,8 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
+import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
@@ -20,6 +19,7 @@ import { generateChatRoute } from '@/pages/routes';
 import { useAppState } from '@/state/hooks';
 import { cn } from '@/lib/utils';
 import { getChatName } from '@/api/chat-messages/utils';
+import { MAX_CHAT_NAME_LENGTH } from '@/constants/chat';
 
 type NewChatModalType = {
   highlight: boolean;
@@ -44,10 +44,10 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
     >
       <DialogTrigger asChild>
         <Button
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
+          className={cn(highlight && 'animate-(--animation-blink-border-and-shadow)', 'mr-2')}
           variant="secondary"
         >
-          <FontAwesomeIcon icon={faPlus} /> {t('New chat')}
+          <Plus /> {t('New chat')}
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -63,13 +63,14 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right mn-label">
+            <Label htmlFor="name" className="mn-label text-right">
               {t('Chat name')}
             </Label>
             <Input
               id="name"
               value={name}
               onChange={event => setName(event.target.value)}
+              maxLength={MAX_CHAT_NAME_LENGTH}
               className="col-span-3"
               placeholder={t('Enter a name for your chat')}
               disabled={isPending}
@@ -89,6 +90,13 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
                 }
               }}
             />
+            {name.length >= MAX_CHAT_NAME_LENGTH && (
+              <p className="col-span-3 col-start-2 text-xs text-destructive">
+                {t('Chat name has reached maximum of {{max}} characters', {
+                  max: MAX_CHAT_NAME_LENGTH,
+                })}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

@@ -72,12 +72,12 @@ const EditableCell: React.FC<EditableCellProps> = ({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       autoFocus
-      className="w-full h-[28px]"
+      className="h-[28px] w-full"
     />
   ) : (
     <div
       onDoubleClick={handleDoubleClick}
-      className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px] text-muted-foreground"
+      className="min-h-[28px] cursor-pointer rounded p-1 text-muted-foreground hover:bg-secondary"
       title="Double-click to edit"
     >
       <HighlightText text={value} searchText={searchText || ''} />

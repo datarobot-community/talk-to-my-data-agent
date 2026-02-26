@@ -41,6 +41,17 @@ NOTEBOOK_ID = os.getenv("NOTEBOOK_ID", "")
 templates = Jinja2Templates(directory=ROOT_DIR / "templates")
 
 
+def get_app_version() -> str:
+    """Resolve app version from VERSION file written at deploy time."""
+    version_file = ROOT_DIR / "VERSION"
+    if version_file.is_file():
+        return version_file.read_text().strip()
+    return ""
+
+
+APP_VERSION = get_app_version()
+
+
 @base_router.get("/health")
 async def health() -> dict[str, str]:
     """
@@ -48,7 +59,7 @@ async def health() -> dict[str, str]:
 
     If you don't want this, delete `use_health=True` in the middleware.
     """
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": APP_VERSION}
 
 
 def get_app_base_url(api_port: str) -> str:
@@ -146,6 +157,7 @@ def create_app(
         env_vars = {
             "BASE_PATH": app_base_url,
             "API_PORT": api_port,
+            "APP_VERSION": APP_VERSION,
         }
 
         manifest_assets = get_manifest_assets(

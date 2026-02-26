@@ -70,5 +70,12 @@ export default defineConfig({
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov', 'cobertura', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**'],
+      exclude: ['src/**/*.d.ts', 'src/**/*.test.{ts,tsx}', 'src/main.tsx', 'src/vite-env.d.ts'],
+    },
   },
 });

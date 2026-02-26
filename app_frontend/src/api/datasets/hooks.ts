@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
+import { ApiError } from '@/state/types';
 import { datasetKeys } from './keys';
 import {
   getDatasets,
@@ -11,7 +13,7 @@ import {
 import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
-import { AxiosError } from 'axios';
+import { Dataset } from './types';
 
 interface FileUploadResponse {
   filename?: string;
@@ -21,6 +23,10 @@ interface FileUploadResponse {
   error?: string;
 }
 
+type DatasetsResponse = {
+  local: Dataset[];
+  remote: Dataset[];
+};
 export interface UploadError extends Error {
   responseData?: FileUploadResponse[];
   response?: {
@@ -30,7 +36,7 @@ export interface UploadError extends Error {
 }
 
 export const useFetchDatasets = ({ limit = 100 } = {}) => {
-  const queryResult = useQuery({
+  const queryResult = useQuery<DatasetsResponse, AxiosError<ApiError>>({
     queryKey: datasetKeys.list(limit),
     queryFn: async ({ signal }) => {
       const [local, remote] = await Promise.all([
@@ -40,6 +46,16 @@ export const useFetchDatasets = ({ limit = 100 } = {}) => {
       return { local: local, remote: remote };
     },
     refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      const errorCode = error?.response?.data?.detail?.code;
+      // Don't retry on 403 Forbidden or USER_ACCESS_DENIED errors
+      if (errorCode === 'USER_ACCESS_DENIED') {
+        return false;
+      }
+
+      // Retry up to 3 times for other errors
+      return failureCount < 3;
+    },
   });
 
   return queryResult;

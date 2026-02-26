@@ -3,9 +3,7 @@ import { useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
 import { getMessage, getResponseMessage } from '@/api/chat-messages/selectors';
 import { UserAvatar, DataRobotAvatar } from './Avatars';
 import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
-import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
+import { Trash2, FileDown } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
 import { formatMessageDate } from './utils';
@@ -74,7 +72,7 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
       ? t('Exporting...')
       : responseInProgress || !responseMessage
         ? t('Wait for agent to finish responding')
-        : t('Export chat');
+        : t('Export prompt and response');
 
   const isDeleteDisabled = !responseMessage;
   const deleteButtonTooltip = isDeleteDisabled
@@ -94,8 +92,8 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
         variant="destructive"
         isLoading={isDeleting}
       />
-      <div className="self-stretch justify-between items-center gap-1 inline-flex">
-        <div className="grow shrink basis-0 h-6 justify-start items-center gap-2 flex">
+      <div className="inline-flex items-center justify-between gap-1 self-stretch">
+        <div className="flex h-6 shrink grow basis-0 items-center justify-start gap-2">
           {avatar()}
           <div className="mn-label-large">{name}</div>
           <div className="body-secondary">{date}</div>
@@ -109,7 +107,7 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
               title={exportButtonTooltip}
               disabled={isExportDisabled}
             >
-              <FontAwesomeIcon icon={faFileArrowDown} />
+              <FileDown />
             </Button>
             <Button
               variant="ghost"
@@ -118,7 +116,7 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
               title={deleteButtonTooltip}
               disabled={isDeleteDisabled}
             >
-              <FontAwesomeIcon icon={faTrash} />
+              <Trash2 />
             </Button>
           </div>
         )}

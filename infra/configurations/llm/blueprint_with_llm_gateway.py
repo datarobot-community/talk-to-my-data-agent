@@ -78,6 +78,7 @@ default_llm_id: str = os.environ.get(
     "LLM_DEFAULT_LLM_ID",
     "amazon-anthropic-claude-sonnet-4-5-20250929-v1",  # External LLM ID from the Playground
 )
+default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 # Verify everything is configured properly for this configuration option.
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
 
@@ -167,6 +168,11 @@ app_runtime_parameters = [
         type="string",
         value=default_model,
     ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=default_use_builder_api_token,
+    ),
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
@@ -183,4 +189,5 @@ custom_model_runtime_parameters = [
 pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
 export("USE_DATAROBOT_LLM_GATEWAY", "1")
+export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
 export("LLM_DEFAULT_MODEL", default_model)

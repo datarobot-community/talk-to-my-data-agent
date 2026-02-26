@@ -21,6 +21,8 @@ import datarobot as dr
 import trafaret as t
 from fastapi import HTTPException, Request
 
+from core.config import Config
+
 FILE_API_CONNECT_TIMEOUT = float(os.environ.get("FILE_API_CONNECT_TIMEOUT", 180))
 FILE_API_READ_TIMEOUT = float(os.environ.get("FILE_API_READ_TIMEOUT", 180))
 
@@ -168,7 +170,16 @@ class File:
         )
 
 
-def get_visitors_token(request: Request) -> str | None:
+def get_visitors_token(
+    request: Request,
+    allow_use_builder_token: bool = False,
+) -> str | None:
+    if allow_use_builder_token:
+        config = Config()
+
+        if config.use_builder_api_token is True:
+            return config.datarobot_api_token
+
     if request.state.session.datarobot_api_scoped_token:
         return cast(str, request.state.session.datarobot_api_scoped_token)
 
@@ -176,19 +187,33 @@ def get_visitors_token(request: Request) -> str | None:
 
 
 @contextmanager
-def use_user_token(request: Request) -> Generator[None, None, None]:
+def use_user_token(
+    request: Request,
+    allow_use_builder_token: bool = False,
+) -> Generator[None, None, None]:
     """Context manager to temporarily use the user's DataRobot token."""
-    token = get_visitors_token(request)
+    token = get_visitors_token(request, allow_use_builder_token)
     if token:
-        with dr.Client(
+        client_kwargs: dict[str, Any] = dict(
             token=token,
             endpoint=os.environ.get("DATAROBOT_ENDPOINT"),
-        ):
+        )
+        # Clear use case context when DATAROBOT_DEFAULT_USE_CASE is empty — the SDK treats "" as a valid ID
+        if os.environ.get("DATAROBOT_DEFAULT_USE_CASE") == "":
+            client_kwargs["default_use_case"] = []
+        with dr.Client(**client_kwargs):
             yield
     elif not os.environ.get(
         "DR_CUSTOM_APP_EXTERNAL_URL"
     ):  # indicates that it's a local environment
-        yield
+        # Clear use case context on localhost too — the SDK reads "" from env and treats it as a valid ID
+        if os.environ.get("DATAROBOT_DEFAULT_USE_CASE") == "":
+            from datarobot.client import client_configuration
+
+            with client_configuration(default_use_case=[]):
+                yield
+        else:
+            yield
     else:
         raise HTTPException(
             status_code=401,

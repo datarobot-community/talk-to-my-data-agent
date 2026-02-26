@@ -30,7 +30,9 @@ class LogLevel(str, Enum):
     DEBUG = "DEBUG"
 
 
-FormatType = Literal["json", "text"]
+FormatType = Literal["json", "text", "readable"]
+
+_READABLE_INDENT = "   "
 
 
 _STANDARD_LOG_RECORD_ATTRS = set(
@@ -108,6 +110,34 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
+class ReadableFormatter(logging.Formatter):
+    """
+    Human-readable formatter: timestamp LEVEL:logger:message (ISO UTC).
+    When present, extra fields from the log record are appended as | key=value.
+    For records with exception info, appends an indented 'exception:' block
+    with the traceback.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
+        first_line = f"{ts} {record.levelname}:{record.name}:{record.getMessage()}"
+        extra_fields = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in _ALL_EXCLUDED_LOG_RECORD_ATTRS
+        }
+        if extra_fields:
+            extra_str = " | ".join(f"{k}={v}" for k, v in extra_fields.items())
+            first_line = f"{first_line} | {extra_str}"
+        if not (record.exc_info and record.exc_info[0]):
+            return first_line
+        tb_str = "".join(traceback.format_exception(*record.exc_info))
+        tb_indented = "\n".join(
+            _READABLE_INDENT + line for line in tb_str.rstrip().split("\n")
+        )
+        return f"{first_line}\n{_READABLE_INDENT}exception:\n{tb_indented}"
+
+
 class TextFormatter(logging.Formatter):
     """
     Custom text formatter that includes extra fields in the output.
@@ -165,6 +195,8 @@ def init_logging(
     handler = logging.StreamHandler(stream)
     if format_type == "json":
         handler.setFormatter(JsonFormatter())
+    elif format_type == "readable":
+        handler.setFormatter(ReadableFormatter())
     else:
         text_formatter = TextFormatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -201,6 +233,8 @@ def get_logger(
     handler = logging.StreamHandler(stream)
     if format_type == "json":
         handler.setFormatter(JsonFormatter())
+    elif format_type == "readable":
+        handler.setFormatter(ReadableFormatter())
     else:
         text_formatter = TextFormatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

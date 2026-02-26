@@ -26,7 +26,7 @@ export const HighlightText: React.FC<HighlightTextProps> = ({
         regex.lastIndex = 0;
 
         return isMatch ? (
-          <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">
+          <mark key={index} className="rounded bg-yellow-200 px-0.5 dark:bg-yellow-800">
             {part}
           </mark>
         ) : (

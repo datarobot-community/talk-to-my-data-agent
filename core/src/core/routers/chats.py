@@ -24,6 +24,11 @@ from typing import Any, List, Union, cast
 
 import pandas as pd
 import polars.dataframe.frame
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+)
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -61,11 +66,6 @@ from core.schema import (
     RunAnalysisResult,
     RunChartsResult,
     RunDatabaseAnalysisResult,
-)
-from core.token_tracking import (
-    TiktokenCountingStrategy,
-    TokenUsageTracker,
-    count_messages_tokens,
 )
 
 logger = get_logger()
@@ -445,7 +445,7 @@ async def create_chat_message(
 
             # Create token tracker for summarization
             summarization_tracker = TokenUsageTracker(
-                strategy=TiktokenCountingStrategy()
+                strategy=HeuristicTokenCountingStrategy()
             )
 
             try:

@@ -26,16 +26,14 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="border border-border min-w-0"
+      className="min-w-0 border border-border"
       variant={COLLAPSIBLE_VARIANT.standalone}
     >
       <CollapsibleTrigger data-testid={triggerTestId}>
         {header}
         <CollapsibleChevron />
       </CollapsibleTrigger>
-      <CollapsibleContent className="py-4 px-4 min-w-0 overflow-hidden">
-        {children}
-      </CollapsibleContent>
+      <CollapsibleContent className="min-w-0 overflow-hidden p-4">{children}</CollapsibleContent>
     </Collapsible>
   );
 };

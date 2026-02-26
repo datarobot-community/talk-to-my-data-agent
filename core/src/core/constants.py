@@ -57,19 +57,5 @@ MAX_CSV_TOKENS = 50000  # limit for data analyst csv sended to llm
 MODEL_CONTEXT_WINDOW = 128000  # GPT-4o context window
 CONTEXT_WARNING_THRESHOLD = int(MODEL_CONTEXT_WINDOW * 0.8)
 
-# Tiktoken Encoding Configuration
-DEFAULT_TIKTOKEN_ENCODING = "o200k_base"
-
-
-def get_tiktoken_encoding_map() -> dict[str, str]:
-    """Get tiktoken encoding map with current model configuration."""
-    model = get_llm_model()
-    return {
-        model: DEFAULT_TIKTOKEN_ENCODING,
-    }
-
-
-TIKTOKEN_ENCODING_MAP = get_tiktoken_encoding_map()
-
 # Error Messages
 VALUE_ERROR_MESSAGE = "Input data cannot be empty (no dataset provided)"

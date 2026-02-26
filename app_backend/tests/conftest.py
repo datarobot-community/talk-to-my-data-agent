@@ -11,11 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from typing import Generator
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+# Set env vars before importing app (app → core loads core.config.Config at import time)
+os.environ.setdefault("DATAROBOT_ENDPOINT", "https://dummy-endpoint.datarobot.com")
+os.environ.setdefault("DATAROBOT_API_TOKEN", "dummy-api-token-for-tests")
 
 from app import create_app
 from app.config import Config

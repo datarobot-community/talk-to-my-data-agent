@@ -21,15 +21,15 @@ const BUTTON_SIZE = {
 } as const;
 
 const BUTTON_VARIANTS = cva(
-  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[1px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded text-sm font-semibold whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring disabled:pointer-events-none aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       size: {
         [BUTTON_SIZE.default]: 'h-9 px-4 py-2 has-[>svg]:px-3',
         [BUTTON_SIZE.sm]: 'h-8 gap-1.5 px-3 has-[>svg]:px-2.5',
         [BUTTON_SIZE.lg]: 'h-10 px-6 has-[>svg]:px-4',
-        [BUTTON_SIZE.icon]: 'h-9 w-9',
-        [BUTTON_SIZE.iconSm]: 'h-5 w-5',
+        [BUTTON_SIZE.icon]: 'size-9',
+        [BUTTON_SIZE.iconSm]: 'size-5',
       },
       variant: {
         [BUTTON_VARIANT.primary]:
@@ -37,10 +37,10 @@ const BUTTON_VARIANTS = cva(
         [BUTTON_VARIANT.destructive]:
           'bg-destructive text-white hover:bg-destructive/90 disabled:brightness-70',
         [BUTTON_VARIANT.secondary]:
-          'border border-muted-foreground bg-transparent hover:text-accent hover:border-accent hover:bg-muted/50 disabled:border-foreground/50 disabled:text-foreground/50',
+          'border border-muted-foreground bg-transparent hover:border-accent hover:bg-muted/50 hover:text-accent disabled:border-foreground/50 disabled:text-foreground/50',
         [BUTTON_VARIANT.ghost]:
-          'hover:bg-sidebar-primary hover:text-accent px-2 disabled:text-foreground/50',
-        [BUTTON_VARIANT.link]: 'text-primary hover:text-accent p-0 disabled:text-foreground/50',
+          'px-2 hover:bg-sidebar-primary hover:text-accent disabled:text-foreground/50',
+        [BUTTON_VARIANT.link]: 'p-0 text-primary hover:text-accent disabled:text-foreground/50',
       },
     },
     defaultVariants: {

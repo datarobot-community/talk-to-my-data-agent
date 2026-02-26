@@ -14,6 +14,9 @@ includes:
   core:
     taskfile: ./core/Taskfile.yaml
     dir: ./core
+  e2e:
+    taskfile: ./tests/e2e/Taskfile.yaml
+    dir: ./tests/e2e
   infra:
     taskfile: ./infra/Taskfile.yaml
     dir: ./infra
@@ -39,6 +42,7 @@ tasks:
       - task: app_backend:lint
       - task: app_frontend:lint
       - task: core:lint
+      - task: e2e:lint
       - task: infra:lint
 
   install:
@@ -47,6 +51,7 @@ tasks:
       - task: app_backend:install
       - task: app_frontend:install
       - task: core:install
+      - task: e2e:install
       - task: infra:install
 
   reinstall:

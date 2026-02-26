@@ -36,17 +36,40 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: npm install
-        working-directory: app_frontend
-
-      - name: Run Vitest
-        run: npm run test
+        run: npm ci
         working-directory: app_frontend
 
       - name: Run Lint
         run: npm run lint
         working-directory: app_frontend
 
+      - name: Run Vitest
+        run: npm run test
+        working-directory: app_frontend
+
       - name: Run Knip
         run: npm run knip
         working-directory: app_frontend
+
+  coverage:
+    name: "React: coverage report"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: app_frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run test:coverage
+      - name: Get Cover
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: "React (app_frontend)"
+          json-summary-path: app_frontend/coverage/coverage-summary.json
+          vite-config-path: app_frontend/vite.config.ts

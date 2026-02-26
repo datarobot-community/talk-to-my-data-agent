@@ -62,7 +62,7 @@ describe('MessageHeader Component', () => {
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
     const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
-    const exportButton = screen.getByRole('button', { name: /export chat/i });
+    const exportButton = screen.getByRole('button', { name: /export prompt and response/i });
 
     expect(deleteButton).toBeInTheDocument();
     expect(exportButton).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('MessageHeader Component', () => {
 
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const exportButton = screen.getByRole('button', { name: /export chat/i });
+    const exportButton = screen.getByRole('button', { name: /export prompt and response/i });
     await user.click(exportButton);
 
     expect(exportChat).toHaveBeenCalledWith({ chatId: 'chat-1', messageId: 'msg-1' });

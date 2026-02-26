@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { CheckIcon, ChevronDown } from 'lucide-react';
+import { defaultFilter } from 'cmdk';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
 const singleSelectVariants = cva('m-1', {
   variants: {
     variant: {
-      default: 'border-foreground/10 text-foreground bg-card hover:bg-card/80',
+      default: 'border-foreground/10 bg-card text-foreground hover:bg-card/80',
       secondary:
         'border-foreground/10 bg-secondary text-secondary-foreground hover:bg-secondary/80',
       destructive:
@@ -102,13 +103,13 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
             {...props}
             onClick={handleTogglePopover}
             className={cn(
-              'flex w-full p-1 rounded-md border min-h-10 h-auto items-center justify-between bg-inherit hover:bg-inherit [&_svg]:pointer-events-auto',
+              'flex h-auto min-h-10 w-full items-center justify-between rounded-md border bg-inherit p-1 hover:bg-inherit [&_svg]:pointer-events-auto',
               className
             )}
             testId={testId}
           >
             {selectedValue ? (
-              <div className="flex justify-between items-center w-full">
+              <div className="flex w-full items-center justify-between">
                 <div className="flex flex-wrap items-center">
                   {(() => {
                     const option = options.find(o => o.value === selectedValue);
@@ -128,13 +129,13 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                   })()}
                 </div>
                 <div className="flex items-center justify-between">
-                  <ChevronDown className="h-4 mx-2 cursor-pointer text-muted-foreground" />
+                  <ChevronDown className="mx-2 h-4 cursor-pointer text-muted-foreground" />
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between w-full mx-auto">
-                <span className="body-secondary mx-3">{placeholder}</span>
-                <ChevronDown className="h-4 cursor-pointer text-muted-foreground mx-2" />
+              <div className="mx-auto flex w-full items-center justify-between">
+                <span className="mx-3 body-secondary">{placeholder}</span>
+                <ChevronDown className="mx-2 h-4 cursor-pointer text-muted-foreground" />
               </div>
             )}
           </Button>
@@ -144,7 +145,11 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
           align="start"
           onEscapeKeyDown={() => setIsPopoverOpen(false)}
         >
-          <Command>
+          <Command
+            filter={(value, search, keywords) =>
+              search.trim() ? defaultFilter!(value, search.trim(), keywords) : 1
+            }
+          >
             <CommandInput
               placeholder={t('Search...')}
               disabled={isLoading || !options.length}
@@ -155,7 +160,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
             <CommandList className="max-w-[800px]">
               {isLoading ? (
                 <CommandItem className="flex items-center justify-center py-6">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 </CommandItem>
               ) : (
                 <>
@@ -172,13 +177,13 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                         >
                           <div
                             className={cn(
-                              'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                              'mr-2 flex size-4 items-center justify-center rounded-sm border border-primary',
                               {
                                 'opacity-50 [&_svg]:invisible': !isSelected,
                               }
                             )}
                           >
-                            <CheckIcon className="h-4 w-4 text-primary" />
+                            <CheckIcon className="size-4 text-primary" />
                           </div>
                           <span>{option.label}</span>
                           {option?.postfix && (
@@ -199,7 +204,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                     disabled={isLoading}
                     data-testid="multi-select-close"
                     onSelect={() => setIsPopoverOpen(false)}
-                    className="flex-1 justify-center cursor-pointer max-w-full"
+                    className="max-w-full flex-1 cursor-pointer justify-center"
                   >
                     {t('Confirm')}
                   </CommandItem>

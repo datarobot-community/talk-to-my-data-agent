@@ -1,12 +1,10 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import { DATA_TABS } from '@/state/constants';
 import { SearchControl } from '@/components/ui-custom/search-control';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Download, Trash2, Loader2 } from 'lucide-react';
 
 interface DatasetCardActionBarProps {
   onSearch?: (searchText: string) => void;
@@ -52,24 +50,16 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
           onClick={onDownload}
           title={t('Download dictionary as CSV')}
           disabled={isDisabled}
+          data-testid="download-dictionary-button"
         >
-          {isDownloading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <FontAwesomeIcon icon={faDownload} />
-          )}
+          {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download />}
         </Button>
       )}
 
       {/* Delete Button */}
       {onDelete && (
-        <Button
-          variant="link"
-          onClick={onDelete}
-          title={t('Delete dictionary')}
-          disabled={isDisabled}
-        >
-          <FontAwesomeIcon icon={faTrash} />
+        <Button variant="link" onClick={onDelete} title={t('Delete dataset')} disabled={isDisabled}>
+          <Trash2 />
         </Button>
       )}
     </div>

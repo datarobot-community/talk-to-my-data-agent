@@ -167,19 +167,17 @@ describe('PromptInput Tooltip', () => {
 });
 
 describe('PromptInput Icon Change', () => {
-  it('shows faHourglassHalf icon when processing is true', () => {
+  it('shows Hourglass icon when processing is true', () => {
     render(<PromptInput isProcessing={true} initialValue="test" />);
-    const hourglassIcon = screen
-      .getByTestId('send-message-button')
-      .querySelector('[data-icon="hourglass-half"]');
-    expect(hourglassIcon).toBeInTheDocument();
+    const button = screen.getByTestId('send-message-button');
+    expect(button.querySelector('[data-testid="hourglass-icon"]')).toBeInTheDocument();
+    expect(button.querySelector('[data-testid="send-icon"]')).not.toBeInTheDocument();
   });
 
-  it('shows faPaperPlane icon when processing is false', () => {
+  it('shows Send icon when processing is false', () => {
     render(<PromptInput isProcessing={false} initialValue="test" />);
-    const paperPlaneIcon = screen
-      .getByTestId('send-message-button')
-      .querySelector('[data-icon="paper-plane"]');
-    expect(paperPlaneIcon).toBeInTheDocument();
+    const button = screen.getByTestId('send-message-button');
+    expect(button.querySelector('[data-testid="send-icon"]')).toBeInTheDocument();
+    expect(button.querySelector('[data-testid="hourglass-icon"]')).not.toBeInTheDocument();
   });
 });

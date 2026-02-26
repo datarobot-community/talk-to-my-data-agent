@@ -174,23 +174,23 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
   return (
     <MessageContainer testId={testId} ref={ref} key={message.id}>
       <MessageHeader messageId={message.id} chatId={chatId} messages={messages} />
-      <div className="self-stretch body min-w-0">
+      <div className="min-w-0 self-stretch body">
         {enhancedUserMessage && <div className="mb-3">{enhancedUserMessage}</div>}
 
         {messageStep && (
-          <div className="flex w-full justify-start items-center">
+          <div className="flex w-full items-center justify-start">
             <LoadingIndicator
               isLoading={true}
               hasError={false}
               successTestId="step-loading-success"
             />
-            <div className="ml-1 mb-0 italic text-muted-foreground">{messageStep}</div>
+            <div className="mb-0 ml-1 text-muted-foreground italic">{messageStep}</div>
           </div>
         )}
 
         {message?.error && (
-          <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">
-            <span className="text-destructive text-sm">{message?.error}</span>
+          <div className="max-h-[300px] max-w-full overflow-x-auto overflow-y-auto">
+            <span className="text-sm text-destructive">{message?.error}</span>
           </div>
         )}
 

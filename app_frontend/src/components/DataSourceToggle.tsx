@@ -74,7 +74,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
 
   const getTooltip = () => {
     return (
-      <div className="absolute min-w-[270px] max-w-[600px] left-1/2 -translate-x-1/2 top-full mb-2 hidden bg-secondary text-secondary-foreground group-hover:block text-xs rounded px-2 py-1 shadow z-10">
+      <div className="absolute top-full left-1/2 z-10 mb-2 hidden max-w-[600px] min-w-[270px] -translate-x-1/2 rounded bg-secondary px-2 py-1 text-xs text-secondary-foreground shadow group-hover:block">
         {t('Selected data sources:')}
         {dataByDataSource && dataByDataSource?.length > 0 ? (
           <ul className="list-disc pl-5">
@@ -96,7 +96,7 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
       type="single"
       value={currentValue}
       onValueChange={handleValueChange}
-      className="bg-muted rounded-md p-1 shadow-sm group relative"
+      className="group relative rounded-md bg-muted p-1 shadow-sm"
     >
       {getTooltip()}
       {allowedDataSources && allowedDataSources.includes(DATA_SOURCES.DATABASE) && (

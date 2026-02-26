@@ -18,16 +18,6 @@ vi.mock('@/pages/routes', () => ({
   generateChatRoute: vi.fn(),
 }));
 
-// Mock FontAwesomeIcon
-vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: () => <div data-testid="mock-icon" />,
-}));
-
-// Mock lucide-react
-vi.mock('lucide-react', () => ({
-  XIcon: () => <div data-testid="x-icon" />,
-}));
-
 describe('NewChatModal Component', () => {
   let mockCreateChat: MockInstance;
   let mockNavigate: MockInstance;
@@ -53,7 +43,7 @@ describe('NewChatModal Component', () => {
     render(<NewChatModal highlight={false} />);
     const newChatButton = screen.getByRole('button', { name: /new chat/i });
     expect(newChatButton).toBeInTheDocument();
-    expect(screen.getByTestId('mock-icon')).toBeInTheDocument();
+    expect(newChatButton.querySelector('.lucide-plus')).toBeInTheDocument();
   });
 
   test('shows loading state when creating a chat', () => {
@@ -73,5 +63,28 @@ describe('NewChatModal Component', () => {
     const createButton = screen.getByRole('button', { name: /creating/i });
     expect(createButton).toBeInTheDocument();
     expect(createButton).toBeDisabled();
+  });
+
+  test('enforces max length on chat name input', () => {
+    render(<NewChatModal highlight={false} />);
+
+    const triggerButton = screen.getByRole('button', { name: /new chat/i });
+    fireEvent.click(triggerButton);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveAttribute('maxLength', '200');
+  });
+
+  test('shows warning when chat name reaches max length', () => {
+    render(<NewChatModal highlight={false} />);
+
+    const triggerButton = screen.getByRole('button', { name: /new chat/i });
+    fireEvent.click(triggerButton);
+
+    const input = screen.getByRole('textbox');
+    const longName = 'a'.repeat(200);
+    fireEvent.change(input, { target: { value: longName } });
+
+    expect(screen.getByText(/has reached maximum of 200 characters/i)).toBeInTheDocument();
   });
 });

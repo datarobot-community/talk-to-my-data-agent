@@ -20,6 +20,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import plotly.graph_objects as go
 import pytest
 import pytest_asyncio
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+)
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
@@ -58,7 +62,6 @@ from core.schema import (
     RunAnalysisResult,
     RunChartsResult,
 )
-from core.token_tracking import TiktokenCountingStrategy, TokenUsageTracker
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -237,7 +240,7 @@ def analysis_context(
         user_message_id="message",
         enable_business_insights=True,
         enable_chart_generation=True,
-        token_tracker=TokenUsageTracker(strategy=TiktokenCountingStrategy()),
+        token_tracker=TokenUsageTracker(strategy=HeuristicTokenCountingStrategy()),
     )
 
 

@@ -1,7 +1,5 @@
 import React, { useRef, useEffect, useImperativeHandle, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
-import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
+import { Send, Hourglass } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 
 import { cn } from '~/lib/utils';
@@ -92,9 +90,9 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
         aria-disabled={isDisabled}
         data-testid={testId}
         className={cn(
-          'flex gap-2 justify-start items-center px-3 py-3 w-full min-w-3xs mr-4',
-          'border-border rounded-md border shadow-xs',
-          'bg-transparent placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
+          'mr-4 flex w-full min-w-3xs items-center justify-start gap-2 p-3',
+          'rounded-md border border-border shadow-xs',
+          'bg-transparent selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground',
           'text-base transition-[color,box-shadow]',
           'ring-ring/10 outline-ring/50',
           !isFocused && 'hover:border-muted-foreground',
@@ -107,7 +105,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
         <textarea
           id="prompt-input-textarea"
           className={cn(
-            'flex leading-5 box-content max-h-[300px] justify-center w-full resize-none overflow-hidden bg-transparent placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+            'box-content flex max-h-[300px] w-full resize-none justify-center overflow-hidden bg-transparent leading-5 placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
           rows={1}
@@ -141,7 +139,11 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
           onClick={handleSend}
           title={buttonTooltip}
         >
-          <FontAwesomeIcon icon={isProcessing ? faHourglassHalf : faPaperPlane} size="lg" />
+          {isProcessing ? (
+            <Hourglass className="size-5" data-testid="hourglass-icon" />
+          ) : (
+            <Send className="size-5" data-testid="send-icon" />
+          )}
         </Button>
       </div>
     );

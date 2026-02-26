@@ -45,7 +45,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
       className="w-full py-4"
     >
       <TabsList variant="underline" className="w-full">
-        <TabsTrigger value={RESPONSE_TABS.SUMMARY}>
+        <TabsTrigger data-testid="tab-summary" value={RESPONSE_TABS.SUMMARY}>
           <LoadingIndicator
             isLoading={states.summary.isLoading}
             hasError={states.summary.hasError}
@@ -53,7 +53,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
           />
           {t('Summary')}
         </TabsTrigger>
-        <TabsTrigger value={RESPONSE_TABS.INSIGHTS}>
+        <TabsTrigger data-testid="tab-insights" value={RESPONSE_TABS.INSIGHTS}>
           <LoadingIndicator
             isLoading={states.insights.isLoading}
             hasError={states.insights.hasError}
@@ -61,7 +61,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
           />
           {t('More insights')}
         </TabsTrigger>
-        <TabsTrigger value={RESPONSE_TABS.CODE}>
+        <TabsTrigger data-testid="tab-code" value={RESPONSE_TABS.CODE}>
           <LoadingIndicator
             isLoading={states.code.isLoading}
             hasError={states.code.hasError}

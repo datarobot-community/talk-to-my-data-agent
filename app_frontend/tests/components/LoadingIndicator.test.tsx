@@ -2,13 +2,14 @@ import { render, screen } from '@testing-library/react';
 import { test, describe, expect, vi } from 'vitest';
 import { LoadingIndicator } from '@/components/chat/LoadingIndicator';
 
-// Mock the FontAwesomeIcon component
-vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: () => <div data-testid="mock-icon" />,
-}));
-
-// Mock the Loader2 component from lucide-react
+// Mock lucide-react icons
 vi.mock('lucide-react', () => ({
+  Check: (props: Record<string, unknown>) => (
+    <svg data-testid={props['data-testid'] || 'mock-icon'} className={props.className as string} />
+  ),
+  TriangleAlert: (props: Record<string, unknown>) => (
+    <svg data-testid="mock-icon" className={props.className as string} />
+  ),
   Loader2: ({ className }: { className?: string }) => (
     <svg data-testid="loader" className={className} />
   ),
@@ -33,7 +34,7 @@ describe('LoadingIndicator Component', () => {
     expect(screen.queryByTestId('loader')).not.toBeInTheDocument();
 
     // Check that the icon is rendered
-    const icon = screen.getByTestId('mock-icon');
+    const icon = screen.getByTestId('data-loading-success');
     expect(icon).toBeInTheDocument();
   });
 });

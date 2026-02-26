@@ -39,16 +39,16 @@ export const InitialPrompt = ({
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
 
   return (
-    <div className="flex-1 flex flex-col p-4" data-testid={testId}>
-      <div className="flex flex-col flex-1 items-center justify-center">
-        <div className="w-[400px] flex flex-col flex-1 items-center justify-center">
+    <div className="flex flex-1 flex-col p-4" data-testid={testId}>
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="flex w-[400px] flex-1 flex-col items-center justify-center">
           <img src={theme === 'dark' ? chatMidnight : chatLight} alt="" />
-          <h4 className="mb-2 mt-4">
-            <strong className=" text-center font-semibold">
+          <h4 className="mt-4 mb-2">
+            <strong className="text-center font-semibold">
               {t('Type a question about your dataset')}
             </strong>
           </h4>
-          <p className="text-center mb-10">
+          <p className="mb-10 text-center">
             {t(
               "Ask specific questions about your datasets to get insights, generate visualizations, and discover patterns. Include column names and the kind of analysis you're looking for to get more accurate results."
             )}

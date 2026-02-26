@@ -61,6 +61,7 @@ print("\n.   - ".join(
 default_model: str = os.environ.get(
     "LLM_DEFAULT_MODEL", "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
 )
+default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is configured properly for this configuration option.
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
@@ -85,6 +86,11 @@ app_runtime_parameters = [
         type="string",
         value=default_model,
     ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=default_use_builder_api_token,
+    ),
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
@@ -99,4 +105,5 @@ custom_model_runtime_parameters = [
     ),
 ]
 export("USE_DATAROBOT_LLM_GATEWAY", "1")
+export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
 export("LLM_DEFAULT_MODEL", default_model)

@@ -64,7 +64,7 @@ async def update_data_sources_for_data_store(
     analyst_db: AnalystDB,
 ) -> None:
     """Update data sources for a data store."""
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         logger.debug("Loading recipe for datasources %s.")
         recipe = await DataSourceRecipe.load_or_create(
             analyst_db, external_data_store_id
@@ -93,7 +93,7 @@ def get_available_external_data_stores(
     Returns:
         list[ExternalDataStore]: The given page of datastores.
     """
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         return asyncio.run(
             DataSourceRecipe.list_available_datastores(analyst_db.user_id)
         )
@@ -126,7 +126,7 @@ async def register_external_data_sources(
         "PUT /external-data-stores/%s/external-data-sources/",
         external_data_store_id,
     )
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         name = await DataSourceRecipe.get_canonical_name_for_datastore_id(
             external_data_store_id
         )

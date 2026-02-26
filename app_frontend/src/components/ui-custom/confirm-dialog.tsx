@@ -45,7 +45,7 @@ export function ConfirmDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <Separator className="border-t my-2" />
+          <Separator className="my-2 border-t" />
           <DialogDescription className="mb-2">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -58,7 +58,7 @@ export function ConfirmDialog({
             disabled={isLoading}
             testId="confirm-dialog-confirm"
           >
-            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isLoading && <Loader2 className="size-4 animate-spin" />}
             {confirmText}
           </Button>
         </DialogFooter>

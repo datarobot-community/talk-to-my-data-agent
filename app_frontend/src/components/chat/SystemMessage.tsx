@@ -16,14 +16,14 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message, testId })
 
   return (
     <div
-      className="p-3 bg-card rounded flex-col justify-start items-start gap-3 flex mb-2.5 mr-2"
+      className="mr-2 mb-2.5 flex flex-col items-start justify-start gap-3 rounded bg-card p-3"
       data-testid={testId}
       key={message.id}
     >
-      <div className="self-stretch justify-between items-center gap-1 inline-flex">
-        <div className="grow shrink basis-0 h-6 justify-start items-center gap-2 flex">
-          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-blue-600" />
+      <div className="inline-flex items-center justify-between gap-1 self-stretch">
+        <div className="flex h-6 shrink grow basis-0 items-center justify-start gap-2">
+          <div className="flex size-6 items-center justify-center rounded-full bg-blue-100">
+            <Zap className="size-4 text-blue-600" />
           </div>
           <div className="mn-label-large">{t('Summarization')}</div>
           {message.created_at && (
@@ -37,15 +37,15 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message, testId })
             statusText={t("Condensing conversation history to stay within model's context limits")}
           />
         ) : message.error ? (
-          <div className="text-destructive body">{message.error}</div>
+          <div className="body text-destructive">{message.error}</div>
         ) : (
           <div>
-            <div className="body mb-2">
+            <div className="mb-2 body">
               {t(
                 "Previous messages have been condensed to stay within model's context limits. Your full chat history is preserved."
               )}
             </div>
-            <div className="whitespace-pre-wrap body-secondary">{message.content}</div>
+            <div className="body-secondary whitespace-pre-wrap">{message.content}</div>
           </div>
         )}
       </div>

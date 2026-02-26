@@ -67,6 +67,7 @@ default_llm_friendly_name: str = os.environ.get(
     "LLM_DEFAULT_LLM_NAME",
     "Claude Sonnet 4.5",  # Shown in the Web UI
 )
+default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
 llm_credential_runtime_params = get_runtime_values(default_model)
@@ -157,6 +158,11 @@ app_runtime_parameters = [
         type="string",
         value=default_llm_friendly_name,
     ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=default_use_builder_api_token,
+    ),
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
@@ -174,3 +180,4 @@ pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
 export("LLM_default_llm_friendly_name", default_llm_friendly_name)
+export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)

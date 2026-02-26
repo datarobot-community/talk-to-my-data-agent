@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import Dropzone, { type FileRejection } from 'react-dropzone';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder } from '@fortawesome/free-solid-svg-icons/faFolder';
-import { XIcon, FileIcon } from 'lucide-react';
+import { Folder, XIcon, FileIcon } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useTranslation } from '@/i18n';
 interface FileUploaderProps {
@@ -56,25 +54,25 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         <section>
           <div
             {...getRootProps()}
-            className="border border-dashed border-primary/20 p-4 rounded-lg cu"
+            className="cu rounded-lg border border-dashed border-primary/20 p-4"
           >
-            <input {...getInputProps()} />
-            <p className="text-center p-6">
-              {t('Drag and drop from your desktop, or')} <FontAwesomeIcon icon={faFolder} />{' '}
+            <input {...getInputProps()} aria-label={t('Upload CSV, XLSX, or XLS files')} />
+            <p className="p-6 text-center">
+              {t('Drag and drop from your desktop, or')} <Folder className="inline size-4" />{' '}
               <strong>{t('browse local files')}</strong>
             </p>
             <div>
               {files.map((file, index) => (
                 <div
                   key={index}
-                  className="h-min-[36px] pt-4 flex-col justify-start items-start gap-2.5 flex"
+                  className="h-min-[36px] flex flex-col items-start justify-start gap-2.5 pt-4"
                 >
-                  <div className="self-stretch bg-secondary/50 rounded border border-primary/10 justify-start items-center gap-2 inline-flex">
-                    <div className="w-9 self-stretch bg-secondary rounded-tl-[3px] rounded-bl-[3px] flex-col justify-center items-center gap-2 inline-flex">
-                      <div className="w-9 h-9 flex-col justify-center items-center gap-2.5 flex">
-                        <div className="text-center text-sm font-black leading-tight">
+                  <div className="inline-flex items-center justify-start gap-2 self-stretch rounded border border-primary/10 bg-secondary/50">
+                    <div className="inline-flex w-9 flex-col items-center justify-center gap-2 self-stretch rounded-l-[3px] bg-secondary">
+                      <div className="flex size-9 flex-col items-center justify-center gap-2.5">
+                        <div className="text-center text-sm leading-tight font-black">
                           <FileIcon
-                            className="w-4 h-4 cursor-pointer text-muted-foreground"
+                            className="size-4 cursor-pointer text-muted-foreground"
                             onClick={event => {
                               event.stopPropagation();
                             }}
@@ -82,16 +80,16 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="grow shrink basis-0 flex-col justify-center items-start inline-flex">
-                      <div className="py-1 text-sm font-normal leading-normal whitespace-wrap break-all">
+                    <div className="inline-flex shrink grow basis-0 flex-col items-start justify-center">
+                      <div className="whitespace-wrap py-1 text-sm leading-normal font-normal break-all">
                         {file.name}
                       </div>
                     </div>
-                    <div className="w-9 h-9 p-2 justify-center items-center flex">
-                      <div className="w-5 h-5 flex-col justify-center items-center gap-2.5 inline-flex">
-                        <div className="text-center text-sm font-black leading-tight">
+                    <div className="flex size-9 items-center justify-center p-2">
+                      <div className="inline-flex size-5 flex-col items-center justify-center gap-2.5">
+                        <div className="text-center text-sm leading-tight font-black">
                           <XIcon
-                            className="w-4 h-4 cursor-pointer text-muted-foreground"
+                            className="size-4 cursor-pointer text-muted-foreground"
                             onClick={event => {
                               event.stopPropagation();
                               onRemove(index);
@@ -104,7 +102,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                 </div>
               ))}
               {progress !== 100 && progress !== 0 && (
-                <Progress value={progress} className="h-1 mt-2" />
+                <Progress value={progress} className="mt-2 h-1" />
               )}
             </div>
           </div>

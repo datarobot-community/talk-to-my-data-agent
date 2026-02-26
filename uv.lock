@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version < '3.11'",
@@ -866,9 +866,9 @@ requires-dist = [
     { name = "openpyxl", specifier = ">=3.1.5,<4.0" },
     { name = "opentelemetry-api", specifier = ">=1.20.0,<1.30.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20.0,<1.30.0" },
-    { name = "opentelemetry-instrumentation", specifier = ">=0.45b0,<0.59b0" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0,<0.59b0" },
-    { name = "opentelemetry-instrumentation-requests", specifier = ">=0.45b0,<0.59b0" },
+    { name = "opentelemetry-instrumentation", specifier = ">=0.45b0,<0.61" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0,<0.61" },
+    { name = "opentelemetry-instrumentation-requests", specifier = ">=0.45b0,<0.61" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0,<1.30.0" },
     { name = "pandas", specifier = ">=2.2.3,<3.0" },
     { name = "pandas-stubs", specifier = ">=2.2.3.241126,<3.0" },
@@ -902,7 +902,6 @@ requires-dist = [
     { name = "streamlit", specifier = "==1.44.1" },
     { name = "streamlit-javascript", specifier = ">=0.1.5,<1.0" },
     { name = "textblob", specifier = ">=0.19.0,<1.0" },
-    { name = "tiktoken", specifier = ">=0.11.0,<1.0" },
     { name = "tslearn", specifier = ">=0.6.3,<1.0" },
     { name = "types-aiofiles", specifier = "==24.1.0.20241221" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20241230,<7.0" },

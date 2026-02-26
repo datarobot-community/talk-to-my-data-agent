@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from '@/i18n';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import drLogoDark from '@/assets/DataRobot_black.svg';
 import drLogoLight from '@/assets/DataRobot_white.svg';
 import { SidebarMenu, SidebarMenuOptionType } from '@/components/ui-custom/sidebar-menu';
@@ -10,11 +9,11 @@ import { AddDataModal } from './AddDataModal';
 import { ROUTES, generateChatRoute, generateDataRoute } from '@/pages/routes';
 import { Separator } from '@radix-ui/react-separator';
 import { NewChatModal } from './NewChatModal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Settings } from 'lucide-react';
 import { useGeneratedDictionaries, getDictionariesMenu } from '@/api/dictionaries';
 import { useFetchAllChats, getChatsMenu } from '@/api/chat-messages';
 import { Button } from '@/components/ui/button';
-import { faCog } from '@fortawesome/free-solid-svg-icons/faCog';
+
 import { SettingsModal } from '@/components/SettingsModal';
 import {
   Sidebar as SidebarUI,
@@ -35,8 +34,8 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative flex flex-col flex-1 h-full">
-      <div className="flex justify-between items-center pb-3 pl-2">
+    <div className="relative flex h-full flex-1 flex-col">
+      <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t('Datasets')}</p>
         </div>
@@ -50,11 +49,13 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
         />
         {isLoading && (
           <div className="mt-4 flex justify-center">
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           </div>
         )}
         {!isLoading && !data?.length && (
-          <p className="pl-2 text-muted-foreground">{t('Add your data here')}</p>
+          <p data-testid="empty-datasets" className="pl-2 text-muted-foreground">
+            {t('Add your data here')}
+          </p>
         )}
       </div>
     </div>
@@ -68,8 +69,8 @@ const ChatList = ({ highlight }: { highlight: boolean }) => {
   const { t } = useTranslation();
 
   return (
-    <div className="relative flex flex-col flex-1 h-full">
-      <div className="flex justify-between items-center pb-3 pl-2">
+    <div className="relative flex h-full flex-1 flex-col">
+      <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t('Chats')}</p>
         </div>
@@ -85,11 +86,13 @@ const ChatList = ({ highlight }: { highlight: boolean }) => {
         />
         {isLoading && (
           <div className="mt-4 flex justify-center">
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           </div>
         )}
         {!isLoading && !data?.length && (
-          <p className="pl-2 text-muted-foreground">{t('Start your first chart here')}</p>
+          <p data-testid="empty-chats" className="pl-2 text-muted-foreground">
+            {t('Start your first chat here')}
+          </p>
         )}
       </div>
     </div>
@@ -114,17 +117,19 @@ export const Sidebar = () => {
           <img
             src={drLogo}
             alt="DataRobot"
-            className="w-[130px] cursor-pointer mb-4"
+            className="mb-4 w-[130px] cursor-pointer"
             onClick={() => navigate(ROUTES.DATA)}
           />
-          <h1 className="heading-04 mb-1">{t('Talk to my data')}</h1>
+          <h1 className="mb-1 flex items-baseline heading-04">
+            <span className="shrink-0">{t('Talk to my data')}</span>
+          </h1>
           <p className="body-secondary">
             {t(
               'Add the data you want to analyze, then ask DataRobot questions to generate insights.'
             )}
           </p>
         </SidebarHeader>
-        <SidebarContent className="flex-none max-h-[300px]">
+        <SidebarContent className="max-h-[300px] flex-none">
           <Separator className="my-6 border-t" />
           <SidebarGroup className="h-full">
             <DatasetList highlight={highlightDatasets} />
@@ -141,12 +146,13 @@ export const Sidebar = () => {
           <SettingsModal isOpen={settingsModalOpen} onOpenChange={setSettingsModalOpen} />
           <div className="mt-4 flex justify-center">
             <Button
+              testId="settings-button"
               variant="ghost"
               size="sm"
-              className="w-full flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2"
               onClick={() => setSettingsModalOpen(true)}
             >
-              <FontAwesomeIcon icon={faCog} />
+              <Settings />
               <span>{t('Settings')}</span>
             </Button>
           </div>

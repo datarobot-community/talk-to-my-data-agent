@@ -4,8 +4,8 @@ import { Loader2 } from 'lucide-react';
 export const Loading = () => {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col flex-1 items-center justify-center h-full">
-      <Loader2 className="w-4 h-4 animate-spin" />
+    <div data-testid="loading" className="flex h-full flex-1 flex-col items-center justify-center">
+      <Loader2 className="size-4 animate-spin" />
       <span className="ml-2">{t('Loading...')}</span>
     </div>
   );

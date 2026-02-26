@@ -75,7 +75,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
 
   if (isError) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center h-96">
+      <div className="flex h-96 flex-1 flex-col items-center justify-center">
         {t('Error loading data')}: {String(error)}
       </div>
     );
@@ -83,7 +83,7 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
 
   if (allRows.length === 0) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center h-96">
+      <div className="flex h-96 flex-1 flex-col items-center justify-center">
         {t('No data available for this dataset.')}
       </div>
     );
@@ -116,10 +116,10 @@ export const CleansedDataTable: React.FC<CleansedDataTableProps> = ({
         </table>
 
         {/* Loading indicator - inside scrollable area */}
-        <div ref={ref} className="w-full text-center p-4">
+        <div ref={ref} className="w-full p-4 text-center">
           {isFetchingNextPage ? (
-            <div className="flex justify-center items-center">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="flex items-center justify-center">
+              <Loader2 className="size-4 animate-spin" />
               <span className="ml-2">{t('Loading more...')}</span>
             </div>
           ) : (

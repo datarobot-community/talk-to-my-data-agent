@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.5.3] - 2026-02-26
+
+### Added
+
+- Privacy notice when uploading datasets
+- App version number display on the React UI
+- Ability to use builder's token for shared applications
+- Error handler for 403 seat license with disabled data selection on access denied
+- Max length validation to chat name inputs
+- Frontend test coverage reporting to PRs
+
+### Changed
+
+- Redesigned Settings modal with instant-apply and visual overhaul
+- Moved version display from Sidebar header to Settings modal
+- Replaced all FontAwesome icons with Lucide icons
+- UX/Accessibility improvements to Add Data modal
+- Changed required API key scope level from 'user' to 'admin'
+- Replaced `tiktoken` token usage predictions with a local algorithm
+- Removed JSON-style logs in favor of standard logging
+- Set `no_database` as default for `DATABASE_CONNECTION_TYPE`
+- Added guidelines for chart titles and text in prompts
+- Minor wording improvements across the UI
+- Updated dr-ui version
+
+### Fixed
+
+- Fixed empty Data Registry dropdown on localhost with empty use case
+- Fixed handling of empty DATAROBOT_DEFAULT_USE_CASE (empty data registry, log errors)
+- Fixed whitespace-only search returning invalid results in dropdown menus
+- Fixed bug with missing builder token
+- Fixed empty "Connected as:" field in Settings modal
+- Hide download button on Raw Rows tab
+
 ## [11.5.2] - 2026-02-11
 
 ### Fixed

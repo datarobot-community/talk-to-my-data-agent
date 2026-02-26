@@ -48,7 +48,7 @@ const BADGE_HOVER_STYLES: Record<
 };
 
 const BADGE_VARIANTS = cva(
-  'inline-flex items-center rounded-xl border px-2 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-xl border px-2 py-0.5 text-xs font-semibold transition-colors focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none',
   {
     variants: {
       type: {
@@ -68,65 +68,62 @@ const BADGE_VARIANTS = cva(
       {
         type: BADGE_TYPE.default,
         variant: BADGE_VARIANT.destructive,
-        className:
-          'border-transparent bg-[var(--destructive)] text-[var(--primary-foreground)] shadow',
+        className: 'border-transparent bg-(--destructive) text-(--primary-foreground) shadow',
       },
       // Default type - info
       {
         type: BADGE_TYPE.default,
         variant: BADGE_VARIANT.info,
-        className: 'border-transparent bg-[var(--link)] text-[var(--primary-foreground)] shadow',
+        className: 'border-transparent bg-(--link) text-(--primary-foreground) shadow',
       },
       // Default type - warning
       {
         type: BADGE_TYPE.default,
         variant: BADGE_VARIANT.warning,
-        className: 'border-transparent bg-[var(--warning)] text-[var(--primary-foreground)] shadow',
+        className: 'border-transparent bg-(--warning) text-(--primary-foreground) shadow',
       },
       // Default type - success
       {
         type: BADGE_TYPE.default,
         variant: BADGE_VARIANT.success,
-        className: 'border-transparent bg-[var(--success)] text-[var(--primary-foreground)] shadow',
+        className: 'border-transparent bg-(--success) text-(--primary-foreground) shadow',
       },
       // Default type - default
       {
         type: BADGE_TYPE.default,
         variant: BADGE_VARIANT.default,
-        className:
-          'border-transparent bg-[var(--border)] text-[var(--foreground)] shadow dark:bg-[var(--border)]',
+        className: 'border-transparent bg-(--border) text-(--foreground) shadow dark:bg-(--border)',
       },
       // Outline type - destructive (error)
       {
         type: BADGE_TYPE.outline,
         variant: BADGE_VARIANT.destructive,
         className:
-          'border-[var(--destructive)] text-[var(--destructive)] bg-transparent dark:border-[color-mix(in_srgb,var(--destructive)_70%,white)] dark:text-[color-mix(in_srgb,var(--destructive)_70%,white)]',
+          'border-(--destructive) bg-transparent text-(--destructive) dark:border-[color-mix(in_srgb,var(--destructive)_70%,white)] dark:text-[color-mix(in_srgb,var(--destructive)_70%,white)]',
       },
       // Outline type - info
       {
         type: BADGE_TYPE.outline,
         variant: BADGE_VARIANT.info,
-        className: 'border-[var(--link)] text-[var(--link)] bg-transparent',
+        className: 'border-(--link) bg-transparent text-(--link)',
       },
       // Outline type - warning
       {
         type: BADGE_TYPE.outline,
         variant: BADGE_VARIANT.warning,
-        className: 'border-[var(--warning)] text-[var(--warning)] bg-transparent',
+        className: 'border-(--warning) bg-transparent text-(--warning)',
       },
       // Outline type - success
       {
         type: BADGE_TYPE.outline,
         variant: BADGE_VARIANT.success,
-        className: 'border-[var(--success)] text-[var(--success)] bg-transparent',
+        className: 'border-(--success) bg-transparent text-(--success)',
       },
       // Outline type - default
       {
         type: BADGE_TYPE.outline,
         variant: BADGE_VARIANT.default,
-        className:
-          'border-[var(--secondary-foreground)] text-[var(--secondary-foreground)] bg-transparent',
+        className: 'border-(--secondary-foreground) bg-transparent text-(--secondary-foreground)',
       },
     ],
     defaultVariants: {

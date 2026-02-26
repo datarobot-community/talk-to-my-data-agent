@@ -18,4 +18,4 @@ from app.telemetry import FormatType, LogLevel
 
 class Config(DataRobotAppFrameworkBaseSettings):
     log_level: LogLevel = LogLevel.INFO
-    log_format: FormatType = "json"
+    log_format: FormatType = "readable"

@@ -372,6 +372,9 @@ Round values to 2 decimal places if they have more than 2.
 Visualization Principles:
 Choose visualizations that effectively display the data and complement each other.
 
+Titles and text:
+Use plain text only for chart titles, axis labels, and annotations (e.g. in layout title, xaxis_title, yaxis_title). Do not use HTML tags or Markdown in these strings.
+
 Examples:
 Gauge Chart and Choropleth: Display a key metric (e.g., national unemployment rate) using a gauge chart and show its variation across regions with a choropleth (e.g., state-level unemployment).
 Scatter Plot and Contour Plot: Combine scatter plots for individual data points with contour plots to visualize density gradients or clustering trends (e.g., customer locations vs. density).

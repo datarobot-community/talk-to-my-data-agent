@@ -32,4 +32,6 @@ def test_favicon_file(client: TestClient) -> None:
 def test_health(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "version" in data

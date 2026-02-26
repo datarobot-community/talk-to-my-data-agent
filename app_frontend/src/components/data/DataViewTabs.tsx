@@ -1,8 +1,6 @@
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuoteLeft } from '@fortawesome/free-solid-svg-icons/faQuoteLeft';
-import { faTable } from '@fortawesome/free-solid-svg-icons/faTable';
+import { Quote, Table } from 'lucide-react';
 import { DATA_TABS } from '@/state/constants';
 import { useTranslation } from '@/i18n';
 
@@ -19,14 +17,19 @@ export const DataViewTabs: React.FC<DataViewTabsProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Tabs defaultValue={defaultValue} onValueChange={onChange} className="w-fit py-4">
+    <Tabs
+      data-testid="data-view-tabs"
+      defaultValue={defaultValue}
+      onValueChange={onChange}
+      className="w-fit py-4"
+    >
       <TabsList>
         <TabsTrigger value={DATA_TABS.DESCRIPTION} data-testid="description-tab">
-          <FontAwesomeIcon className="mr-2" icon={faQuoteLeft} />
+          <Quote className="mr-2 size-4" />
           {t('Description')}
         </TabsTrigger>
         <TabsTrigger value={DATA_TABS.RAW} data-testid="raw-tab">
-          <FontAwesomeIcon className="mr-2" icon={faTable} />
+          <Table className="mr-2 size-4" />
           {t('Raw rows')}
         </TabsTrigger>
       </TabsList>

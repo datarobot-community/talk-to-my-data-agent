@@ -203,7 +203,7 @@ async def upload_files(
     if registry_ids:
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
-            with use_user_token(request):
+            with use_user_token(request, allow_use_builder_token=True):
                 if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY:
                     dataframes, tasks = await register_remote_registry_datasets(
                         request, id_list, analyst_db

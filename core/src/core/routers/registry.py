@@ -40,5 +40,5 @@ def get_registry_datasets(
     Returns:
         list[DataRegistryDataset]: List of registry datasets
     """
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         return list_registry_datasets(remote=remote, limit=limit)

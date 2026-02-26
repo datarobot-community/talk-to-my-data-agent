@@ -9,12 +9,12 @@ const Chats = lazy(() => import('./Chats').then(module => ({ default: module.Cha
 
 const Loading = () => {
   const { t } = useTranslation();
-  return <div className="flex items-center justify-center h-full">{t('Loading...')}</div>;
+  return <div className="flex h-full items-center justify-center">{t('Loading...')}</div>;
 };
 
 const Pages = () => {
   return (
-    <div className="w-full h-full overflow-y-auto">
+    <div className="size-full overflow-y-auto">
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Layout />}>

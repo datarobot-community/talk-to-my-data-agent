@@ -57,21 +57,21 @@ const SidebarMenuOption = ({
         }
       }}
       className={cn(
-        'flex gap-2 pr-3 pl-2 py-2 rounded border-l-2 border-transparent overflow-hidden transition-colors cursor-pointer hover:bg-card',
+        'flex cursor-pointer gap-2 overflow-hidden rounded border-l-2 border-transparent py-2 pr-3 pl-2 transition-colors hover:bg-card',
         {
           'rounded-l-none border-l-2 border-l-accent bg-card': active,
-          'opacity-50 cursor-not-allowed': disabled,
+          'cursor-not-allowed opacity-50': disabled,
         }
       )}
       onClick={
         !disabled ? () => onClick({ name, id, icon, endIcon, disabled, testId }) : () => null
       }
     >
-      <div className="flex items-center min-w-0 leading-[20px]" title={name}>
-        {icon && <div className="flex items-center flex-shrink-0">{icon}</div>}
-        <div className="truncate min-w-0 flex-1">{name}</div>
+      <div className="flex min-w-0 items-center leading-[20px]" title={name}>
+        {icon && <div className="flex flex-shrink-0 items-center">{icon}</div>}
+        <div className="min-w-0 flex-1 truncate">{name}</div>
       </div>
-      {endIcon && <div className="flex items-center flex-shrink-0">{endIcon}</div>}
+      {endIcon && <div className="flex flex-shrink-0 items-center">{endIcon}</div>}
     </div>
   );
 };

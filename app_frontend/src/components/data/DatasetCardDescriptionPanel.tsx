@@ -9,9 +9,7 @@ import {
 } from '@/api/dictionaries/hooks';
 import { DatasetCardActionBar } from '@/components/data';
 import { useDatasetMetadata } from '@/api/cleansed-datasets/hooks';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { DictionaryTable } from './DictionaryTable';
 import { CleansedDataTable } from './CleansedDataTable';
 import { ValueOf } from '@/state/types';
@@ -114,7 +112,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
   return (
     <div
       ref={ref}
-      className={cn('flex flex-col w-full bg-card p-4 shrink-0', {
+      className={cn('flex w-full shrink-0 flex-col bg-card p-4', {
         'h-[300px]': isProcessing,
         'h-full overflow-hidden': fullHeight,
       })}
@@ -122,39 +120,39 @@ export const DatasetCardDescriptionPanel = forwardRef<
       <ConfirmDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
-        title={t('Delete dictionary')}
+        title={t('Delete dataset')}
         confirmText={t('Delete')}
         cancelText={t('Cancel')}
         variant="destructive"
         isLoading={isDeleting}
-        description={t('Are you sure you want to delete this dictionary?')}
+        description={t('Are you sure you want to delete this dataset?')}
         onConfirm={() => deleteDictionary({ name: dictionary.name })}
       />
       <div>
-        <h3 className="heading-05 mb-2">
+        <h3 className="mb-2 heading-05">
           <strong>{dictionary.name}</strong>
         </h3>
         <div className="flex justify-between pt-1">
-          <div className="flex gap-2 my-1">
-            <Badge type="outline" className="leading-tight text-sm">
+          <div className="my-1 flex gap-2">
+            <Badge type="outline" className="text-sm leading-tight">
               {isLoadingMetadata
                 ? t('Loading...')
                 : `${metadata?.columns?.length || 0} ${t('features')}`}
             </Badge>
-            <Badge type="outline" className="leading-tight text-sm">
+            <Badge type="outline" className="text-sm leading-tight">
               {isLoadingMetadata
                 ? t('Loading...')
                 : `${metadata?.row_count?.toLocaleString() || 0} ${t('rows')}`}
             </Badge>
-            <Badge type="outline" className="leading-tight text-sm">
+            <Badge type="outline" className="text-sm leading-tight">
               {isLoadingMetadata ? t('Loading...') : size}
             </Badge>
-            <Badge type="outline" className="leading-tight text-sm">
+            <Badge type="outline" className="text-sm leading-tight">
               {metadata?.data_source ? friendlySourceName(metadata.data_source) : t('file')}
             </Badge>
             {isProcessing ? (
-              <Badge type="outline" className="leading-tight text-sm">
-                <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+              <Badge type="outline" className="text-sm leading-tight">
+                <Loader2 className="mr-2 size-4 animate-spin" />
                 {t('Processing...')}
               </Badge>
             ) : (
@@ -162,17 +160,19 @@ export const DatasetCardDescriptionPanel = forwardRef<
                 type="outline"
                 variant="success"
                 testId="data-processed-badge"
-                className="leading-tight text-sm"
+                className="text-sm leading-tight"
               >
-                <FontAwesomeIcon className="mr-1 w-4 h-4 " icon={faCheck} />
+                <Check className="mr-1 size-4" />
                 {t('Processed')}
               </Badge>
             )}
           </div>
           <DatasetCardActionBar
             onSearch={setSearchText}
-            onDownload={() =>
-              downloadDictionary({ name: dictionary.name, includeBom: includeCsvBom })
+            onDownload={
+              viewMode === DATA_TABS.DESCRIPTION
+                ? () => downloadDictionary({ name: dictionary.name, includeBom: includeCsvBom })
+                : undefined
             }
             onDelete={() => setIsDeleteDialogOpen(true)}
             isDownloading={isDownloading}
@@ -181,14 +181,14 @@ export const DatasetCardDescriptionPanel = forwardRef<
           />
         </div>
       </div>
-      <div className="flex flex-col flex-1 mn-label-large min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden mn-label-large">
         {isProcessing ? (
-          <div className="flex flex-col flex-1 items-center justify-center">
+          <div className="flex flex-1 flex-col items-center justify-center">
             {t('Processing the dataset may take a few minutes...')}
           </div>
         ) : fullHeight ? (
           // When fullHeight, render content directly without ScrollArea wrapper
-          <div className="mt-4 flex-1 min-h-0 overflow-auto">
+          <div className="mt-4 min-h-0 flex-1 overflow-auto">
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <DictionaryTable
                 data={filteredDictionary}
@@ -206,7 +206,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
             )}
           </div>
         ) : (
-          <ScrollArea className={cn('mt-4 flex-1 min-h-0', !fullHeight && 'h-96')}>
+          <ScrollArea className={cn('mt-4 min-h-0 flex-1', !fullHeight && 'h-96')}>
             {viewMode === DATA_TABS.DESCRIPTION ? (
               <div className={cn(!fullHeight && 'max-h-[360px] overflow-auto')}>
                 <DictionaryTable

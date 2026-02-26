@@ -20,14 +20,13 @@ export const useTheme = () => {
 
 const themeKey = 'app-theme';
 
-const getInitialTheme = (): Theme => {
+const getInitialTheme = () => {
   if (typeof window !== 'undefined') {
     const savedTheme = localStorage.getItem(themeKey);
     if (savedTheme) {
       return savedTheme as Theme;
     }
-    // return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    return 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   return 'light';
 };

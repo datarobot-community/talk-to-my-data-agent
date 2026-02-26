@@ -46,14 +46,14 @@ const typography = {
     fontWeight: '400',
     fontSize: '0.875rem',
     lineHeight: '1.25rem',
-    color: 'var(--color-muted-foreground)',
+    color: 'var(--color-secondary-foreground)',
   }),
   '.uppercased': {
     ...textSetUp({
       fontWeight: '400',
-      fontSize: '0.875rem',
-      lineHeight: '1.25rem',
-      color: 'var(--color-muted-foreground)',
+      fontSize: '0.75rem',
+      lineHeight: '1rem',
+      color: 'var(--color-secondary-foreground)',
       letterSpacing: '0.075rem',
     }),
     textTransform: 'uppercase',
@@ -74,7 +74,7 @@ const typography = {
     fontWeight: '400',
     fontSize: '0.75rem',
     lineHeight: '1rem',
-    color: 'var(--color-muted-foreground)',
+    color: 'var(--color-secondary-foreground)',
   }),
   '.code': textSetUp({
     fontWeight: '400',

@@ -39,7 +39,7 @@ export function CopyToClipboardButton({
 
   return (
     <Button variant="ghost" onClick={handleCopy}>
-      {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
       {isCopied ? copiedLabel : label}
     </Button>
   );
