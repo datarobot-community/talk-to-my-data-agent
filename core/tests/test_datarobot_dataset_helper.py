@@ -26,7 +26,7 @@ import pytest
 from datarobot.enums import DataWranglingDialect, RecipeInputType, RecipeType
 from datarobot.models.data_store import DataStore
 from datarobot.models.dataset import Dataset
-from datarobot.models.recipe import Recipe, RecipeDatasetInput
+from datarobot.models.recipe import Recipe, RecipeDatasetInput, RecipePreview
 from datarobot.models.use_cases.use_case import UseCase
 from requests import HTTPError
 
@@ -43,12 +43,6 @@ from core.data_connections.datarobot.helpers import (
     handle_datarobot_error,
 )
 from core.schema import ExternalDataSource, ExternalDataStore
-from datarobot.enums import DataWranglingDialect, RecipeInputType, RecipeType
-from datarobot.models.data_store import DataStore
-from datarobot.models.dataset import Dataset
-from datarobot.models.recipe import Recipe, RecipeDatasetInput, RecipePreview
-from datarobot.models.use_cases.use_case import UseCase
-from requests import HTTPError
 
 
 def test_handle_datarobot_error() -> None:

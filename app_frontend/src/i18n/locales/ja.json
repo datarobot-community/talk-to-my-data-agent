@@ -2,6 +2,12 @@
   "chat_{{chatId}}_message_{{messageId}}.xlsx": "chat_{{chatId}}_message_{{messageId}}.xlsx",
   "chat_{{chatId}}_messages.xlsx": "chat_{{chatId}}_messages.xlsx",
   "There was a problem downloading the file.": "ファイルのダウンロード中に問題が発生しました。",
+  "There was a problem sending your message.": "メッセージの送信中に問題が発生しました。",
+  "There was a problem deleting the message.": "メッセージの削除中に問題が発生しました。",
+  "There was a problem creating the chat.": "チャットの作成中に問題が発生しました。",
+  "There was a problem deleting the chat.": "チャットの削除中に問題が発生しました。",
+  "There was a problem renaming the chat.": "チャット名の変更中に問題が発生しました。",
+  "There was a problem updating the data source.": "データソースの更新中に問題が発生しました。",
   "Chat {{formattedDate}} {{formattedTime}}": "チャット {{formattedDate}} {{formattedTime}}",
   "Analyzing Question": "",
   "Testing Connection": "",
@@ -179,5 +185,6 @@
   "Use your own API key instead of the app default": "アプリのデフォルトの代わりに独自のAPIキーを使用します",
   "Configure app preferences and DataRobot connection": "アプリの設定とDataRobot接続を構成する",
   "Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.": "社会保障番号、金融口座データ、医療記録、政府発行の身分証明書などの機密個人情報を含むデータセットをアップロードしないでください。",
-  "Privacy Policy": "プライバシーポリシー"
+  "Privacy Policy": "プライバシーポリシー",
+  "Message limit reached ({{max}} characters)": "メッセージの上限に達しました（{{max}}文字）"
 }

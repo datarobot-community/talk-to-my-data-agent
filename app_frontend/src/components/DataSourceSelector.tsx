@@ -12,6 +12,7 @@ interface DataSourceSelectorProps {
   accessDenied: {
     datasetRegistry: boolean;
     dataStore: boolean;
+    errorMsg: string;
   };
 }
 
@@ -64,7 +65,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
             </TooltipTrigger>
             <TooltipContent>
               {accessDenied.datasetRegistry ? (
-                <p className="body">{t('Feature unavailable due to seat license restrictions.')}</p>
+                <p className="body">{accessDenied.errorMsg}</p>
               ) : (
                 <p className="body">
                   {t(
@@ -110,7 +111,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
             </TooltipTrigger>
             <TooltipContent>
               {accessDenied.dataStore ? (
-                <p className="body">{t('Feature unavailable due to seat license restrictions.')}</p>
+                <p className="body">{accessDenied.errorMsg}</p>
               ) : (
                 <p className="body">
                   {t(

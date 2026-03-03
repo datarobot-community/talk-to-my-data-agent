@@ -88,20 +88,14 @@
   --warning: var(--yellow-70);
 
   --react-table-pinned-left-border-box-shadow:
-    1px 0px 0px 0px rgba(124, 136, 154, 0.01),
-    3px 0px 0px 0px rgba(124, 136, 154, 0.01),
-    5px 0px 0px 0px rgba(124, 136, 154, 0.02),
-    7px 0px 0px 0px rgba(124, 136, 154, 0.02),
-    9px 0px 0px 0px rgba(124, 136, 154, 0.03),
-    11px 0px 0px 0px rgba(124, 136, 154, 0.04);
+    1px 0px 0px 0px rgba(124, 136, 154, 0.01), 3px 0px 0px 0px rgba(124, 136, 154, 0.01),
+    5px 0px 0px 0px rgba(124, 136, 154, 0.02), 7px 0px 0px 0px rgba(124, 136, 154, 0.02),
+    9px 0px 0px 0px rgba(124, 136, 154, 0.03), 11px 0px 0px 0px rgba(124, 136, 154, 0.04);
 
   --react-table-pinned-right-border-box-shadow:
-    -1px 0px 0px 0px rgba(124, 136, 154, 0.01),
-    -3px 0px 0px 0px rgba(124, 136, 154, 0.01),
-    -5px 0px 0px 0px rgba(124, 136, 154, 0.02),
-    -7px 0px 0px 0px rgba(124, 136, 154, 0.02),
-    -9px 0px 0px 0px rgba(124, 136, 154, 0.03),
-    -11px 0px 0px 0px rgba(124, 136, 154, 0.04);
+    -1px 0px 0px 0px rgba(124, 136, 154, 0.01), -3px 0px 0px 0px rgba(124, 136, 154, 0.01),
+    -5px 0px 0px 0px rgba(124, 136, 154, 0.02), -7px 0px 0px 0px rgba(124, 136, 154, 0.02),
+    -9px 0px 0px 0px rgba(124, 136, 154, 0.03), -11px 0px 0px 0px rgba(124, 136, 154, 0.04);
 }
 
 .dark {
@@ -145,20 +139,14 @@
   --warning: var(--yellow-40);
 
   --react-table-pinned-left-border-box-shadow:
-    1px 0px 0px 0px rgba(17, 21, 25, 0.02),
-    3px 0px 0px 0px rgba(17, 21, 25, 0.04),
-    5px 0px 0px 0px rgba(17, 21, 25, 0.06),
-    7px 0px 0px 0px rgba(17, 21, 25, 0.08),
-    9px 0px 0px 0px rgba(17, 21, 25, 0.1),
-    11px 0px 0px 0px rgba(17, 21, 25, 0.12);
+    1px 0px 0px 0px rgba(17, 21, 25, 0.02), 3px 0px 0px 0px rgba(17, 21, 25, 0.04),
+    5px 0px 0px 0px rgba(17, 21, 25, 0.06), 7px 0px 0px 0px rgba(17, 21, 25, 0.08),
+    9px 0px 0px 0px rgba(17, 21, 25, 0.1), 11px 0px 0px 0px rgba(17, 21, 25, 0.12);
 
   --react-table-pinned-right-border-box-shadow:
-    -1px 0px 0px 0px rgba(17, 21, 25, 0.02),
-    -3px 0px 0px 0px rgba(17, 21, 25, 0.04),
-    -5px 0px 0px 0px rgba(17, 21, 25, 0.06),
-    -7px 0px 0px 0px rgba(17, 21, 25, 0.08),
-    -9px 0px 0px 0px rgba(17, 21, 25, 0.1),
-    -11px 0px 0px 0px rgba(17, 21, 25, 0.12);
+    -1px 0px 0px 0px rgba(17, 21, 25, 0.02), -3px 0px 0px 0px rgba(17, 21, 25, 0.04),
+    -5px 0px 0px 0px rgba(17, 21, 25, 0.06), -7px 0px 0px 0px rgba(17, 21, 25, 0.08),
+    -9px 0px 0px 0px rgba(17, 21, 25, 0.1), -11px 0px 0px 0px rgba(17, 21, 25, 0.12);
 }
 
 @layer base {

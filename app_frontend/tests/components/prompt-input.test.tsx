@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
+import { MAX_PROMPT_LENGTH } from '@/constants/chat';
 
 describe('PromptInput', () => {
   it('renders correctly', () => {
@@ -163,6 +164,61 @@ describe('PromptInput Tooltip', () => {
     render(<PromptInput initialValue="Hello" />);
     const sendButton = screen.getByTestId('send-message-button');
     expect(sendButton).toHaveAttribute('title', 'Send message');
+  });
+});
+
+describe('PromptInput Character Limit', () => {
+  it('does not show counter below 80% of limit', () => {
+    const shortText = 'a'.repeat(Math.ceil(MAX_PROMPT_LENGTH * 0.8) - 1);
+    render(<PromptInput initialValue={shortText} />);
+    expect(screen.queryByTestId('char-counter')).not.toBeInTheDocument();
+  });
+
+  it('shows character counter near the limit', () => {
+    const nearLimitText = 'a'.repeat(Math.ceil(MAX_PROMPT_LENGTH * 0.8));
+    render(<PromptInput initialValue={nearLimitText} />);
+    const counter = screen.getByTestId('char-counter');
+    expect(counter).toBeInTheDocument();
+    expect(counter).toHaveTextContent(`${nearLimitText.length}/${MAX_PROMPT_LENGTH}`);
+  });
+
+  it('disables sending at exactly max length', () => {
+    const maxText = 'a'.repeat(MAX_PROMPT_LENGTH);
+    render(<PromptInput initialValue={maxText} />);
+    const sendButton = screen.getByTestId('send-message-button');
+    expect(sendButton).toBeDisabled();
+  });
+
+  it('shows "Message limit reached" and disables send over max length', () => {
+    const overLimitText = 'a'.repeat(MAX_PROMPT_LENGTH + 1);
+    render(<PromptInput initialValue={overLimitText} />);
+    const counter = screen.getByTestId('char-counter');
+    expect(counter).toHaveTextContent(`Message limit reached (${MAX_PROMPT_LENGTH} characters)`);
+    expect(screen.getByTestId('send-message-button')).toBeDisabled();
+  });
+
+  it('does not send via Enter when over the limit', () => {
+    const handleSend = vi.fn();
+    const overLimitText = 'a'.repeat(MAX_PROMPT_LENGTH + 1);
+    render(<PromptInput onSend={handleSend} initialValue={overLimitText} />);
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it('does not send via Enter at exactly max length', () => {
+    const handleSend = vi.fn();
+    const maxText = 'a'.repeat(MAX_PROMPT_LENGTH);
+    render(<PromptInput onSend={handleSend} initialValue={maxText} />);
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it('shows counter after typing past 80% threshold', () => {
+    render(<PromptInput initialValue="" />);
+    expect(screen.queryByTestId('char-counter')).not.toBeInTheDocument();
+    const longText = 'a'.repeat(Math.ceil(MAX_PROMPT_LENGTH * 0.8));
+    fireEvent.change(screen.getByTestId('prompt-input-textarea'), { target: { value: longText } });
+    expect(screen.getByTestId('char-counter')).toBeInTheDocument();
   });
 });
 

@@ -218,4 +218,5 @@ def use_user_token(
         raise HTTPException(
             status_code=401,
             detail="API token required. Please authenticate with DataRobot.",
+            headers={"x-datarobot-auth-required": "true"},
         )

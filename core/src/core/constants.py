@@ -53,6 +53,7 @@ REGISTRY_DATASET_SIZE_CUTOFF: Final[float] = (
 DISK_CACHE_LIMIT_BYTES = 512e6
 
 # Token and Context Limits
+MAX_PROMPT_LENGTH = 4096  # max characters allowed in a single user prompt
 MAX_CSV_TOKENS = 50000  # limit for data analyst csv sended to llm
 MODEL_CONTEXT_WINDOW = 128000  # GPT-4o context window
 CONTEXT_WARNING_THRESHOLD = int(MODEL_CONTEXT_WINDOW * 0.8)

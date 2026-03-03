@@ -2,6 +2,12 @@
   "chat_{{chatId}}_message_{{messageId}}.xlsx": "chat_{{chatId}}_message_{{messageId}}.xlsx",
   "chat_{{chatId}}_messages.xlsx": "chat_{{chatId}}_messages.xlsx",
   "There was a problem downloading the file.": "파일을 다운로드하는 중 문제가 발생했습니다.",
+  "There was a problem sending your message.": "메시지를 보내는 중 문제가 발생했습니다.",
+  "There was a problem deleting the message.": "메시지를 삭제하는 중 문제가 발생했습니다.",
+  "There was a problem creating the chat.": "채팅을 생성하는 중 문제가 발생했습니다.",
+  "There was a problem deleting the chat.": "채팅을 삭제하는 중 문제가 발생했습니다.",
+  "There was a problem renaming the chat.": "채팅 이름을 변경하는 중 문제가 발생했습니다.",
+  "There was a problem updating the data source.": "데이터 소스를 업데이트하는 중 문제가 발생했습니다.",
   "Chat {{formattedDate}} {{formattedTime}}": "채팅 {{formattedDate}} {{formattedTime}}",
   "Analyzing Question": "질문 분석 중",
   "Testing Connection": "연결 테스트 중",
@@ -179,5 +185,6 @@
   "Use your own API key instead of the app default": "앱 기본값 대신 자신의 API 키를 사용합니다",
   "Configure app preferences and DataRobot connection": "앱 환경설정 및 DataRobot 연결 구성",
   "Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.": "사회보장번호, 금융 계좌 데이터, 건강 기록 또는 정부 발급 신분증과 같은 민감한 개인 정보가 포함된 데이터셋을 업로드하지 마십시오.",
-  "Privacy Policy": "개인정보 보호정책"
+  "Privacy Policy": "개인정보 보호정책",
+  "Message limit reached ({{max}} characters)": "메시지 한도에 도달했습니다 ({{max}}자)"
 }

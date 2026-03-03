@@ -4,6 +4,8 @@ import { useTranslation } from '@/i18n';
 
 import { cn } from '~/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FieldDescription, FieldError } from '@/components/ui/field';
+import { MAX_PROMPT_LENGTH } from '@/constants/chat';
 
 type SendButtonArrangement = 'prepend' | 'append';
 
@@ -75,7 +77,9 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
       }
     };
 
-    const isButtonDisabled = isProcessing || isDisabled || !message.trim();
+    const isAtLimit = message.length >= MAX_PROMPT_LENGTH;
+    const showCounter = message.length > MAX_PROMPT_LENGTH * 0.8;
+    const isButtonDisabled = isProcessing || isDisabled || !message.trim() || isAtLimit;
 
     const buttonTooltip =
       isButtonDisabled && !isProcessing
@@ -90,7 +94,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
         aria-disabled={isDisabled}
         data-testid={testId}
         className={cn(
-          'mr-4 flex w-full min-w-3xs items-center justify-start gap-2 p-3',
+          'relative mr-4 flex w-full min-w-3xs items-center justify-start gap-2 p-3',
           'rounded-md border border-border shadow-xs',
           'bg-transparent selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground',
           'text-base transition-[color,box-shadow]',
@@ -104,6 +108,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
       >
         <textarea
           id="prompt-input-textarea"
+          data-testid="prompt-input-textarea"
           className={cn(
             'box-content flex max-h-[300px] w-full resize-none justify-center overflow-hidden bg-transparent leading-5 placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
             className
@@ -117,6 +122,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
               !isComposing &&
               !isProcessing &&
               !isDisabled &&
+              !isAtLimit &&
               event.key === 'Enter' &&
               !(event.shiftKey || event.altKey)
             ) {
@@ -145,6 +151,16 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
             <Send className="size-5" data-testid="send-icon" />
           )}
         </Button>
+        {showCounter &&
+          (isAtLimit ? (
+            <FieldError data-testid="char-counter" className="absolute right-0 -bottom-6">
+              {t('Message limit reached ({{max}} characters)', { max: MAX_PROMPT_LENGTH })}
+            </FieldError>
+          ) : (
+            <FieldDescription data-testid="char-counter" className="absolute right-0 -bottom-6">
+              {message.length}/{MAX_PROMPT_LENGTH}
+            </FieldDescription>
+          ))}
       </div>
     );
   }

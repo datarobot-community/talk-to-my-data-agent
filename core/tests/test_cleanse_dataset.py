@@ -27,6 +27,7 @@ from core.schema import AnalystDataset
 
 log = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def sample_datasets():
     # Basic dataset with various types of columns

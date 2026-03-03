@@ -30,6 +30,7 @@ import { localizeException } from '@/api/exceptions';
 import { useListAvailableDataStores, useSelectDataSourcesMutation } from '@/api/datasources/hooks';
 import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api-requests';
 import { SingleSelect } from './ui-custom/single-select';
+import { ApiError } from '@/state/types';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const { data, isLoading: isLoadingDatasets, error: datasetRegistryError } = useFetchDatasets();
@@ -47,11 +48,27 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const { t } = useTranslation();
 
   const accessDenied = useMemo(() => {
+    const getErrorCode = (err: unknown): string | undefined =>
+      (err as AxiosError<ApiError>)?.response?.data?.detail?.code;
+    const getStatus = (err: unknown): number | undefined => (err as AxiosError)?.response?.status;
+    const isUserAccessDenied = (err: unknown) => getErrorCode(err) === 'USER_ACCESS_DENIED';
+    const isAuthRequired = (err: unknown) => getStatus(err) === 401;
+
+    const datasetRegistryDenied =
+      isUserAccessDenied(datasetRegistryError) || isAuthRequired(datasetRegistryError);
+    const dataStoreDenied =
+      isUserAccessDenied(availableDataStores?.error) || isAuthRequired(availableDataStores?.error);
+    const isSeatLicenseDenied =
+      isUserAccessDenied(datasetRegistryError) || isUserAccessDenied(availableDataStores?.error);
+
     return {
-      datasetRegistry: datasetRegistryError?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
-      dataStore: availableDataStores?.error?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
+      datasetRegistry: datasetRegistryDenied,
+      dataStore: dataStoreDenied,
+      errorMsg: isSeatLicenseDenied
+        ? t('Feature unavailable due to seat license restrictions.')
+        : t('Feature unavailable. Please authenticate with DataRobot.'),
     };
-  }, [datasetRegistryError, availableDataStores?.error]);
+  }, [t, datasetRegistryError, availableDataStores?.error]);
 
   const selectedAvailableDataStore: ExternalDataStore | null = useMemo(() => {
     if (availableDataStores?.data) {

@@ -2,6 +2,12 @@
   "chat_{{chatId}}_message_{{messageId}}.xlsx": "chat_{{chatId}}_message_{{messageId}}.xlsx",
   "chat_{{chatId}}_messages.xlsx": "chat_{{chatId}}_messages.xlsx",
   "There was a problem downloading the file.": "Il y a eu un problème lors du téléchargement du fichier.",
+  "There was a problem sending your message.": "Il y a eu un problème lors de l'envoi de votre message.",
+  "There was a problem deleting the message.": "Il y a eu un problème lors de la suppression du message.",
+  "There was a problem creating the chat.": "Il y a eu un problème lors de la création du chat.",
+  "There was a problem deleting the chat.": "Il y a eu un problème lors de la suppression du chat.",
+  "There was a problem renaming the chat.": "Il y a eu un problème lors du renommage du chat.",
+  "There was a problem updating the data source.": "Il y a eu un problème lors de la mise à jour de la source de données.",
   "Chat {{formattedDate}} {{formattedTime}}": "Chat {{formattedDate}} {{formattedTime}}",
   "Analyzing Question": "Analyse de la question",
   "Testing Connection": "Test de la connexion",
@@ -179,5 +185,6 @@
   "Use your own API key instead of the app default": "Utilisez votre propre clé API au lieu de celle par défaut de l'application",
   "Configure app preferences and DataRobot connection": "Configurer les préférences de l'application et la connexion DataRobot",
   "Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.": "Ne téléchargez pas de jeux de données contenant des informations personnelles sensibles telles que des numéros de sécurité sociale, des données de comptes financiers, des dossiers médicaux ou des pièces d'identité gouvernementales.",
-  "Privacy Policy": "Politique de confidentialité"
+  "Privacy Policy": "Politique de confidentialité",
+  "Message limit reached ({{max}} characters)": "Limite de message atteinte ({{max}} caractères)"
 }

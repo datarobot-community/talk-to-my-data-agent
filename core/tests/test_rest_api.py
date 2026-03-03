@@ -15,13 +15,12 @@
 import io
 import json
 import os
-import pytest
 from typing import Any, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 from unittest.mock import MagicMock as MagicMockType
 
 import polars as pl
-from pytest import MonkeyPatch
+import pytest
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
@@ -86,6 +85,7 @@ def mock_request() -> MagicMockType:
     request.headers = {}
     request.method = "GET"
     return request
+
 
 @pytest.fixture
 def clean_environ(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
@@ -213,7 +213,7 @@ async def test_use_user_token_from_session_if_set(mock_request: MagicMockType) -
 
 @pytest.mark.asyncio
 async def test_use_user_token_using_builder_api_token_from_env_var(
-    mock_request: MagicMockType
+    mock_request: MagicMockType,
 ) -> None:
     mock_request.state.session = MagicMock()
     mock_request.state.session.datarobot_api_scoped_token = "token_in_session"
@@ -244,7 +244,7 @@ async def test_use_user_token_using_builder_api_token_from_env_var(
 
 @pytest.mark.asyncio
 async def test_use_user_token_using_builder_api_token_from_runtime_param(
-    mock_request: MagicMockType
+    mock_request: MagicMockType,
 ) -> None:
     mock_request.state.session = MagicMock()
     mock_request.state.session.datarobot_api_scoped_token = "token_in_session"
@@ -274,12 +274,9 @@ async def test_use_user_token_using_builder_api_token_from_runtime_param(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    'env_var', ["NO", "N", "n", "no", "False"]
-)
+@pytest.mark.parametrize("env_var", ["NO", "N", "n", "no", "False"])
 async def test_use_user_token_using_builder_api_token_from_wrong_env_var(
-    env_var: str,
-    mock_request: MagicMockType
+    env_var: str, mock_request: MagicMockType
 ) -> None:
     """
     At each run should use 'token_in_session', because failed to parse
@@ -1102,3 +1099,18 @@ def test_load_and_validate_csv_windows_line_endings() -> None:
     content = "Name,Age\r\nJohn,25\r\nJane,30"
     df = load_and_validate_csv(content, "test.csv")
     assert df.height == 2
+
+
+def test_chat_message_payload_rejects_oversized_message() -> None:
+    """Verify that ChatMessagePayload rejects messages exceeding MAX_PROMPT_LENGTH."""
+    from pydantic import ValidationError
+
+    from core.constants import MAX_PROMPT_LENGTH
+    from core.schema import ChatMessagePayload
+
+    # At the limit should be fine
+    ChatMessagePayload(message="a" * MAX_PROMPT_LENGTH)
+
+    # Over the limit should raise
+    with pytest.raises(ValidationError, match="string_too_long"):
+        ChatMessagePayload(message="a" * (MAX_PROMPT_LENGTH + 1))

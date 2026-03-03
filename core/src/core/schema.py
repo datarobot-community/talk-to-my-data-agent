@@ -847,7 +847,9 @@ class ChatUpdate(BaseModel):
 
 
 class ChatMessagePayload(BaseModel):
-    message: str = ""
+    message: str = Field(
+        default="", max_length=4096
+    )  # see also constants.MAX_PROMPT_LENGTH
     enable_chart_generation: bool = True
     enable_business_insights: bool = True
     data_source: str = "file"

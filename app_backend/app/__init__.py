@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from core.rest_api import create_app as core_create_app
+from core.telemetry import configure_uvicorn_logging, init_logging
 from datarobot_asgi_middleware import DataRobotASGIMiddleware
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -28,7 +29,6 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Config
 from app.deps import Deps, create_deps
-from app.telemetry import configure_uvicorn_logging, init_logging
 
 base_router = APIRouter()
 
