@@ -2,6 +2,7 @@ import { cn } from '~/lib/utils';
 
 export type SidebarMenuOptionType = {
   name: string;
+  subtitle?: string;
   icon?: React.ReactNode;
   endIcon?: React.ReactNode;
   disabled?: boolean;
@@ -39,6 +40,7 @@ export const SidebarMenu = ({ options = [], activeKey, onClick }: Props) => {
 const SidebarMenuOption = ({
   id,
   name,
+  subtitle,
   icon,
   active,
   disabled,
@@ -53,7 +55,7 @@ const SidebarMenuOption = ({
       tabIndex={0}
       onKeyDown={e => {
         if (e.key === 'Enter' || (e.key === ' ' && !disabled)) {
-          onClick({ name, id, icon, endIcon, disabled, testId });
+          onClick({ name, subtitle, id, icon, endIcon, disabled, testId });
         }
       }}
       className={cn(
@@ -64,12 +66,17 @@ const SidebarMenuOption = ({
         }
       )}
       onClick={
-        !disabled ? () => onClick({ name, id, icon, endIcon, disabled, testId }) : () => null
+        !disabled
+          ? () => onClick({ name, subtitle, id, icon, endIcon, disabled, testId })
+          : () => null
       }
     >
       <div className="flex min-w-0 items-center leading-[20px]" title={name}>
         {icon && <div className="flex flex-shrink-0 items-center">{icon}</div>}
-        <div className="min-w-0 flex-1 truncate">{name}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate">{name}</div>
+          {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
+        </div>
       </div>
       {endIcon && <div className="flex flex-shrink-0 items-center">{endIcon}</div>}
     </div>

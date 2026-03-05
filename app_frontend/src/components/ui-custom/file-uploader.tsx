@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { useTranslation } from '@/i18n';
 interface FileUploaderProps {
   maxSize?: number;
+  maxFiles?: number;
   accept?: { [key: string]: string[] };
   onFilesChange: (files: File[]) => void;
   progress: number;
@@ -12,6 +13,7 @@ interface FileUploaderProps {
 
 export const FileUploader: React.FC<FileUploaderProps> = ({
   maxSize = 1024 * 1024 * 200,
+  maxFiles = 0,
   accept = { 'file/csv': ['.csv'], 'file/xlsx': ['.xlsx', '.xls'] },
   progress = 0,
   onFilesChange,
@@ -26,7 +28,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         })
       );
 
-      const updatedFiles = files ? [...files, ...newFiles] : newFiles;
+      const updatedFiles =
+        maxFiles === 1 ? newFiles.slice(0, 1) : files ? [...files, ...newFiles] : newFiles;
 
       setFiles(updatedFiles);
       onFilesChange(updatedFiles);
@@ -38,7 +41,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       }
     },
 
-    [files, onFilesChange]
+    [files, maxFiles, onFilesChange]
   );
 
   function onRemove(index: number) {
@@ -49,7 +52,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   }
 
   return (
-    <Dropzone onDrop={onDrop} maxSize={maxSize} accept={accept}>
+    <Dropzone onDrop={onDrop} maxSize={maxSize} maxFiles={maxFiles} accept={accept}>
       {({ getRootProps, getInputProps }) => (
         <section>
           <div

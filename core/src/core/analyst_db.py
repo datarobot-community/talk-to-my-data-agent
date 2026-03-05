@@ -422,9 +422,31 @@ class BaseDuckDBHandler(ABC):
 
 
 class DatasetHandler(BaseDuckDBHandler):
+    _KNOWN_FILE_EXTENSIONS = {".csv", ".tsv", ".txt", ".xls", ".xlsx"}
+
     async def _initialize_database(self) -> None:
         """Initialize database tables and metadata tracking."""
         await super()._initialize_database()
+
+    async def _resolve_existing_dataset_name(self, name: str) -> str:
+        """Resolve user-provided dataset names to stored table names.
+
+        Uploaded files are stored using their filename stem (without extension),
+        but some callers may still pass the full filename.
+        """
+        if await self.table_exists(name):
+            return name
+
+        stem, extension = os.path.splitext(name)
+        if (
+            stem
+            and extension.lower() in self._KNOWN_FILE_EXTENSIONS
+            and await self.table_exists(stem)
+        ):
+            logger.info("Resolved dataset name '%s' to '%s'", name, stem)
+            return stem
+
+        return name
 
     async def _initialize_child(self) -> None:
         all_tables_exists = await async_all(
@@ -627,6 +649,7 @@ class DatasetHandler(BaseDuckDBHandler):
 
     async def get_dataset_type(self, name: str) -> DatasetType:
         """Get the type of a dataset."""
+        name = await self._resolve_existing_dataset_name(name)
         async with self._read_connection() as conn:
             result = await self.execute_query(
                 conn,
@@ -688,7 +711,9 @@ class DatasetHandler(BaseDuckDBHandler):
 
     async def get_dataset_metadata(self, name: str) -> DatasetMetadata:
         """Get metadata for a dataset by name"""
+        requested_name = name
         try:
+            name = await self._resolve_existing_dataset_name(name)
             if not await self.table_exists(name):
                 raise ValueError(f"Dataset '{name}' not found")
 
@@ -728,11 +753,18 @@ class DatasetHandler(BaseDuckDBHandler):
 
                 return metadata
 
+        except ValueError as e:
+            logger.debug(
+                "Metadata not available yet for dataset %s: %s",
+                requested_name,
+                e,
+            )
+            raise
         except Exception as e:
             # Catch all other exceptions and provide a clear error message
-            logger.error(f"Error getting metadata for dataset {name}: {e}")
+            logger.error(f"Error getting metadata for dataset {requested_name}: {e}")
             raise ValueError(
-                f"Failed to retrieve metadata for dataset '{name}': {str(e)}"
+                f"Failed to retrieve metadata for dataset '{requested_name}': {str(e)}"
             )
 
     async def get_dataframe(
@@ -755,16 +787,17 @@ class DatasetHandler(BaseDuckDBHandler):
             ValueError: If dataset doesn't exist or is of wrong type
         """
         logger.debug(f"Retrieving dataframe {name}")
+        resolved_name = await self._resolve_existing_dataset_name(name)
 
         # First verify the dataset exists and check its type
-        if not await self.table_exists(name):
+        if not await self.table_exists(resolved_name):
             raise ValueError(f"Dataset '{name}' not found")
 
         if expected_type:
-            actual_type = await self.get_dataset_type(name)
+            actual_type = await self.get_dataset_type(resolved_name)
             if actual_type != expected_type:
                 raise ValueError(
-                    f"Dataset '{name}' is of type {actual_type.value}, "
+                    f"Dataset '{resolved_name}' is of type {actual_type.value}, "
                     f"expected {expected_type.value}"
                 )
 
@@ -773,7 +806,7 @@ class DatasetHandler(BaseDuckDBHandler):
             try:
                 result = await self.execute_query(
                     conn,
-                    f'SELECT * FROM "{name}"'
+                    f'SELECT * FROM "{resolved_name}"'
                     + (f" LIMIT {max_rows}" if max_rows is not None else ""),
                 )
                 arrow_table = await asyncio.get_running_loop().run_in_executor(
@@ -781,7 +814,9 @@ class DatasetHandler(BaseDuckDBHandler):
                 )
                 return cast(pl.DataFrame, pl.from_arrow(arrow_table))
             except duckdb.CatalogException as e:
-                raise ValueError(f"Error retrieving dataset '{name}': {str(e)}") from e
+                raise ValueError(
+                    f"Error retrieving dataset '{resolved_name}': {str(e)}"
+                ) from e
 
     async def store_cleansing_report(
         self, dataset_name: str, reports: list[CleansedColumnReport]

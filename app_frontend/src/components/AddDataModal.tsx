@@ -42,6 +42,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const [selectedExternalDataSources, setSelectedExternalDataSources] = useState<string[]>([]);
   const { setDataSource, dataSource } = useAppState();
   const [files, setFiles] = useState<File[]>([]);
+  const [dictionaryFiles, setDictionaryFiles] = useState<File[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +96,14 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   // Reset error when selected items change, new revalidation will occure on 'Save selections' button click
   useEffect(() => {
     setError(null);
-  }, [files, selectedDatasets, selectedTables, selectedExternalDataSources, selectedDataStoreId]);
+  }, [
+    files,
+    dictionaryFiles,
+    selectedDatasets,
+    selectedTables,
+    selectedExternalDataSources,
+    selectedDataStoreId,
+  ]);
 
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
@@ -148,6 +156,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         setIsOpen(open);
         setError(null);
         setFiles([]);
+        setDictionaryFiles([]);
         setSelectedDataStoreId(null);
         setSelectedExternalDataSources([]);
       }}
@@ -181,7 +190,15 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <p className="body-secondary">
               {t('Select one or more CSV, XLSX, XLS files, up to 200MB.')}
             </p>
-            <FileUploader onFilesChange={setFiles} progress={progress} />
+            <FileUploader onFilesChange={setFiles} progress={progress} maxFiles={0} />
+            <h3 className="not-prose mt-4 heading-05">{t('Data dictionary')}</h3>
+            <p className="body-secondary">{t('Select one or more JSON files.')}</p>
+            <FileUploader
+              onFilesChange={setDictionaryFiles}
+              progress={progress}
+              accept={{ 'application/json': ['.json'] }}
+              maxFiles={1}
+            />
             <p className="caption-01">
               {t(
                 'Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.'
@@ -375,7 +392,12 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                     setIsPending(false);
                   }
                 } else {
-                  mutate({ files, catalogIds: selectedDatasets, dataSource: dataSource });
+                  mutate({
+                    files,
+                    dictionaryFiles,
+                    catalogIds: selectedDatasets,
+                    dataSource: dataSource,
+                  });
                 }
               }}
             >

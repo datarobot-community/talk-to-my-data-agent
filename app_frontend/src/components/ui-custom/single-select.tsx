@@ -37,8 +37,7 @@ const singleSelectVariants = cva('m-1', {
 });
 
 interface SingleSelectProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof singleSelectVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof singleSelectVariants> {
   options: {
     label: string;
     value: string;

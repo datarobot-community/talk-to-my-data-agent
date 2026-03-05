@@ -48,6 +48,7 @@ from core.schema import (
     AnalystDataset,
     DatasetCleansedResponse,
     FileUploadResponse,
+    UploadedDataDictionary,
 )
 
 logger = get_logger()
@@ -55,14 +56,24 @@ logger = get_logger()
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 
+def _parse_dictionary_json(
+    payload: object,
+) -> UploadedDataDictionary:
+    return UploadedDataDictionary.model_validate(payload)
+
+
 async def process_and_update(
     dataset_names: List[str],
     analyst_db: AnalystDB,
     datasource_type: str | InternalDataSourceType,
+    uploaded_dictionary: UploadedDataDictionary | None = None,
 ) -> None:
     """Process datasets and update state."""
     async for _ in process_data_and_update_state(
-        dataset_names, analyst_db, datasource_type
+        dataset_names,
+        analyst_db,
+        datasource_type,
+        uploaded_dictionary,
     ):
         pass
 
@@ -74,6 +85,7 @@ async def upload_files(
     data_source: str | InternalDataSourceType | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
     files: List[UploadFile] | None = None,
+    dictionary_files: List[UploadFile] | None = None,
     registry_ids: str | None = Form(None),
 ) -> list[FileUploadResponse]:
     """Upload CSV/Excel files or load datasets from the Data Registry."""
@@ -85,6 +97,7 @@ async def upload_files(
         else data_source
     )
     dataset_names = []
+    uploaded_dictionary: UploadedDataDictionary | None = None
     response: list[FileUploadResponse] = []
     if files:
         for file in files:
@@ -185,8 +198,58 @@ async def upload_files(
                     raise ValueError(f"Unsupported file type: {file_extension}")
 
             except Exception as e:
+                logger.warning(
+                    "Dataset file upload failed for '%s': %s",
+                    file.filename or "unknown_file",
+                    e,
+                    exc_info=True,
+                )
                 error_response: FileUploadResponse = {
                     "filename": file.filename or "unknown_file",
+                    "error": str(e),
+                }
+                response.append(error_response)
+
+    if dictionary_files:
+        if len(dictionary_files) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="At most one data dictionary file can be uploaded.",
+            )
+
+        for dictionary_file in dictionary_files:
+            try:
+                if dictionary_file.filename is None:
+                    continue
+
+                file_extension = os.path.splitext(dictionary_file.filename)[1].lower()
+                if file_extension != ".json":
+                    raise ValueError("Unsupported dictionary file type: only .json")
+
+                contents = await dictionary_file.read()
+                payload = json.loads(contents.decode("utf-8"))
+                uploaded_dictionary = _parse_dictionary_json(payload)
+                data_dictionary = uploaded_dictionary.to_data_dictionary()
+
+                await analyst_db.get_dataset(data_dictionary.name)
+                await analyst_db.register_data_dictionary(data_dictionary, clobber=True)
+
+                dictionary_response: FileUploadResponse = {
+                    "filename": dictionary_file.filename,
+                    "content_type": dictionary_file.content_type,
+                    "size": len(contents),
+                    "dataset_name": data_dictionary.name,
+                }
+                response.append(dictionary_response)
+            except Exception as e:
+                logger.warning(
+                    "Dictionary file upload failed for '%s': %s",
+                    dictionary_file.filename or "unknown_file",
+                    e,
+                    exc_info=True,
+                )
+                error_response: FileUploadResponse = {
+                    "filename": dictionary_file.filename or "unknown_file",
                     "error": str(e),
                 }
                 response.append(error_response)
@@ -198,6 +261,7 @@ async def upload_files(
             dataset_names,
             analyst_db,
             InternalDataSourceType.FILE,
+            uploaded_dictionary,
         )
 
     if registry_ids:
@@ -223,6 +287,7 @@ async def upload_files(
                     InternalDataSourceType.REMOTE_REGISTRY
                     if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY
                     else InternalDataSourceType.REGISTRY,
+                    uploaded_dictionary,
                 )
                 for dts in dataframes:
                     dts_response: FileUploadResponse = {

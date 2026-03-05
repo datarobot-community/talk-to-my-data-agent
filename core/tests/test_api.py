@@ -38,6 +38,7 @@ from core.analyst_db import (
     InternalDataSourceType,
 )
 from core.api import RunCompleteAnalysisRequestContext, run_complete_analysis
+from core.api import execute_business_analysis_and_charts
 from core.llm_client import (
     AsyncLLMClient,
     ChatWrapper,
@@ -60,6 +61,7 @@ from core.schema import (
     EnhancedQuestionGeneration,
     GetBusinessAnalysisResult,
     RunAnalysisResult,
+    RunAnalysisResultMetadata,
     RunChartsResult,
 )
 
@@ -395,3 +397,46 @@ def run_business_result_canned() -> GetBusinessAnalysisResult:
 
 
 # TODO: add tests of reflection in run_analysis once test_api refactored/cleaned up
+
+
+@pytest.mark.asyncio
+async def test_execute_business_analysis_uses_source_dictionary_fallback(
+    mock_analyst_db: AsyncMock,
+) -> None:
+    analysis_result = RunAnalysisResult(
+        status="success",
+        metadata=RunAnalysisResultMetadata(duration=0, attempts=1),
+        dataset=AnalystDataset(data=DataFrameWrapper(df=DataFrame({"sales": [1]}))),
+    )
+    source_dictionary = DataDictionary(name="uploaded_dataset", column_descriptions=[])
+
+    mock_analyst_db.get_data_dictionary.side_effect = [None, source_dictionary]
+
+    with patch(
+        "core.api.get_business_analysis",
+        new=AsyncMock(
+            return_value=GetBusinessAnalysisResult(
+                status="success",
+                bottom_line="ok",
+                additional_insights="ok",
+                follow_up_questions=[],
+            )
+        ),
+    ) as mock_get_business_analysis:
+        _, business_result = await execute_business_analysis_and_charts(
+            analysis_result=analysis_result,
+            enhanced_message="What happened?",
+            analyst_db=mock_analyst_db,
+            enable_chart_generation=False,
+            enable_business_insights=True,
+            dataset_lookup_names=["uploaded_dataset"],
+        )
+
+    assert isinstance(business_result, GetBusinessAnalysisResult)
+    assert [
+        call.args[0] for call in mock_analyst_db.get_data_dictionary.await_args_list
+    ] == ["analyst_dataset", "uploaded_dataset"]
+
+    request = mock_get_business_analysis.await_args.args[0]
+    assert request.dictionary.column_descriptions == source_dictionary.column_descriptions
+    assert request.dictionary.name == "analyst_dataset"
