@@ -143,6 +143,7 @@ from core.schema import (
     RunDatabaseAnalysisResultMetadata,
     TokenUsageInfo,
     Tool,
+    UploadedDataDictionary,
     UsageInfoComponent,
 )
 
@@ -622,10 +623,20 @@ async def _get_dictionary_batch(
 
 @log_api_call
 @otel.meter_and_trace
-async def get_dictionary(dataset: AnalystDataset) -> DataDictionary:
+async def get_dictionary(
+    dataset: AnalystDataset,
+    uploaded_dictionary: UploadedDataDictionary | None = None,
+) -> DataDictionary:
     """Process a single dataset with parallel column batch processing"""
 
     try:
+        if uploaded_dictionary and uploaded_dictionary.dataset_name == dataset.name:
+            logger.info(
+                "Using uploaded dictionary object for dataset %s",
+                dataset.name,
+            )
+            return uploaded_dictionary.to_data_dictionary()
+
         logger.info(f"Processing dataset {dataset.name} init")
         # Convert JSON to DataFrame
         df_full = dataset.to_df()
@@ -1715,14 +1726,52 @@ class AnalysisGenerationError:
 async def execute_business_analysis_and_charts(
     analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult,
     enhanced_message: str,
+    analyst_db: AnalystDB,
     token_tracker: TokenUsageTracker | None = None,
     enable_chart_generation: bool = True,
     enable_business_insights: bool = True,
+    dataset_lookup_names: list[str] | None = None,
 ) -> tuple[
     RunChartsResult | BaseException | None,
     GetBusinessAnalysisResult | BaseException | None,
 ]:
     analysis_result.dataset = cast(AnalystDataset, analysis_result.dataset)
+
+    dictionary_lookup_names: list[str] = [analysis_result.dataset.name]
+    if dataset_lookup_names:
+        dictionary_lookup_names.extend(dataset_lookup_names)
+
+    persisted_dictionary: DataDictionary | None = None
+    source_dictionary_name: str | None = None
+    for dictionary_name in dict.fromkeys(dictionary_lookup_names):
+        persisted_dictionary = await analyst_db.get_data_dictionary(dictionary_name)
+        if persisted_dictionary is not None:
+            source_dictionary_name = dictionary_name
+            break
+
+    if persisted_dictionary is None:
+        logger.info(
+            "No persisted dictionary found for dataset %s; using generated dictionary",
+            analysis_result.dataset.name,
+        )
+        persisted_dictionary = DataDictionary.from_analyst_df(
+            analysis_result.dataset.to_df(),
+            name=analysis_result.dataset.name,
+        )
+    elif (
+        source_dictionary_name is not None
+        and source_dictionary_name != analysis_result.dataset.name
+    ):
+        logger.info(
+            "Using persisted dictionary from source dataset %s for analysis dataset %s",
+            source_dictionary_name,
+            analysis_result.dataset.name,
+        )
+        persisted_dictionary = DataDictionary(
+            name=analysis_result.dataset.name,
+            column_descriptions=persisted_dictionary.column_descriptions,
+        )
+
     # Prepare both requests
     chart_request = RunChartsRequest(
         dataset=analysis_result.dataset,
@@ -1731,7 +1780,7 @@ async def execute_business_analysis_and_charts(
 
     business_request = GetBusinessAnalysisRequest(
         dataset=analysis_result.dataset,
-        dictionary=DataDictionary.from_analyst_df(analysis_result.dataset.to_df()),
+        dictionary=persisted_dictionary,
         question=enhanced_message,
     )
 
@@ -2119,9 +2168,11 @@ async def run_complete_analysis(
         charts_result, business_result = await execute_business_analysis_and_charts(
             analysis_result,
             enhanced_message,
+            analysis_context.analyst_db,
             analysis_context.token_tracker,
             enable_business_insights=enable_business_insights,
             enable_chart_generation=enable_chart_generation,
+            dataset_lookup_names=datasets_names,
         )
 
         # Handle chart results
@@ -2183,6 +2234,7 @@ async def process_data_and_update_state(
     new_dataset_names: list[str],
     analyst_db: AnalystDB,
     data_source: str | DataSourceType,
+    uploaded_dictionary: UploadedDataDictionary | None = None,
 ) -> AsyncGenerator[str, None]:
     """Process datasets and yield progress updates asynchronously."""
     # Start processing and yield initial message
@@ -2219,7 +2271,9 @@ async def process_data_and_update_state(
 
                 cleansed_dataset = await cleanse_dataframe(analysis_dataset)
                 await analyst_db.register_dataset(
-                    cleansed_dataset, data_source=InternalDataSourceType.GENERATED
+                    cleansed_dataset,
+                    data_source=InternalDataSourceType.GENERATED,
+                    clobber=True,
                 )
                 yield f"Cleansed dataset: {analysis_dataset_name}"
                 del cleansed_dataset
@@ -2256,7 +2310,10 @@ async def process_data_and_update_state(
                 pass
             logger.info(f"Creating dictionary for dataset: {analysis_dataset_name}")
             analysis_dataset = await analyst_db.get_dataset(analysis_dataset_name)
-            new_dictionary = await get_dictionary(analysis_dataset)
+            new_dictionary = await get_dictionary(
+                analysis_dataset,
+                uploaded_dictionary,
+            )
             logger.info(new_dictionary.to_application_df())
             del analysis_dataset
             await analyst_db.register_data_dictionary(new_dictionary, clobber=True)

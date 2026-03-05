@@ -42,12 +42,14 @@ export const getDatasetById = async ({
 
 export async function uploadDataset({
   files,
+  dictionaryFiles,
   onUploadProgress,
   catalogIds,
   dataSource,
   signal,
 }: {
   files?: File[];
+  dictionaryFiles?: File[];
   catalogIds?: string[];
   dataSource?: string;
   onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
@@ -59,6 +61,10 @@ export async function uploadDataset({
 
   if (files && files.length > 0) {
     files.forEach(file => formData.append('files', file));
+  }
+
+  if (dictionaryFiles && dictionaryFiles.length > 0) {
+    dictionaryFiles.forEach(file => formData.append('dictionary_files', file));
   }
 
   formData.append('registry_ids', JSON.stringify(catalogIds || []));

@@ -404,6 +404,61 @@ class DataDictionaryResponse(DataDictionary):
     in_progress: bool = False
 
 
+class UploadedDataDictionaryColumn(BaseModel):
+    column_name: str
+    data_type: str
+    definition: str
+
+
+class UploadedDataDictionary(BaseModel):
+    dataset_name: str
+    data_dictionary: list[UploadedDataDictionaryColumn]
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_shape(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            raise ValueError("Dictionary JSON must be an object")
+
+        if set(values.keys()) != {"dataset_name", "data_dictionary"}:
+            raise ValueError(
+                "Dictionary JSON must contain exactly: dataset_name, data_dictionary"
+            )
+
+        if (
+            not isinstance(values.get("dataset_name"), str)
+            or not values.get("dataset_name").strip()
+        ):
+            raise ValueError("dataset_name must be a non-empty string")
+
+        if not isinstance(values.get("data_dictionary"), list):
+            raise ValueError("data_dictionary must be a list")
+
+        for index, entry in enumerate(values["data_dictionary"]):
+            if not isinstance(entry, dict):
+                raise ValueError(f"data_dictionary[{index}] must be an object")
+
+            if set(entry.keys()) != {"column_name", "data_type", "definition"}:
+                raise ValueError(
+                    "Each data_dictionary entry must contain exactly: column_name, data_type, definition"
+                )
+
+        return values
+
+    def to_data_dictionary(self) -> DataDictionary:
+        return DataDictionary(
+            name=self.dataset_name,
+            column_descriptions=[
+                DataDictionaryColumn(
+                    column=entry.column_name,
+                    data_type=entry.data_type,
+                    description=entry.definition,
+                )
+                for entry in self.data_dictionary
+            ],
+        )
+
+
 class DictionaryGeneration(SanitizedJsonModel):
     """Validates LLM responses for data dictionary generation
 

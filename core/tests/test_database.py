@@ -139,3 +139,26 @@ async def test_data_source_type_saving() -> None:
     assert "file_dataset" in file_names
     assert "database_dataset" in db_names
     assert "registry_dataset" in registry_names
+
+
+@pytest.mark.asyncio
+async def test_dataset_name_with_extension_resolves_to_registered_stem() -> None:
+    dataset_name = "ontario_real_estate_market_2021"
+    df = pd.DataFrame({"id": [1, 2], "price": [500000, 600000]})
+
+    db = await get_analyst_db(
+        ANALYST_DATABASE_VERSION + 3,
+        user_id="test_user_name_resolution",
+    )
+    await db.delete_all_tables()
+
+    await db.register_dataset(
+        AnalystDataset(name=dataset_name, data=df),
+        data_source=InternalDataSourceType.FILE,
+    )
+
+    metadata = await db.get_dataset_metadata(f"{dataset_name}.csv")
+    assert metadata.name == dataset_name
+
+    loaded_dataset = await db.get_dataset(f"{dataset_name}.csv")
+    assert loaded_dataset.to_df().shape == (2, 2)
