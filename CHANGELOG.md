@@ -5,12 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [11.5.4] - 2026-02-03
+## [11.5.5] - 2026-03-16
+
+### Added
+
+- Support Data Connector Integration with Apache Impala (APP-5077)
+- Support Data Connector Integration with MySQL (APP-5385)
+- Updated README with Codespace links for different regions (APP-5592)
+
+### Fixed
+
+- Fix Add Data modal stuck loading on empty selections (APP-4858)
+
+## [11.5.4] - 2026-03-03
 
 ### Added
 
 - Add error toasts to chat mutation hooks
-- Set a limit for input prompt length by
+- Set a limit for input prompt length
 
 ### Fixed
 

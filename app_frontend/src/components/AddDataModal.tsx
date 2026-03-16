@@ -81,6 +81,20 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     return null;
   }, [selectedDataStoreId, availableDataStores]);
 
+  const hasSelections = useMemo(() => {
+    if (dataSource === DATA_SOURCES.DATABASE) return selectedTables.length > 0;
+    if (dataSource === NEW_DATA_STORE)
+      return selectedAvailableDataStore != null && selectedExternalDataSources.length > 0;
+    return files.length > 0 || selectedDatasets.length > 0;
+  }, [
+    dataSource,
+    selectedTables,
+    selectedAvailableDataStore,
+    selectedExternalDataSources,
+    files,
+    selectedDatasets,
+  ]);
+
   // Reset selections when modal is opened/closed.
   useEffect(() => {
     setSelectedDatasets([]);
@@ -352,27 +366,19 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <Button
               type="submit"
               variant="secondary"
-              disabled={isPending}
+              disabled={isPending || !hasSelections}
               testId="add-data-modal-save-button"
               onClick={() => {
                 setError(null);
                 setIsPending(true);
                 if (dataSource === DATA_SOURCES.DATABASE) {
-                  if (selectedTables.length > 0) {
-                    loadFromDatabase({ tableNames: selectedTables });
-                  } else {
-                    setIsOpen(false);
-                    setIsPending(false);
-                  }
+                  loadFromDatabase({ tableNames: selectedTables });
                 } else if (dataSource === NEW_DATA_STORE) {
                   if (selectedAvailableDataStore) {
                     selectDataSources({
                       selectedDataStore: selectedAvailableDataStore,
                       selectedDataSourceNames: selectedExternalDataSources,
                     });
-                  } else {
-                    setIsOpen(false);
-                    setIsPending(false);
                   }
                 } else {
                   mutate({ files, catalogIds: selectedDatasets, dataSource: dataSource });

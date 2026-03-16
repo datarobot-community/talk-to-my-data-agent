@@ -1,5 +1,18 @@
 # Talk to My Data
-
+<p align="center">
+  <a href="https://app.datarobot.com/usecases/application-templates/67a0f7338be36c535d4dcaa0?referrerUrl=github">
+    <img src="https://img.shields.io/badge/US-Open%20in%20a%20Codespace-%23909BF5?style=flat&labelColor=%2330373D" alt="US - Open in a Codespace">
+  </a>
+  <a href="https://app.eu.datarobot.com/usecases/application-templates/67a0f7338be36c535d4dcaa0?referrerUrl=github">
+    <img src="https://img.shields.io/badge/EU-Open%20in%20a%20Codespace-%232BC46F?labelColor=%2330373D" alt="EU - Open in a Codespace">
+  </a>
+  <a href="https://app.jp.datarobot.com/usecases/application-templates/67a0f7338be36c535d4dcaa0?referrerUrl=github">
+    <img src="https://img.shields.io/badge/JP-Open%20in%20a%20Codespace-%23EDA769?labelColor=%2330373D" alt="JP - Open in a Codespace">
+  </a>
+  <a href="https://app.jp.datarobot.com/usecases/application-templates/67a0f7338be36c535d4dcaa0?referrerUrl=github">
+    <img src="https://img.shields.io/badge/JP-%E3%80%8CCodespace%20%E3%81%A7%E9%96%8B%E3%81%8F%E3%80%8D-%23EDA769?labelColor=%2330373D" alt="JP - 「Codespaceで開く」">
+  </a>
+</p>
 **Talk to My Data** delivers a seamless **talk-to-your-data** experience, transforming files, spreadsheets, and cloud data into actionable insights. Simply upload data, connect to Snowflake or BigQuery, or access datasets from DataRobot's Data Registry. Then, ask a question, and the agent recommends business analyses, generating **charts, tables, and even code** to help you interpret the results.
 
 This intuitive experience is designed for **scalability and flexibility**, ensuring that whether you're working with a few thousand rows or billions, your data analysis remains **fast, efficient, and insightful**.

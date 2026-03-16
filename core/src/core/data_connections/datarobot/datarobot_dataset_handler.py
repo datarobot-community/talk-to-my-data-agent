@@ -84,6 +84,9 @@ from core.data_connections.database.database_interface import (
     _DEFAULT_DB_QUERY_TIMEOUT,
     DatabaseOperator,
 )
+from core.data_connections.database.datastore.connection import (
+    DataRobotDatastoreConnection,
+)
 from core.data_connections.datarobot.helpers import (
     default_retry,
     find_underlying_client_message,
@@ -93,6 +96,8 @@ from core.data_connections.datarobot.helpers import (
 from core.logging_helper import get_logger
 from core.prompts import (
     SYSTEM_PROMPT_DATABRICKS,
+    SYSTEM_PROMPT_IMPALA,
+    SYSTEM_PROMPT_MYSQL,
     SYSTEM_PROMPT_POSTGRES,
     SYSTEM_PROMPT_REDSHIFT,
     SYSTEM_PROMPT_SPARK_SQL,
@@ -689,6 +694,14 @@ def format_spark_table(table_parts: list[str]) -> str:
     return ".".join(f"`{part}`" for part in table_parts)
 
 
+def format_mysql_table(table_parts: list[str]) -> str:
+    return ".".join(f"`{part}`" for part in table_parts)
+
+
+def format_impala_table(table_parts: list[str]) -> str:
+    return ".".join(f"`{part}`" for part in table_parts)
+
+
 class DataSourceRecipe(BaseRecipe):
     """
     A recipe defined over data sources.
@@ -696,26 +709,42 @@ class DataSourceRecipe(BaseRecipe):
 
     # In order to add support for a new driver, there's two steps
     # 1. Create a corresponding `PromptFactory` in `prompts.py`.
-    SUPPORTED_DRIVER_CLASS_TYPES: list[str] = ["postgres", "redshift", "databricks-v1"]
+    SUPPORTED_DRIVER_CLASS_TYPES: list[str] = [
+        "postgres",
+        "redshift",
+        "databricks-v1",
+        "mysql",
+        "impala",
+    ]
     DRIVER_CLASS_TYPE_TO_DIALECT: dict[str, DataWranglingDialect] = {
         "postgres": DataWranglingDialect.POSTGRES,
         "redshift": DataWranglingDialect.POSTGRES,
         "databricks-v1": DataWranglingDialect.DATABRICKS,
+        # We actually don't use these dialects. This is just a
+        # placeholder to support the existing interface.
+        "mysql": DataWranglingDialect.POSTGRES,
+        "impala": DataWranglingDialect.POSTGRES,
     }
     PROMPTS: dict[str, str] = {
         "postgres": SYSTEM_PROMPT_POSTGRES,
         "redshift": SYSTEM_PROMPT_REDSHIFT,
         "databricks-v1": SYSTEM_PROMPT_DATABRICKS,
+        "mysql": SYSTEM_PROMPT_MYSQL,
+        "impala": SYSTEM_PROMPT_IMPALA,
     }
     WARMUP_QUERIES: dict[str, str] = {
         "postgres": "SELECT 1",
         "redshift": "SELECT 1",
         "databricks-v1": "SELECT 1",
+        "mysql": "SELECT 1",
+        "impala": "SELECT 1",
     }
     FORMAT_TABLE_NAME: dict[str, Callable[[list[str]], str]] = {
         "postgres": format_postgres_table,
         "redshift": format_postgres_table,
         "databricks-v1": format_spark_table,
+        "mysql": format_mysql_table,
+        "impala": format_impala_table,
     }
     INSTANCE_CACHE: dict[tuple[str, str], DataSourceRecipe] = {}
     EXTERNAL_DATA_STORE_CACHE: dict[
@@ -884,7 +913,7 @@ class DataSourceRecipe(BaseRecipe):
     @staticmethod
     @otel.trace
     def _fetch_default_cred(
-        data_store_obj: DataStore, user_id: str
+        data_store_obj: DataStore | ExternalDataStore, user_id: str
     ) -> Credential | None:
         logger.debug(
             "Finding credential for datastore.",
@@ -1181,11 +1210,18 @@ class DataSourceRecipe(BaseRecipe):
             analyst_db, data_store_obj, data_store
         )
 
+        if driver_class_type in {"mysql", "impala"}:
+            ds_recipe: DataSourceRecipe = DataSourceVerifySQLRecipe(
+                analyst_db=analyst_db, recipe=recipe, data_store=data_store
+            )
+        else:
+            ds_recipe = DataSourceRecipe(
+                analyst_db=analyst_db, recipe=recipe, data_store=data_store
+            )
+
         return DataSourceRecipe.INSTANCE_CACHE.setdefault(
             (analyst_db.user_id, data_store_id),
-            DataSourceRecipe(
-                analyst_db=analyst_db, recipe=recipe, data_store=data_store
-            ),
+            ds_recipe,
         )
 
     @staticmethod
@@ -1480,6 +1516,86 @@ class DataSourceRecipe(BaseRecipe):
             f"SELECT * FROM {dataset_identifier} LIMIT {preview_limit}"
         )
         return await self.retrieve_preview()
+
+
+class DataSourceVerifySQLRecipe(DataSourceRecipe):
+    """
+    Special case of DataSourceRecipe, to use 'verifySQL' interface for
+    the recipe preview on MySQL connection.
+    """
+
+    MAX_ROWS = 999
+
+    _dataset_identifier = None
+
+    async def preview_datasource(
+        self, dataset: ExternalDataSource, preview_limit: int = 1000
+    ) -> RunSqlResponse:
+        """
+        Overrides the special case of DataSourceRecipe.preview_datasource which generates the data
+        preview using 'verifySQL' interface.
+
+        NOTE: ignores the 'preview_limit' param, because 'verifySQL' supports only up to 999
+        sample size. The parameter left only for compatibility with the base method.
+
+        Args:
+            dataset (Dataset): The dataset to add
+            preview_limit (int, optional): The maximum number of rows to return. Defaults to 1000.
+
+        Returns:
+            RetrievePreviewResponse: The first preview_limit rows.
+        """
+        await self._ensure_recipe_initialized()
+        self._dataset_identifier = self.query_friendly_name(dataset.path)
+
+        return await self.retrieve_preview()
+
+    @retry(
+        wait=wait_random_exponential(multiplier=2, max=300),
+        retry=retry_if_exception(retryable_recipe_preview_exception),
+        stop=stop_after_attempt(6),
+        reraise=True,
+        after=after_log(logger, logging.DEBUG),
+    )
+    @otel.trace
+    async def _retrieve_preview(self, timeout_seconds: int = 300) -> RunSqlResponse:
+        assert self._recipe is not None
+
+        credentials = self._fetch_default_cred(
+            self.data_store, self._analyst_db.user_id
+        )
+        assert credentials is not None
+        assert self._dataset_identifier is not None
+
+        connection = DataRobotDatastoreConnection(
+            use_case_id=get_or_create_wrangling_use_case(self._analyst_db).id,
+            datastore_id=self.data_store.id,
+            dataset_name=self._dataset_identifier,
+            credential_id=credentials.credential_id,
+        )
+
+        loop = asyncio.get_running_loop()
+        preview = await loop.run_in_executor(
+            None, connection.run_preview, self._dataset_identifier, self.MAX_ROWS
+        )
+
+        schema = [col.model_dump() for col in preview.columns]
+
+        # Casing changed between SDK versions
+        original_types = {
+            col["name"]: BaseRecipe.get_column_data_type(col) for col in schema
+        }
+
+        all_rows = []
+        for row in preview.sample_rows:
+            row_data = []
+            for col_name in original_types.keys():
+                row_data.append(row.get(col_name))
+
+            all_rows.append(row_data)
+
+        dataframe = DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
+        return RunSqlResponse(dataframe, original_types)
 
 
 class DatasetSparkRecipe(BaseRecipe):

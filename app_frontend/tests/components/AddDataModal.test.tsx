@@ -1,4 +1,4 @@
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, act } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, type Mock } from 'vitest';
 import { AddDataModal } from '@/components/AddDataModal';
 import { renderWithProviders } from '../test-utils';
@@ -218,26 +218,28 @@ describe('AddDataModal', () => {
     expect(screen.getByText('Select one or more data sources')).toBeInTheDocument();
   });
 
-  test('Save with FILE source calls mutate', async () => {
+  test('Save button is disabled with FILE source and no selections', () => {
     setupMocks({ dataSource: 'file' });
     renderWithProviders(<AddDataModal />);
     openModal();
-    const saveButton = screen.getByTestId('add-data-modal-save-button');
-    fireEvent.click(saveButton);
-    expect(mockMutate).toHaveBeenCalled();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
   });
 
-  test('Save with DATABASE source and no tables selected does not call mutate', async () => {
+  test('Save button is disabled with REMOTE_CATALOG source and no selections', () => {
+    setupMocks({ dataSource: 'remote_catalog' });
+    renderWithProviders(<AddDataModal />);
+    openModal();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
+  });
+
+  test('Save button is disabled with DATABASE source and no tables selected', () => {
     setupMocks({ dataSource: 'database', dbTables: ['t1'] });
     renderWithProviders(<AddDataModal />);
     openModal();
-    const saveButton = screen.getByTestId('add-data-modal-save-button');
-    fireEvent.click(saveButton);
-    // No tables selected, so loadFromDatabase should NOT be called
-    expect(mockLoadFromDatabase).not.toHaveBeenCalled();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
   });
 
-  test('Save with NEW_DATA_STORE source and no store selected does not call mutate', async () => {
+  test('Save button is disabled with NEW_DATA_STORE source and no store selected', () => {
     setupMocks({
       dataSource: 'new_data_store',
       dataStores: [
@@ -251,9 +253,7 @@ describe('AddDataModal', () => {
     });
     renderWithProviders(<AddDataModal />);
     openModal();
-    const saveButton = screen.getByTestId('add-data-modal-save-button');
-    fireEvent.click(saveButton);
-    expect(mockSelectDataSources).not.toHaveBeenCalled();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
   });
 
   test('Cancel button closes dialog', () => {
@@ -265,13 +265,14 @@ describe('AddDataModal', () => {
   });
 
   test('error alert shown on mutation error', () => {
-    (useFileUploadMutation as Mock).mockImplementation(({ onError }: any) => ({
-      mutate: vi.fn(() => onError({ message: 'Upload failed' })),
-      progress: 0,
-    }));
+    let capturedOnError: (error: { message: string }) => void;
+    (useFileUploadMutation as Mock).mockImplementation(({ onError }: any) => {
+      capturedOnError = onError;
+      return { mutate: vi.fn(), progress: 0 };
+    });
     renderWithProviders(<AddDataModal />);
     openModal();
-    fireEvent.click(screen.getByTestId('add-data-modal-save-button'));
+    act(() => capturedOnError!({ message: 'Upload failed' }));
     expect(screen.getByText('Upload failed')).toBeInTheDocument();
   });
 

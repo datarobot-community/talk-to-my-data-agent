@@ -34,6 +34,7 @@ from core.analyst_db import UserRecipe
 from core.api_exceptions import ApplicationUsageException
 from core.data_connections.datarobot.datarobot_dataset_handler import (
     DatasetSparkRecipe,
+    DataSourceVerifySQLRecipe,
     DataSourceRecipe,
     load_or_create_spark_recipe,
 )
@@ -990,3 +991,108 @@ async def test_load_or_create_datastore_happy_path(mocks: Mocks) -> None:
     mocks.analyst_db.register_data_store.assert_awaited()
     assert result.data_store.id == "ds1"
     assert result.data_store.canonical_name == "canonicalName"
+
+
+@pytest.mark.asyncio
+async def test_verify_sql_recipe_preview_datasource_sets_identifier_and_retrieves(
+    mocks: Mocks,
+) -> None:
+    data_store = ExternalDataStore(
+        id="ds1",
+        canonical_name="TestStore",
+        driver_class_type="mysql",
+        defined_data_sources=[],
+    )
+    recipe = DataSourceVerifySQLRecipe(
+        analyst_db=mocks.analyst_db,
+        recipe=mocks.recipe,
+        data_store=data_store,
+    )
+    dataset = ExternalDataSource.from_path(
+        path="db.schema.table_one", data_store_id="ds1"
+    )
+    expected_result = Mock()
+    retrieve_preview_mock = AsyncMock(return_value=expected_result)
+
+    with (
+        patch.object(
+            DataSourceVerifySQLRecipe,
+            "_ensure_recipe_initialized",
+            new=AsyncMock(),
+        ),
+        patch.object(recipe, "retrieve_preview", new=retrieve_preview_mock),
+    ):
+        result = await recipe.preview_datasource(dataset, preview_limit=1)
+
+    assert recipe._dataset_identifier == recipe.query_friendly_name(dataset.path)
+    retrieve_preview_mock.assert_awaited_once_with()
+    assert result is expected_result
+
+
+@pytest.mark.asyncio
+async def test_verify_sql_recipe_retrieve_preview_builds_response(
+    mocks: Mocks,
+) -> None:
+    data_store = ExternalDataStore(
+        id="ds1",
+        canonical_name="TestStore",
+        driver_class_type="mysql",
+        defined_data_sources=[],
+    )
+    recipe = DataSourceVerifySQLRecipe(
+        analyst_db=mocks.analyst_db,
+        recipe=mocks.recipe,
+        data_store=data_store,
+    )
+    dataset_identifier = "`db`.`schema`.`table_one`"
+    recipe._dataset_identifier = dataset_identifier
+
+    credentials = Mock()
+    credentials.credential_id = "cred1"
+
+    use_case = Mock()
+    use_case.id = "uc1"
+
+    preview_col_id = Mock()
+    preview_col_id.model_dump.return_value = {"name": "id", "data_type": "INTEGER"}
+    preview_col_name = Mock()
+    preview_col_name.model_dump.return_value = {"name": "name", "data_type": "STRING"}
+
+    preview = Mock()
+    preview.columns = [preview_col_id, preview_col_name]
+    preview.sample_rows = [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]
+
+    with (
+        patch.object(
+            DataSourceRecipe,
+            "_fetch_default_cred",
+            return_value=credentials,
+        ),
+        patch(
+            (
+                "core.data_connections.datarobot.datarobot_dataset_handler"
+                ".get_or_create_wrangling_use_case"
+            ),
+            return_value=use_case,
+        ),
+        patch(
+            (
+                "core.data_connections.datarobot.datarobot_dataset_handler"
+                ".DataRobotDatastoreConnection.run_preview"
+            ),
+            autospec=True,
+            return_value=preview,
+        ) as run_preview_mock,
+    ):
+        result = await recipe._retrieve_preview()
+
+    assert result.original_types == {"id": "INTEGER", "name": "STRING"}
+    assert result.response.to_dict() == [
+        {"id": 1, "name": "a"},
+        {"id": 2, "name": "b"},
+    ]
+
+    connection = run_preview_mock.call_args.args[0]
+    assert connection.dataset_name == dataset_identifier
+    assert run_preview_mock.call_args.args[1] == dataset_identifier
+    assert run_preview_mock.call_args.args[2] == recipe.MAX_ROWS
