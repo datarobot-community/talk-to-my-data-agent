@@ -23,6 +23,8 @@ interface FileUploadResponse {
   error?: string;
 }
 
+type UploadedDictionaryFileNameMap = Record<string, string>;
+
 type DatasetsResponse = {
   local: Dataset[];
   remote: Dataset[];
@@ -116,15 +118,18 @@ export const useFileUploadMutation = ({
   const mutation = useMutation({
     mutationFn: async ({
       files,
+      dictionaryFiles,
       catalogIds,
       dataSource,
     }: {
       files: File[];
+      dictionaryFiles: File[];
       catalogIds: string[];
       dataSource: string;
     }) => {
       const response = await uploadDataset({
         files,
+        dictionaryFiles,
         catalogIds,
         dataSource,
         onUploadProgress: progressEvent => {
@@ -157,7 +162,7 @@ export const useFileUploadMutation = ({
         queryClient.getQueryData<DictionaryTable[]>(dictionaryKeys.all) || [];
 
       const placeholderDictionaries: DictionaryTable[] = files.map(file => ({
-        name: file.name,
+        name: file.name.replace(/\.[^/.]+$/, ''),
         in_progress: true,
         column_descriptions: [],
       }));
@@ -170,6 +175,26 @@ export const useFileUploadMutation = ({
       return { previousDictionaries };
     },
     onSuccess: async data => {
+      if (Array.isArray(data)) {
+        const currentMap =
+          queryClient.getQueryData<UploadedDictionaryFileNameMap>(
+            dictionaryKeys.uploadedFileNames
+          ) || {};
+        const nextMap: UploadedDictionaryFileNameMap = { ...currentMap };
+        let hasChanges = false;
+
+        for (const file of data) {
+          if (file.dataset_name && file.filename && file.filename.toLowerCase().endsWith('.json')) {
+            nextMap[file.dataset_name] = file.filename;
+            hasChanges = true;
+          }
+        }
+
+        if (hasChanges) {
+          queryClient.setQueryData(dictionaryKeys.uploadedFileNames, nextMap);
+        }
+      }
+
       await queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
       onSuccess(data);
     },
@@ -209,6 +234,7 @@ export const useDeleteAllDatasets = ({ onSuccess }: { onSuccess?: () => void }) 
     },
     onSuccess: () => {
       queryClient.setQueryData<DictionaryTable[]>(dictionaryKeys.all, []);
+      queryClient.setQueryData<UploadedDictionaryFileNameMap>(dictionaryKeys.uploadedFileNames, {});
       queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
       onSuccess?.();
     },

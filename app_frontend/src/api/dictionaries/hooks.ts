@@ -32,6 +32,15 @@ export const useDeleteGeneratedDictionary = ({ onSuccess }: { onSuccess: () => v
         if (!oldData) return [];
         return oldData.filter(d => d.name !== name);
       });
+      queryClient.setQueryData<Record<string, string>>(dictionaryKeys.uploadedFileNames, old => {
+        if (!old || !(name in old)) {
+          return old || {};
+        }
+
+        const rest = { ...old };
+        delete rest[name];
+        return rest;
+      });
       queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
       onSuccess?.();
     },

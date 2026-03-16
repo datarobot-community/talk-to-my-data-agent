@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from '@/i18n';
 import { useNavigate, useParams } from 'react-router-dom';
 import drLogoDark from '@/assets/DataRobot_black.svg';
@@ -10,9 +10,11 @@ import { ROUTES, generateChatRoute, generateDataRoute } from '@/pages/routes';
 import { Separator } from '@radix-ui/react-separator';
 import { NewChatModal } from './NewChatModal';
 import { Loader2, Settings } from 'lucide-react';
-import { useGeneratedDictionaries, getDictionariesMenu } from '@/api/dictionaries';
+import { useGeneratedDictionaries } from '@/api/dictionaries';
 import { useFetchAllChats, getChatsMenu } from '@/api/chat-messages';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { dictionaryKeys } from '@/api/dictionaries/keys';
 
 import { SettingsModal } from '@/components/SettingsModal';
 import {
@@ -26,9 +28,25 @@ import {
 import { useTheme } from '@/theme/theme-provider';
 
 const DatasetList = ({ highlight }: { highlight: boolean }) => {
-  const { data, isLoading } = useGeneratedDictionaries<SidebarMenuOptionType[]>({
-    select: getDictionariesMenu,
+  const { data, isLoading } = useGeneratedDictionaries();
+  const { data: uploadedFileNames = {} } = useQuery<Record<string, string>>({
+    queryKey: dictionaryKeys.uploadedFileNames,
+    queryFn: () => ({}),
+    initialData: {},
+    staleTime: Infinity,
   });
+  const menuOptions = useMemo<SidebarMenuOptionType[]>(
+    () =>
+      data?.map(dictionary => ({
+        key: dictionary.name,
+        name: dictionary.name,
+        subtitle: uploadedFileNames[dictionary.name],
+        endIcon: dictionary.in_progress ? (
+          <Loader2 className="mr-2 size-4 animate-spin" />
+        ) : undefined,
+      })) || [],
+    [data, uploadedFileNames]
+  );
   const { t } = useTranslation();
   const params = useParams();
   const navigate = useNavigate();
@@ -43,7 +61,7 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
       </div>
       <div className="flex-1 overflow-y-auto">
         <SidebarMenu
-          options={data}
+          options={menuOptions}
           activeKey={params.dataId}
           onClick={({ name }) => navigate(generateDataRoute(name))}
         />
@@ -52,7 +70,7 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
             <Loader2 className="size-4 animate-spin" />
           </div>
         )}
-        {!isLoading && !data?.length && (
+        {!isLoading && !menuOptions.length && (
           <p data-testid="empty-datasets" className="pl-2 text-muted-foreground">
             {t('Add your data here')}
           </p>
