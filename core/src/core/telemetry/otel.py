@@ -492,7 +492,7 @@ class OTel:
         Args:
             application_name: Name of the application for logging context
         """
-        # Only log startup once per process to prevent Streamlit rerun spam
+        # prevent duplicate startup logs
         if self._startup_logged:
             return
 

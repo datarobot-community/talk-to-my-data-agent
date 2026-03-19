@@ -7,16 +7,6 @@ root:
     help: >
       Enter the passphrase used to encrypt and decrypt the private key. This value is required if you're not using Pulumi
       Cloud.
-  - env: FRONTEND_TYPE
-    type: string
-    help: "Choose which frontend implementation to use (streamlit or react)"
-    multiple: false
-    default: "react"
-    options:
-      - name: "react"
-        value: "react"
-      - name: "streamlit"
-        value: "streamlit"
   - env: DATAROBOT_DEFAULT_USE_CASE
     type: string
     default:

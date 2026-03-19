@@ -16,7 +16,6 @@ import os
 import re
 import subprocess
 import textwrap
-from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import datarobot
@@ -57,12 +56,6 @@ EXCLUDE_PATTERNS = [
         r".*\.pytest_cache/.*",
     ]
 ]
-APP_BACKEND_APP_PATHS = {
-    "react": Path("app_backend"),
-    "streamlit": Path("frontend"),
-}
-
-
 __all__ = [
     "app_backend_app",
     "app_backend_app_env_name",
@@ -219,14 +212,9 @@ def get_app_backend_app_files(
     return source_files
 
 
-def get_app_backend_app_path() -> Path:
-    frontend_type = os.environ.get("FRONTEND_TYPE", "react")
-    return APP_BACKEND_APP_PATHS[frontend_type]
-
-
 # Start of Pulumi settings and application infrastructure
 app_backend_app_env_name: str = "DATAROBOT_APPLICATION_ID"
-app_backend_application_path = project_dir.parent / get_app_backend_app_path()
+app_backend_application_path = project_dir.parent / "app_backend"
 
 app_backend_app_source_args = ApplicationSourceArgs(
     resource_name=f"Talk to My Data [{PROJECT_NAME}]",

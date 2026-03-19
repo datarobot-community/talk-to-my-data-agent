@@ -31,8 +31,6 @@ rich>=13.9.4,<14.0
 inquirer>=3.4.0,<4.0
 nbformat>=5.10.0,<6.0
 
-# ======= frontend/requirements.txt ======= #
-
 # python sandbox libraries
 pandas>=2.2.3,<3.0
 numpy>=2.1.3,<3.0
@@ -66,12 +64,6 @@ openai>=1.60.0,<2
 instructor[litellm]>=1.3.4,<2.0
 boto3>=1.36.2,<2.0
 litellm>=1.72.1
-
-# frontend
-streamlit==1.44.1
-st-theme>=1.2.3,<2.0
-streamlit-javascript>=0.1.5,<1.0
-nest-asyncio>=1.6.0,<2.0
 
 # backend
 aiologic>=0.16,<1.0
