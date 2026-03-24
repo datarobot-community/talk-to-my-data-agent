@@ -19,9 +19,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, Request
-
 from core.datarobot_client import get_visitors_token
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/user", tags=["user"])
 

@@ -11,10 +11,9 @@ requires-python = ">=3.11, <3.14"
 dependencies = [
     "core",
     "datarobot>=3.8.2",
-    "datarobot-pulumi-utils>=0.1.1",
-    "litellm>=1.72.1",
+    "datarobot-pulumi-utils>=0.1.5",
+    "litellm>=1.72.1,<2.0.0,!=1.82.7,!=1.82.8",
     "pulumi>=3.175.0",
-    "pulumi-datarobot>=0.10.17",
     "jinja2>=3.1.5,<4.0",
     "pulumi-command>=1.1.3",
     "ipdb>=0.13.13",

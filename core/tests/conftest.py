@@ -16,7 +16,6 @@
 # mypy: ignore-errors
 
 import contextlib
-import json
 import logging
 import os
 import subprocess
@@ -177,32 +176,3 @@ def cd(new_dir: Path) -> Any:
         yield
     finally:
         os.chdir(prev_dir)
-
-
-@pytest.fixture
-def example_chat_file_content() -> dict:
-    with open(
-        os.path.join(os.path.dirname(__file__), "models", "example_chat.json"), "r"
-    ) as f:
-        return json.load(f)
-
-
-@pytest_asyncio.fixture
-async def mock_analyst_db_creation(monkeypatch):
-    """Fixture to prevent real AnalystDB creation during tests."""
-    from unittest.mock import AsyncMock
-
-    from core.analyst_db import AnalystDB
-
-    original_create = AnalystDB.create
-
-    async def mock_create(user_id: str, **kwargs):
-        """Return a mock AnalystDB instead of creating a real one."""
-        mock_db = AsyncMock(spec=AnalystDB)
-        mock_db.user_id = user_id
-        return mock_db
-
-    monkeypatch.setattr(AnalystDB, "create", staticmethod(mock_create))
-    yield
-    # Restore original
-    monkeypatch.setattr(AnalystDB, "create", staticmethod(original_create))

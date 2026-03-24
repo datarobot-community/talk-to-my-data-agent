@@ -21,11 +21,6 @@ from unittest.mock import MagicMock as MagicMockType
 
 import polars as pl
 import pytest
-from fastapi import Request, Response
-from fastapi.testclient import TestClient
-from openpyxl import load_workbook
-
-import core.deps
 from core.analyst_db import (
     AnalystDB,  # noqa: E402
     DatasetType,
@@ -36,14 +31,6 @@ from core.file_utils import (
     detect_delimiter,
     load_and_validate_csv,
 )
-from core.middleware import (
-    SessionState,
-    _initialize_session,
-    _set_session_cookie,
-)
-from core.rest_api import create_app
-from core.routers.chats import delete_chat_message
-from core.routers.user import get_datarobot_account, store_datarobot_account
 from core.schema import (
     AnalystChatMessage,
     GetBusinessAnalysisMetadata,
@@ -52,6 +39,19 @@ from core.schema import (
     RunAnalysisResultMetadata,
     RunChartsResult,
 )
+from fastapi import Request, Response
+from fastapi.testclient import TestClient
+from openpyxl import load_workbook
+
+import app.deps as app_deps
+from app.middleware import (
+    SessionState,
+    _initialize_session,
+    _set_session_cookie,
+)
+from app.rest_api import create_app
+from app.routers.chats import delete_chat_message
+from app.routers.user import get_datarobot_account, store_datarobot_account
 
 
 @pytest.fixture
@@ -505,7 +505,7 @@ async def test_save_chat_history_to_xlsx(
     mock_analyst_db = AsyncMock()
     mock_analyst_db.get_chat_messages = AsyncMock(return_value=chat_history)
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get(
@@ -530,7 +530,7 @@ async def test_save_empty_chat_to_xlsx(mock_analyst_db_creation: None) -> None:
     mock_analyst_db = AsyncMock()
     mock_analyst_db.get_chat_messages = AsyncMock(return_value=[])
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get(
@@ -572,7 +572,7 @@ async def test_save_chat_with_in_progress_message_blocked(
     mock_analyst_db = AsyncMock()
     mock_analyst_db.get_chat_messages = AsyncMock(return_value=chat_history)
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get(
@@ -631,7 +631,7 @@ async def test_save_single_message_to_xlsx(mock_analyst_db_creation: None) -> No
     mock_analyst_db = AsyncMock()
     mock_analyst_db.get_chat_messages = AsyncMock(return_value=chat_history)
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get(
@@ -794,7 +794,7 @@ async def test_export_message_to_xlsx(
     mock_analyst_db.dataset_handler = mock_dataset_handler
 
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get(
@@ -920,7 +920,7 @@ def test_download_dictionary_with_bom(test_client: TestClient) -> None:
         return_value=FakeDictionary("ja_ds")
     )
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     response = client.get("/api/v1/dictionaries/ja_ds/download?bom=true")
@@ -947,7 +947,7 @@ async def test_save_chat_filename_generation(mock_analyst_db_creation: None) -> 
     mock_analyst_db = AsyncMock()
     mock_analyst_db.get_chat_messages = AsyncMock(return_value=chat_history)
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     # Test full chat download filename
@@ -995,7 +995,7 @@ async def test_download_result_dataset(test_client: TestClient) -> None:
     mock_analyst_db.dataset_handler = mock_dataset_handler
 
     app = create_app()
-    app.dependency_overrides[core.deps.get_initialized_db] = lambda: mock_analyst_db
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
     client = TestClient(app)
 
     # Basic download without BOM
@@ -1103,10 +1103,9 @@ def test_load_and_validate_csv_windows_line_endings() -> None:
 
 def test_chat_message_payload_rejects_oversized_message() -> None:
     """Verify that ChatMessagePayload rejects messages exceeding MAX_PROMPT_LENGTH."""
-    from pydantic import ValidationError
-
     from core.constants import MAX_PROMPT_LENGTH
     from core.schema import ChatMessagePayload
+    from pydantic import ValidationError
 
     # At the limit should be fine
     ChatMessagePayload(message="a" * MAX_PROMPT_LENGTH)

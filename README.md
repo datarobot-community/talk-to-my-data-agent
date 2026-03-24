@@ -199,8 +199,9 @@ App templates contain three families of complementary logic:
 
 - **App Logic**: Necessary for user consumption; whether via a hosted front-end or integrating into an external consumption layer.
   ```
-  app_frontend/  # React frontend with the api located in app_backend
-  core/  # App business logic & runtime helpers
+  app_frontend/  # React frontend
+  app_backend/  # FastAPI web layer, app assembly, and route registration
+  core/  # Shared app business logic & runtime helpers
   ```
 - **Operational Logic**: Necessary to activate DataRobot assets.
   ```

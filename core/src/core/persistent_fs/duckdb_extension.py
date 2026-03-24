@@ -1,4 +1,4 @@
-# Copyright 2025 DataRobot, Inc.
+# Copyright 2026 DataRobot, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # You may not use this file except in compliance with the License.
@@ -11,13 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
+import logging
 import os
 from types import TracebackType
-from typing import Any, Self
+from typing import Any
 
 import duckdb
 
 from core.persistent_fs.dr_file_system import DRFileSystem, calculate_checksum
+
+logger = logging.getLogger(__name__)
 
 
 def _get_fs_entity() -> DRFileSystem | None:
@@ -60,7 +65,7 @@ class DuckDBPyConnectionWrapper:
         self._fs_entity.put(self._database, self._database)
         self._checksum = new_checksum
 
-    def duplicate(self) -> Self:
+    def duplicate(self) -> DuckDBPyConnectionWrapper:
         return self.__class__(
             self._connection_entity.duplicate(),
             self._database,
@@ -84,7 +89,7 @@ class DuckDBPyConnectionWrapper:
         self.close()
 
 
-def _preload_file(database: str | None) -> bytes:
+def preload_file(database: str | None) -> bytes:
     checksum = b""
     if not database or database == ":memory:":
         return checksum
@@ -94,9 +99,16 @@ def _preload_file(database: str | None) -> bytes:
     if not fs_entity.exists(database):
         return checksum
 
-    fs_entity.get(
-        database, database
-    )  # get file with the same name from persistent storage
+    try:
+        fs_entity.get(
+            database, database
+        )  # get file with the same name from persistent storage
+    except FileNotFoundError:
+        logger.warning(
+            "Persistent storage file not found during preload; starting with empty database.",
+            extra={"database": database},
+        )
+        return checksum
 
     return calculate_checksum(database)
 
@@ -110,7 +122,7 @@ def connect_dr_fs(
     database = database or ":memory:"
     config = config or {}
 
-    checksum = _preload_file(database)
+    checksum = preload_file(database)
 
     con = duckdb.connect(database=database, read_only=read_only, config=config)
     return DuckDBPyConnectionWrapper(con, database, read_only, checksum)

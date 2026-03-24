@@ -33,6 +33,7 @@ dependencies = [
     "opentelemetry-instrumentation-requests>=0.43b0,<0.59b0",
     "pydantic>=2.11.4,<3.0",
     "pydantic-settings>=2.4.0,<3.0",
+    "python-multipart>=0.0.20,<1.0",
     "python-dotenv>=1.0.1",
     "spacy>=3.8.3,<4.0",
     "sqlalchemy>=2.0.37,<3.0",

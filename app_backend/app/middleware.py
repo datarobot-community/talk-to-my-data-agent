@@ -27,12 +27,10 @@ from tempfile import gettempdir
 from typing import Any
 
 import datarobot as dr
-from fastapi import Request, Response
-
 from core.analyst_db import AnalystDB
 from core.datarobot_client import use_user_token
-
-from .telemetry import otel
+from core.telemetry import otel
+from fastapi import Request, Response
 
 logger = getLogger(__name__)
 

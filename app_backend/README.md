@@ -1,5 +1,7 @@
 # Talk to My Data: FastAPI App app_backend
 
+`app_backend` owns the FastAPI web layer for the application, including app assembly, middleware, and route registration. It also serves the built React frontend as static assets.
+
 ## Tech Stack
 
 - FastAPI

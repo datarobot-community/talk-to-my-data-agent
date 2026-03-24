@@ -19,15 +19,15 @@ from __future__ import annotations
 import io
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException, Response
-
 from core.analyst_db import AnalystDB
-from core.deps import get_initialized_db
 from core.schema import (
     DataDictionary,
     DataDictionaryResponse,
     DictionaryCellUpdate,
 )
+from fastapi import APIRouter, Depends, HTTPException, Response
+
+from app.deps import get_initialized_db
 
 router = APIRouter(prefix="/dictionaries", tags=["dictionaries"])
 

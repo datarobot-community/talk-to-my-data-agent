@@ -24,6 +24,32 @@ from typing import Any, List, Union, cast
 
 import pandas as pd
 import polars.dataframe.frame
+from core.analyst_db import AnalystDB, get_data_source_type
+from core.api import (
+    AnalysisGenerationError,
+    run_complete_analysis,
+    summarize_conversation,
+)
+from core.chat_dataset_helper import cleanup_message_datasets
+from core.constants import (
+    ALTERNATIVE_LLM_BIG,
+    CONTEXT_WARNING_THRESHOLD,
+    MODEL_CONTEXT_WINDOW,
+)
+from core.logging_helper import get_logger
+from core.schema import (
+    AnalystChatMessage,
+    AnalystDataset,
+    ChatCreate,
+    ChatMessagePayload,
+    ChatRequest,
+    ChatResponse,
+    ChatUpdate,
+    GetBusinessAnalysisResult,
+    RunAnalysisResult,
+    RunChartsResult,
+    RunDatabaseAnalysisResult,
+)
 from datarobot_genai.core.utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
@@ -40,33 +66,7 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
-from core.analyst_db import AnalystDB, get_data_source_type
-from core.api import (
-    AnalysisGenerationError,
-    run_complete_analysis,
-    summarize_conversation,
-)
-from core.chat_dataset_helper import cleanup_message_datasets
-from core.constants import (
-    ALTERNATIVE_LLM_BIG,
-    CONTEXT_WARNING_THRESHOLD,
-    MODEL_CONTEXT_WINDOW,
-)
-from core.deps import get_initialized_db
-from core.logging_helper import get_logger
-from core.schema import (
-    AnalystChatMessage,
-    AnalystDataset,
-    ChatCreate,
-    ChatMessagePayload,
-    ChatRequest,
-    ChatResponse,
-    ChatUpdate,
-    GetBusinessAnalysisResult,
-    RunAnalysisResult,
-    RunChartsResult,
-    RunDatabaseAnalysisResult,
-)
+from app.deps import get_initialized_db
 
 logger = get_logger()
 

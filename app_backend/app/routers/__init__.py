@@ -14,16 +14,16 @@
 
 """Routers for the Data Analyst API."""
 
-from core.routers.chats import router as chats_router
-from core.routers.database import router as database_router
-from core.routers.datasets import router as datasets_router
-from core.routers.dictionaries import router as dictionaries_router
-from core.routers.external_data_stores import (
+from app.routers.chats import router as chats_router
+from app.routers.database import router as database_router
+from app.routers.datasets import router as datasets_router
+from app.routers.dictionaries import router as dictionaries_router
+from app.routers.external_data_stores import (
     external_data_stores_router,
     supported_types_router,
 )
-from core.routers.registry import router as registry_router
-from core.routers.user import router as user_router
+from app.routers.registry import router as registry_router
+from app.routers.user import router as user_router
 
 __all__ = [
     "chats_router",

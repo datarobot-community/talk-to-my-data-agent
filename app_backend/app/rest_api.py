@@ -19,14 +19,15 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from core.logging_helper import get_logger
+from core.telemetry import otel
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from starlette.types import Lifespan
 
-from core.logging_helper import get_logger
-from core.middleware import session_middleware
-from core.routers import (
+from app.middleware import session_middleware
+from app.routers import (
     chats_router,
     database_router,
     datasets_router,
@@ -36,8 +37,6 @@ from core.routers import (
     supported_types_router,
     user_router,
 )
-
-from .telemetry import otel
 
 logger = get_logger()
 

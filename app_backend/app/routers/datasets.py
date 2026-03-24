@@ -22,6 +22,21 @@ import os
 from typing import List
 
 import polars as pl
+from core.analyst_db import AnalystDB, DatasetMetadata, InternalDataSourceType
+from core.api import (
+    load_registry_datasets,
+    log_memory,
+    process_data_and_update_state,
+    register_remote_registry_datasets,
+)
+from core.datarobot_client import use_user_token
+from core.file_utils import detect_and_decode_csv, load_and_validate_csv
+from core.logging_helper import get_logger
+from core.schema import (
+    AnalystDataset,
+    DatasetCleansedResponse,
+    FileUploadResponse,
+)
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -33,22 +48,7 @@ from fastapi import (
     UploadFile,
 )
 
-from core.analyst_db import AnalystDB, DatasetMetadata, InternalDataSourceType
-from core.api import (
-    load_registry_datasets,
-    log_memory,
-    process_data_and_update_state,
-    register_remote_registry_datasets,
-)
-from core.datarobot_client import use_user_token
-from core.deps import get_initialized_db
-from core.file_utils import detect_and_decode_csv, load_and_validate_csv
-from core.logging_helper import get_logger
-from core.schema import (
-    AnalystDataset,
-    DatasetCleansedResponse,
-    FileUploadResponse,
-)
+from app.deps import get_initialized_db
 
 logger = get_logger()
 
@@ -444,7 +444,6 @@ async def get_cleansed_dataset(
         # Create an instance of AnalystDataset
         dataset = AnalystDataset(
             name=name,
-            columns=df_display.columns,
             data=df_display.to_dicts(),  # Convert rows to a list of dictionaries
         )
 

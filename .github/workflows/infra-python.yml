@@ -40,3 +40,17 @@ jobs:
       - name: Run Static Checks
         working-directory: infra
         run: task lint-check
+
+      - name: Run Unit Tests
+        id: run_unit_tests
+        working-directory: infra
+        run: |
+          task unit
+          echo "coverage_report_exists=$([ -f coverage.xml ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+      - name: Get Cover
+        if: steps.run_unit_tests.outputs.coverage_report_exists == 'true' && github.event_name == 'pull_request'
+        uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: infra/coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}

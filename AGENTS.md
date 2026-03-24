@@ -1,6 +1,6 @@
 # Data Analyst — Agent Instructions
 
-Monorepo: app_frontend (React/Vite), app_backend (FastAPI), core (shared Python lib), infra (Pulumi IaC). Commands are in `Taskfile.yaml` files — run `task --list` to discover them.
+Monorepo: app_frontend (React/Vite), app_backend (FastAPI web layer), core (shared business logic/runtime helpers), infra (Pulumi IaC). Commands are in `Taskfile.yaml` files — run `task --list` to discover them.
 
 ## Key Versions
 

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version < '3.11'",
@@ -237,6 +237,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "spacy" },
     { name = "sqlalchemy" },
     { name = "textblob" },
@@ -296,6 +297,7 @@ requires-dist = [
     { name = "pytest-httpx", marker = "extra == 'dev'", specifier = ">=0.31.0,<1.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14.0,<4.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "python-multipart", specifier = ">=0.0.20,<1.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.11" },
     { name = "spacy", specifier = ">=3.8.3,<4.0" },
     { name = "sqlalchemy", specifier = ">=2.0.37,<3.0" },
@@ -780,7 +782,6 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "python-multipart" },
     { name = "requests" },
     { name = "rich" },
     { name = "scikit-learn" },
@@ -828,7 +829,6 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=19.0.0,<22.0.0" },
     { name = "pydantic", specifier = ">=2.7.4,<3.0" },
     { name = "pydantic-settings", specifier = ">=2.4.0,<3.0" },
-    { name = "python-multipart", specifier = ">=0.0.20,<1.0" },
     { name = "requests", specifier = ">=2.32.5,<3.0" },
     { name = "rich", specifier = ">=13.9.4,<14.0" },
     { name = "scikit-learn", specifier = ">=1.6.1,<2.0" },

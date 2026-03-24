@@ -11,14 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
+
+from core.analyst_db import AnalystDB
+from core.logging_helper import get_logger
+from fastapi import HTTPException, Request
 
 from app.config import Config
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
+
+
+def get_initialized_db(request: Request) -> AnalystDB:
+    """Return the session-scoped database once middleware has initialized it."""
+    if (
+        not hasattr(request.state.session, "analyst_db")
+        or request.state.session.analyst_db is None
+    ):
+        if not request.headers.get("x-user-email"):
+            logger.error("x-user-email is required in order to initialize the database")
+        raise HTTPException(
+            status_code=400,
+            detail="Database not initialized.",
+        )
+
+    return cast(AnalystDB, request.state.session.analyst_db)
 
 
 @dataclass

@@ -18,8 +18,6 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-
 from core.analyst_db import AnalystDB, ExternalDataStoreNameDataSourceType
 from core.api import sync_data_sources_and_datasets
 from core.data_connections.database.database_implementations import (
@@ -31,7 +29,6 @@ from core.data_connections.datarobot.datarobot_dataset_handler import (
     DataSourceRecipe,
 )
 from core.datarobot_client import use_user_token
-from core.deps import get_initialized_db
 from core.logging_helper import get_logger
 from core.schema import (
     EmptyResponse,
@@ -39,6 +36,9 @@ from core.schema import (
     ExternalDataStore,
     SupportedDataSourceTypes,
 )
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+
+from app.deps import get_initialized_db
 
 logger = get_logger()
 

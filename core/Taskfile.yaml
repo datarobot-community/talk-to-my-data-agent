@@ -5,36 +5,46 @@ version: '3'
 env:
   SRCDIR: ./src/
 
+includes:
+  common:
+    taskfile: ./task-common.yaml
+    internal: true
+
 tasks:
   install:
     desc: "🔧 Install dependencies"
     cmds:
       - echo "🔧 Installing dependencies.."
-      - uv sync --all-extras --dev
+      - "{{.UV_CMD}} sync --all-extras --dev"
+  uninstall:
+    desc: "🔧 Uninstall dependencies"
+    cmds:
+      - echo "🔧 Uninstalling dependencies.."
+      - rm -rf .venv
   build:
     desc: "🏗️  Build React code"
     cmds:
-      - uv build
+      - "{{.UV_CMD}} build"
   lint:
     silent: true
     desc: "🧹 Run linters"
     cmds:
       - echo "🧹 Running linters.."
-      - uv run ruff format "$SRCDIR"
-      - uv run ruff check "$SRCDIR" --fix
-      - uv run mypy --pretty "$SRCDIR"
+      - "{{.UV_CMD}} run ruff format \"$SRCDIR\""
+      - "{{.UV_CMD}} run ruff check \"$SRCDIR\" --fix"
+      - "{{.UV_CMD}} run mypy --pretty \"$SRCDIR\""
 
   lint-check:
     desc: 🧹 Check whether the codebase is linted
     cmds:
       - echo "🧹 Linting"
-      - uv run ruff format --check "$SRCDIR"
-      - uv run ruff check "$SRCDIR"
-      - uv run mypy --pretty "$SRCDIR"
+      - "{{.UV_CMD}} run ruff format --check \"$SRCDIR\""
+      - "{{.UV_CMD}} run ruff check \"$SRCDIR\""
+      - "{{.UV_CMD}} run mypy --pretty \"$SRCDIR\""
 
   test:
     silent: true
     desc: "🧪 Run tests"
     cmds:
       - echo "🧪 Running tests.."
-      - uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+      - "{{.UV_CMD}} run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml"

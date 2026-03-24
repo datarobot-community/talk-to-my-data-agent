@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, BackgroundTasks, Depends
-
 from core.analyst_db import AnalystDB, InternalDataSourceType
 from core.data_connections.database.database_implementations import (
     get_external_database,
 )
-from core.deps import get_initialized_db
 from core.schema import AnalystDataset, LoadDatabaseRequest
+from fastapi import APIRouter, BackgroundTasks, Depends
+
+from app.deps import get_initialized_db
 
 router = APIRouter(prefix="/database", tags=["database"])
 

@@ -1,21 +1,12 @@
 ---
 # https://taskfile.dev
 version: '3'
+includes:
+  common:
+    taskfile: ../core/task-common.yaml
+    internal: true
 
 vars:
-  UV_CMD:
-    # Cross-platform environment cleaning - uses 'env -u' on Unix systems
-    # Falls back to empty string on Windows
-    sh: |
-      # This command ensures compatibility with codespaces environments
-      # Cross-platform environment cleaning - uses 'env -u' on Unix systems,
-      # falls back to empty string on Windows
-      if command -v env >/dev/null 2>&1; then
-        echo "env -u PYTHONPATH -u VIRTUAL_ENV uv"
-      else
-        echo "uv"
-      fi
-
   PULUMI_SKIP_UPDATE_CHECK:
     # Check if PULUMI_SKIP_UPDATE_CHECK is set in the environment;
     # if not, default to "0"
@@ -33,7 +24,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_PLUGIN_VERSION:-}" ]; then
         echo "${PULUMI_DATAROBOT_PLUGIN_VERSION}"
       else
-        echo "v0.10.24"
+        echo "v0.10.30"
       fi
 
   PULUMI_DATAROBOT_DEFAULT_URL:
@@ -44,7 +35,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_DEFAULT_URL:-}" ]; then
         echo "${PULUMI_DATAROBOT_DEFAULT_URL}"
       else
-        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.24"
+        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.30"
       fi
 
 tasks:
@@ -82,7 +73,7 @@ tasks:
     cmds:
       - |
         if [ "{{.PULUMI_SKIP_UPDATE_CHECK}}" = "1" ]; then
-          uv run pulumi plugin install resource datarobot {{.PULUMI_DATAROBOT_PLUGIN_VERSION}} \
+          {{.UV_CMD}} run pulumi plugin install resource datarobot {{.PULUMI_DATAROBOT_PLUGIN_VERSION}} \
           --server {{.PULUMI_DATAROBOT_DEFAULT_URL}}
         fi
 
@@ -141,6 +132,16 @@ tasks:
       - echo "🔨 Deploying the infrastructure.."
       - "{{.UV_CMD}} run pulumi up {{.CLI_ARGS}}"
 
+  up-yes:
+    silent: true
+    desc: "🔨 Deploy the infrastructure (non-interactive, auto-confirm)"
+    deps:
+      - auth-check
+    cmds:
+      - task: pulumi-datarobot-plugin-check
+      - echo "🔨 Deploying the infrastructure (non-interactive).."
+      - "{{.UV_CMD}} run pulumi up -y {{.CLI_ARGS}}"
+
   refresh:
     silent: true
     desc: "🔄 Refresh the infrastructure"
@@ -179,6 +180,16 @@ tasks:
       - echo "💥 Destroying the infrastructure.."
       - "{{.UV_CMD}} run pulumi destroy {{.CLI_ARGS}}"
 
+  down-yes:
+    silent: true
+    desc: "💥 Destroy the deployed infrastructure (non-interactive, auto-confirm)"
+    deps:
+      - auth-check
+    cmds:
+      - task: pulumi-datarobot-plugin-check
+      - echo "💥 Destroying the infrastructure (non-interactive).."
+      - "{{.UV_CMD}} run pulumi destroy -y {{.CLI_ARGS}}"
+
   copyright:
     aliases:
       - license
@@ -210,3 +221,19 @@ tasks:
         export PULUMI_SKIP_UPDATE_CHECK=1 && uv run pulumi up -y \
           --target "**[llm]" \
           --target "**datarobot:index/useCase:UseCase**"
+
+  unit:
+    desc: "Run unit tests"
+    vars:
+      TEST_PATH: tests/units/
+    cmds:
+      - |
+        if [ ! -d {{.TEST_PATH}} ]; then
+          echo "Skipping unit tests ({{.TEST_PATH}} not found)"
+          exit 0
+        fi
+        rm -rf .coverage .coverage.xml coverage.xml htmlcov
+        echo "Running unit tests"
+        {{.UV_CMD}} sync --all-extras && {{.UV_CMD}} run pytest {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.TEST_PATH}}{{end}} \
+          --cov=infra --cov-report=xml --cov-report=html --cov-report=term-missing -s -vv
+    silent: true

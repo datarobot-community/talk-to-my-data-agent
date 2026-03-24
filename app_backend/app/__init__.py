@@ -19,7 +19,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from core.rest_api import create_app as core_create_app
 from core.telemetry import configure_uvicorn_logging, init_logging
 from datarobot_asgi_middleware import DataRobotASGIMiddleware
 from fastapi import APIRouter, FastAPI, Request
@@ -29,6 +28,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Config
 from app.deps import Deps, create_deps
+from app.rest_api import create_app as core_create_app
 
 base_router = APIRouter()
 
@@ -177,9 +177,4 @@ def create_app(
             },
         )
 
-    # We are already instrumenting in core.rest_api so this is
-    # redundant. If we remove app creation from core, this should
-    # come back.
-    # otel.log_application_start()
-    # otel.instrument_fastapi_app(app)
     return app

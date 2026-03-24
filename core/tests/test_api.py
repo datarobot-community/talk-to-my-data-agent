@@ -64,6 +64,36 @@ from core.schema import (
 )
 
 
+async def get_cleansed_dataset_response(
+    name: str,
+    analyst_db: AnalystDB,
+    skip: int = 0,
+    limit: int = 10000,
+) -> DatasetCleansedResponse:
+    ds_display = await analyst_db.get_dataset(name)
+    response = DatasetCleansedResponse(
+        dataset_name=name,
+        cleaning_report=None,
+        dataset=None,
+    )
+
+    try:
+        ds_display_cleansed = await analyst_db.get_cleansed_dataset(name)
+        response.cleaning_report = ds_display_cleansed.generate_cleaning_report()
+    except ValueError:
+        pass
+
+    df_display = ds_display.to_df()
+    if skip > 0 or limit > 0:
+        df_display = df_display.slice(skip, limit)
+
+    response.dataset = AnalystDataset(
+        name=name,
+        data=df_display.to_dicts(),
+    )
+    return response
+
+
 @pytest_asyncio.fixture(scope="module")
 async def dataset_cleansed(
     dataset_loaded: AnalystDataset, analyst_db: AnalystDB
@@ -87,10 +117,7 @@ async def cleansed_dataset_from_api(
     analyst_db: AnalystDB,
     dataset_cleansed: CleansedDataset,
 ) -> DatasetCleansedResponse:
-    from core.routers.datasets import get_cleansed_dataset
-
-    # We need to register the dataset first to ensure it exists in the database
-    cleansed_dataset = await get_cleansed_dataset(
+    cleansed_dataset = await get_cleansed_dataset_response(
         name=dataset_loaded.name, skip=0, limit=10000, analyst_db=analyst_db
     )
     return cleansed_dataset
@@ -102,20 +129,15 @@ async def cleansed_dataset_with_pagination(
     analyst_db: AnalystDB,
     dataset_cleansed: CleansedDataset,
 ) -> tuple[DatasetCleansedResponse, DatasetCleansedResponse, DatasetCleansedResponse]:
-    from core.routers.datasets import get_cleansed_dataset
-
-    # Get with skip=0, limit=2
-    dataset1 = await get_cleansed_dataset(
+    dataset1 = await get_cleansed_dataset_response(
         name=dataset_loaded.name, skip=0, limit=2, analyst_db=analyst_db
     )
 
-    # Get with skip=2, limit=2
-    dataset2 = await get_cleansed_dataset(
+    dataset2 = await get_cleansed_dataset_response(
         name=dataset_loaded.name, skip=2, limit=2, analyst_db=analyst_db
     )
 
-    # Get with skip exceeding dataset size
-    dataset3 = await get_cleansed_dataset(
+    dataset3 = await get_cleansed_dataset_response(
         name=dataset_loaded.name, skip=10000, limit=2, analyst_db=analyst_db
     )
 

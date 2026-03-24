@@ -11,16 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
-from typing import Generator
+from typing import Any, AsyncGenerator, Generator, cast
+from unittest.mock import AsyncMock
 
 import pytest
+import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # Set env vars before importing app (app → core loads core.config.Config at import time)
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://dummy-endpoint.datarobot.com")
 os.environ.setdefault("DATAROBOT_API_TOKEN", "dummy-api-token-for-tests")
+
+from core.analyst_db import AnalystDB
 
 from app import create_app
 from app.config import Config
@@ -60,3 +65,27 @@ def client(webapp: FastAPI) -> Generator[TestClient, None, None]:
     """
     with TestClient(webapp) as client:
         yield client
+
+
+@pytest.fixture
+def example_chat_file_content() -> list[dict[str, Any]]:
+    with open(
+        os.path.join(os.path.dirname(__file__), "models", "example_chat.json"), "r"
+    ) as f:
+        return cast(list[dict[str, Any]], json.load(f))
+
+
+@pytest_asyncio.fixture
+async def mock_analyst_db_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncGenerator[None, None]:
+    original_create = AnalystDB.create
+
+    async def mock_create(user_id: str, **kwargs: Any) -> AsyncMock:
+        mock_db = AsyncMock(spec=AnalystDB)
+        mock_db.user_id = user_id
+        return mock_db
+
+    monkeypatch.setattr(AnalystDB, "create", staticmethod(mock_create))
+    yield
+    monkeypatch.setattr(AnalystDB, "create", staticmethod(original_create))

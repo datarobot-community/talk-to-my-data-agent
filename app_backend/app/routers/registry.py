@@ -16,11 +16,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-
 from core.api import list_registry_datasets
 from core.datarobot_client import use_user_token
 from core.schema import DataRegistryDataset
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/registry", tags=["registry"])
 
