@@ -15,12 +15,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from core.analyst_db import BaseDuckDBHandler
-from core.persistent_fs.duckdb_extension import DuckDBPyConnectionWrapper
+from core.persistent_storage import PersistentStorage
 
 
 class StubDBHandler(BaseDuckDBHandler):
@@ -44,30 +44,33 @@ class StubDBHandler(BaseDuckDBHandler):
 @dataclass
 class Mocks:
     conn: Mock
-    dr_conn: Mock
-    preload_file: Mock
+    storage: Mock
 
 
 @pytest.fixture
 def mocks() -> Generator[Mocks, None, None]:
-    dr_conn = MagicMock()
     with (
         patch("duckdb.DuckDBPyConnection") as conn,
         patch("duckdb.connect") as connect,
-        patch("core.analyst_db.connect_dr_fs", return_value=dr_conn),
-        patch("core.analyst_db.preload_file") as mock_preload_file,
+        patch(
+            "core.analyst_db.PersistentStorage", autospec=PersistentStorage
+        ) as storage,
     ):
         connect.return_value = conn
-        yield Mocks(conn=conn, dr_conn=dr_conn, preload_file=mock_preload_file)
+        storage.return_value = storage
+        yield Mocks(conn=conn, storage=storage)
 
 
 @pytest.mark.asyncio
 async def test_write_conn_saves_to_storage(mocks: Mocks) -> None:
     test_db = StubDBHandler()
     async with test_db._write_connection() as conn:
-        assert conn is mocks.dr_conn
+        assert conn is mocks.conn
 
-    mocks.dr_conn.close.assert_called_once()
+    mocks.storage.save_to_storage.assert_called_once_with(
+        "app_db.db", str(Path("./app_db.db").absolute())
+    )
+    mocks.conn.close.assert_called()
 
 
 @pytest.mark.asyncio
@@ -77,7 +80,7 @@ async def test_read_conn_not_saves_to_storage(mocks: Mocks) -> None:
     async with test_db._read_connection():
         pass
 
-    mocks.dr_conn.close.assert_not_called()
+    mocks.storage.save_to_storage.assert_not_called()
     mocks.conn.close.assert_called_once()
 
 
@@ -87,7 +90,7 @@ async def test_initialize_database_fetches_when_db_missing(mocks: Mocks) -> None
 
     await test_db._initialize_database()
 
-    execute_calls = mocks.dr_conn.execute.call_args_list
+    execute_calls = mocks.conn.execute.call_args_list
 
     create_db_version_calls = [
         c[0][0]
@@ -97,5 +100,7 @@ async def test_initialize_database_fetches_when_db_missing(mocks: Mocks) -> None
 
     assert len(create_db_version_calls) == 1
 
-    mocks.preload_file.assert_called_once_with(str(test_db.db_path.absolute()))
+    mocks.storage.fetch_from_storage.assert_awaited_once_with(
+        test_db.db_path.name, str(test_db.db_path.absolute())
+    )
     assert test_db._initialized is True

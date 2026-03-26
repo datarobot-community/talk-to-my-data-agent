@@ -235,7 +235,9 @@ googleapis-common-protos==1.72.0
     #   grpcio-status
     #   opentelemetry-exporter-otlp-proto-http
 greenlet==3.3.1
-    # via gevent
+    # via
+    #   gevent
+    #   sqlalchemy
 grpcio==1.78.0
     # via
     #   google-api-core
@@ -322,9 +324,7 @@ jsonschema-specifications==2025.9.1
 julia==0.5.7
     # via datarobot-drum
 kaleido==0.2.1
-    # via
-    #   -c (workspace)
-    #   -r app_backend/requirements.in
+    # via -r app_backend/requirements.in
 langchain==1.2.10
     # via ragas
 langchain-classic==1.0.1

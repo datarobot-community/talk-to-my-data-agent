@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import datetime
 import hashlib
 import io
 import json
@@ -32,7 +31,11 @@ from typing import (
 
 import datarobot as dr
 from fsspec import AbstractFileSystem
-from fsspec.implementations.local import LocalFileSystem
+
+from core.persistent_fs.kv_custom_app_implementattion import (
+    KeyValue,
+    KeyValueEntityType,
+)
 
 Path = str
 NodeInfo = dict[str, str | int | float]
@@ -78,11 +81,6 @@ def _keep_metadata_in_sync(
                 "Exception caught by sync wrapper.",
                 extra={"function": func.__name__, "stack": fs_entity._sync_stack},
             )
-            if (
-                len(fs_entity._sync_stack) == 1
-                and fs_entity._local_metadata_was_updated()
-            ):
-                fs_entity._update_stored_metadata()
             fs_entity._sync_stack.pop()
             raise
 
@@ -127,8 +125,8 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
         self._fs_metadata: Metadata = {}
         self._fs_metadata_timestamp: float = 0.0  # timestamp of when we have data
 
-        self._fs_metadata_stored: dr.KeyValue | None = None  # remotely stored metadata
-        self._fs_metadata_timestamp_stored: dr.KeyValue | None = (
+        self._fs_metadata_stored: KeyValue | None = None  # remotely stored metadata
+        self._fs_metadata_timestamp_stored: KeyValue | None = (
             None  # remotely stored timestamp
         )
 
@@ -148,9 +146,9 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
             if self._fs_metadata_timestamp_stored:
                 self._fs_metadata_timestamp_stored.refresh()
             else:
-                self._fs_metadata_timestamp_stored = dr.KeyValue.find(
+                self._fs_metadata_timestamp_stored = KeyValue.find(
                     self.app_id,
-                    dr.KeyValueEntityType.CUSTOM_APPLICATION,
+                    KeyValueEntityType.CUSTOM_APPLICATION,
                     TIMESTAMP_STORAGE_NAME,
                 )
 
@@ -159,9 +157,9 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
             if self._fs_metadata_stored:
                 self._fs_metadata_stored.refresh()
             else:
-                self._fs_metadata_stored = dr.KeyValue.find(
+                self._fs_metadata_stored = KeyValue.find(
                     self.app_id,
-                    dr.KeyValueEntityType.CUSTOM_APPLICATION,
+                    KeyValueEntityType.CUSTOM_APPLICATION,
                     METADATA_STORAGE_NAME,
                 )
 
@@ -192,9 +190,9 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
                     value=self._fs_metadata_timestamp
                 )
             else:
-                self._fs_metadata_timestamp_stored = dr.KeyValue.create(
+                self._fs_metadata_timestamp_stored = KeyValue.create(
                     entity_id=self.app_id,
-                    entity_type=dr.KeyValueEntityType.CUSTOM_APPLICATION,
+                    entity_type=KeyValueEntityType.CUSTOM_APPLICATION,
                     name=TIMESTAMP_STORAGE_NAME,
                     category=dr.KeyValueCategory.ARTIFACT,
                     value_type=dr.KeyValueType.NUMERIC,
@@ -204,9 +202,9 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
             if self._fs_metadata_stored:
                 self._fs_metadata_stored.update(value=json.dumps(self._fs_metadata))
             else:
-                self._fs_metadata_stored = dr.KeyValue.create(
+                self._fs_metadata_stored = KeyValue.create(
                     entity_id=self.app_id,
-                    entity_type=dr.KeyValueEntityType.CUSTOM_APPLICATION,
+                    entity_type=KeyValueEntityType.CUSTOM_APPLICATION,
                     name=METADATA_STORAGE_NAME,
                     category=dr.KeyValueCategory.ARTIFACT,
                     value_type=dr.KeyValueType.JSON,
@@ -300,10 +298,10 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
         return ordered_children
 
     @_keep_metadata_in_sync
-    def modified(self, path: str) -> datetime.datetime:
+    def modified(self, path: str) -> float:
         if not self.exists(path):
             raise FileNotFoundError()
-        return datetime.datetime.fromtimestamp(self.info(path).get("modified_at", 0.0))
+        return cast(float, self.info(path).get("modified_at", 0.0))
 
     @_keep_metadata_in_sync
     def _open(self, path: str, mode: str = "rb", **kwargs: Any) -> BinaryIO:
@@ -359,25 +357,10 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
             extra={"catalog_id": catalog_id, "local_path": local_path},
         )
 
-        try:
-            response = self.client.get(
-                f"files/{catalog_id}/file/",
-                timeout=(FILE_API_CONNECT_TIMEOUT, FILE_API_READ_TIMEOUT),
-            )
-        except dr.errors.ClientError as e:
-            if e.status_code == 410:
-                logger.warning(
-                    "Catalog file no longer exists; removing stale metadata entry.",
-                    extra={"catalog_id": catalog_id},
-                )
-                virtual_path = file_info.get("name")
-                if virtual_path:
-                    self._fs_metadata.pop(virtual_path, None)
-                    self._fs_metadata_timestamp = time.time()
-                raise FileNotFoundError(
-                    f"Catalog file {catalog_id} was previously deleted."
-                ) from e
-            raise
+        response = self.client.get(
+            f"files/{catalog_id}/file/",
+            timeout=(FILE_API_CONNECT_TIMEOUT, FILE_API_READ_TIMEOUT),
+        )
         with open(local_path, "wb") as f:
             f.write(response.content)
 
@@ -465,43 +448,6 @@ class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
             return
         raise NotImplementedError(f"No copy logic for node: {path1}")
 
-    @_keep_metadata_in_sync
-    def safe_get_file(self, rpath: str, lpath: str, **kwargs: Any) -> bool:
-        """Replace local file with file from DR if local file is older. Return True if replacement happened."""
-        logger.debug(
-            "Safe copy file to local FS.", extra={"rpath": rpath, "lpath": lpath}
-        )
-        if not self.exists(rpath):
-            raise FileNotFoundError()
-        if not self.isfile(rpath):
-            raise ValueError(f"{rpath} is not a file")
-        local_fs = LocalFileSystem(auto_mkdir=True)
-
-        if not local_fs.exists(lpath):
-            logger.debug(
-                "Local file does not exist. It's save to copy",
-                extra={"rpath": rpath, "lpath": lpath},
-            )
-            self.get_file(rpath, lpath, **kwargs)
-            return True
-
-        source_timestamp = self.modified(rpath)
-        replaced_timestamp = local_fs.modified(lpath)
-        if replaced_timestamp >= source_timestamp:
-            logger.debug(
-                "Local may be more updated",
-                extra={
-                    "rpath": rpath,
-                    "rpath_timestamp": source_timestamp.isoformat(),
-                    "lpath": lpath,
-                    "lpath_timestamp": replaced_timestamp.isoformat(),
-                },
-            )
-            return False
-
-        self.get_file(rpath, lpath, **kwargs)
-        return True
-
 
 def calculate_checksum(path: str) -> bytes:
     adder = hashlib.sha256()
@@ -536,12 +482,3 @@ class _FileIOWrapper(io.FileIO):
             self._fs_entity._upload_to_catalog(self._virtual_path, self.name)
         else:
             logger.debug("Wrapper was empty")
-
-
-def get_file_system() -> AbstractFileSystem:
-    expected_envs = ["DATAROBOT_ENDPOINT", "DATAROBOT_API_TOKEN", "APPLICATION_ID"]
-    if any(not os.environ.get(env_name) for env_name in expected_envs):
-        # there is some env variables missing and probably it's a local run
-        # let's use local file system
-        return LocalFileSystem()
-    return DRFileSystem()

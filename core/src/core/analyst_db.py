@@ -47,7 +47,7 @@ from pydantic import (
 )
 
 from core.logging_helper import get_logger
-from core.persistent_fs.duckdb_extension import connect_dr_fs, preload_file
+from core.persistent_storage import PersistentStorage
 from core.schema import (
     AnalystChatMessage,
     AnalystDataset,
@@ -202,7 +202,7 @@ class BaseDuckDBHandler(ABC):
         self.user_id = user_id
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
         self._async_path = AsyncPath(self.db_path)
-        self._use_persistent_storage = use_persistent_storage
+        self._storage = PersistentStorage(user_id) if use_persistent_storage else None
         self._write_lock = aiologic.Lock()
 
     async def _create_db_version_table(
@@ -272,9 +272,10 @@ class BaseDuckDBHandler(ABC):
     @otel.meter_and_trace
     async def _initialize_database(self) -> None:
         """Initialize database tables and extensions."""
-        if self._use_persistent_storage and not await self._async_path.exists():
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, preload_file, str(self.db_path.absolute()))
+        if self._storage and not await self._async_path.exists():
+            await self._storage.fetch_from_storage(
+                self.db_path.name, str(self.db_path.absolute())
+            )
         tables_to_drop: list[str] = []
         version_update = False
         if await self._async_path.exists():
@@ -373,20 +374,21 @@ class BaseDuckDBHandler(ABC):
     async def _write_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
         loop = asyncio.get_running_loop()
         async with self._write_lock:
-            if self._use_persistent_storage:
-                db_path = str(self.db_path.absolute())
-                conn: duckdb.DuckDBPyConnection = await loop.run_in_executor(
-                    None,
-                    lambda: connect_dr_fs(db_path),  # type: ignore[return-value, arg-type]
-                )
-            else:
-                conn = await loop.run_in_executor(
-                    None, duckdb.connect, self.db_path, False
-                )
+            conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
             try:
                 yield conn
             finally:
                 await loop.run_in_executor(None, conn.close)
+            if self._storage:
+                read_conn = await loop.run_in_executor(
+                    None, duckdb.connect, self.db_path, False
+                )
+                try:
+                    await self._storage.save_to_storage(
+                        self.db_path.name, str(self.db_path.absolute())
+                    )
+                finally:
+                    await loop.run_in_executor(None, read_conn.close)
 
     @asynccontextmanager
     async def _read_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
