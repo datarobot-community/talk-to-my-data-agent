@@ -1,0 +1,5 @@
+# ShellCheck configuration
+#
+# https://github.com/koalaman/shellcheck/blob/master/shellcheck.1.md#rc-files.
+
+disable=SC1091  # Not following

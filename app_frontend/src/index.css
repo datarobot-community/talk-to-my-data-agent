@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+@import './theme/preset.css';
+
+@tailwind utilities;
+
+/* @variant dark (&:where(.dark, .dark *)); */
+
+@plugin "tailwindcss-animate";
+
+@keyframes blinkBorderAndShadow {
+  0%,
+  100% {
+    border-color: hsl(var(--border-blue));
+    box-shadow: 0 0 5px 8px hsl(var(--shadow-blue) / 0.54);
+  }
+  50% {
+    border-color: hsl(var(--border-blue));
+    box-shadow: 0 0 5px 2px hsl(var(--shadow-blue) / 0.24);
+  }
+}
+
+@layer base {
+  :root {
+    --border-blue: 233 83% 76%;
+    --shadow-blue: 227 83% 73%;
+
+    --animation-blink-border-and-shadow: blinkBorderAndShadow 1.5s ease-in-out infinite;
+  }
+}
+
+#root {
+  height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: hsl(var(--muted-foreground));
+  cursor: default;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.9);
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+}

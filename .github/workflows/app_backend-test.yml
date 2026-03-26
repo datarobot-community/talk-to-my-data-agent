@@ -1,0 +1,69 @@
+---
+name: Test app_backend
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'app_backend/**.py'
+
+  pull_request:
+    branches: ["main"]
+    paths:
+      - 'app_backend/**.py'
+
+jobs:
+  tests:
+    name: "FastAPI: app_backend ${{ matrix.python-version }}"
+    runs-on: "ubuntu-latest"
+    defaults:
+      run:
+        working-directory: app_backend
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: "actions/checkout@v5"
+
+      # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: app_backend
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Taskfile
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Dependencies
+        working-directory: app_backend
+        run: task install
+
+      - name: Install Frontend Dependencies
+        working-directory: app_frontend
+        run: npm install
+
+      - name: Build static Frontend files
+        working-directory: app_frontend
+        run: npm run build
+
+      - name: Run Static Checks
+        working-directory: app_backend
+        run: task lint-check
+
+      - name: Test
+        working-directory: app_backend
+        run: task test
+
+      - name: Get Cover
+        uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: app_backend/.coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}

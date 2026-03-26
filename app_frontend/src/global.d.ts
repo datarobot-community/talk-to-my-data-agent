@@ -1,0 +1,14 @@
+// global.d.ts
+
+export {};
+
+declare global {
+  interface Window {
+    ENV: {
+      BASE_PATH?: string;
+      API_PORT?: string;
+      DATAROBOT_ENDPOINT?: string;
+      APP_VERSION?: string;
+    };
+  }
+}

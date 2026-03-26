@@ -1,0 +1,170 @@
+import React, { useRef, useEffect, useImperativeHandle, useState } from 'react';
+import { Send, Hourglass } from 'lucide-react';
+import { useTranslation } from '@/i18n';
+
+import { cn } from '~/lib/utils';
+import { Button } from '@/components/ui/button';
+import { FieldDescription, FieldError } from '@/components/ui/field';
+import { MAX_PROMPT_LENGTH } from '@/constants/chat';
+
+type SendButtonArrangement = 'prepend' | 'append';
+
+type PromptInputProps = Omit<
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+  'onChange' | 'value' | 'onSend'
+> & {
+  sendButtonArrangement?: SendButtonArrangement;
+  onSend?: (message: string) => void;
+  isProcessing?: boolean;
+  isDisabled?: boolean;
+  testId?: string;
+  initialValue?: string;
+  chatId?: string;
+};
+
+export const getChatMessageKey = (chatId: string) => `chat-${chatId}-message`;
+
+const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
+  (
+    {
+      className,
+      sendButtonArrangement = 'append',
+      onSend,
+      isProcessing = false,
+      isDisabled,
+      testId = 'chat-prompt-input',
+      initialValue = '',
+      chatId = 'initial',
+      ...props
+    },
+    ref
+  ) => {
+    const { t } = useTranslation();
+    const chatMessageKey = getChatMessageKey(chatId);
+    const internalRef = useRef<HTMLTextAreaElement>(null);
+    const [message, setMessage] = useState(
+      initialValue || localStorage.getItem(chatMessageKey) || ''
+    );
+
+    useEffect(() => {
+      const timeout = setTimeout(() => {
+        localStorage.setItem(chatMessageKey, message);
+      }, 200);
+      return () => clearTimeout(timeout);
+    }, [message, chatMessageKey]);
+
+    useImperativeHandle(ref, () => internalRef.current as HTMLTextAreaElement);
+    useEffect(() => {
+      // Auto-resize textarea based on content
+      const textarea = internalRef.current;
+      if (textarea) {
+        textarea.style.height = 'auto'; // Reset height to find actual value
+
+        const textHeight = textarea.scrollHeight;
+        textarea.style.height = `${textHeight}px`;
+        textarea.style.overflow = textHeight > 300 ? 'auto' : 'hidden';
+      }
+    }, [message]);
+
+    const [isFocused, setIsFocused] = React.useState(false);
+    const [isComposing, setIsComposing] = React.useState(false);
+
+    const handleSend = () => {
+      if (message.trim()) {
+        onSend?.(message);
+        setMessage('');
+        localStorage.removeItem(chatMessageKey);
+      }
+    };
+
+    const isAtLimit = message.length >= MAX_PROMPT_LENGTH;
+    const showCounter = message.length > MAX_PROMPT_LENGTH * 0.8;
+    const isButtonDisabled = isProcessing || isDisabled || !message.trim() || isAtLimit;
+
+    const buttonTooltip =
+      isButtonDisabled && !isProcessing
+        ? t('Ask a question')
+        : isButtonDisabled && isProcessing
+          ? t('Processing... Waiting for response.')
+          : t('Send message');
+
+    return (
+      <div
+        id="prompt-input-container"
+        aria-disabled={isDisabled}
+        data-testid={testId}
+        className={cn(
+          'relative mr-4 flex w-full min-w-3xs items-center justify-start gap-2 p-3',
+          'rounded-md border border-border shadow-xs',
+          'bg-transparent selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground',
+          'text-base transition-[color,box-shadow]',
+          'ring-ring/10 outline-ring/50',
+          !isFocused && 'hover:border-muted-foreground',
+          isFocused &&
+            'border-accent outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+          sendButtonArrangement === 'prepend' ? 'flex-row-reverse' : 'flex-row',
+          className
+        )}
+      >
+        <textarea
+          id="prompt-input-textarea"
+          data-testid="prompt-input-textarea"
+          className={cn(
+            'box-content flex max-h-[300px] w-full resize-none justify-center overflow-hidden bg-transparent leading-5 placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+            className
+          )}
+          rows={1}
+          autoFocus={props.autoFocus}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
+          onKeyDown={event => {
+            if (
+              !isComposing &&
+              !isProcessing &&
+              !isDisabled &&
+              !isAtLimit &&
+              event.key === 'Enter' &&
+              !(event.shiftKey || event.altKey)
+            ) {
+              event.preventDefault();
+              handleSend();
+            }
+          }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={e => setMessage(e.target.value)}
+          value={message}
+          ref={internalRef}
+          disabled={isDisabled}
+          {...props}
+        />
+        <Button
+          variant="ghost"
+          testId="send-message-button"
+          disabled={isButtonDisabled}
+          onClick={handleSend}
+          title={buttonTooltip}
+        >
+          {isProcessing ? (
+            <Hourglass className="size-5" data-testid="hourglass-icon" />
+          ) : (
+            <Send className="size-5" data-testid="send-icon" />
+          )}
+        </Button>
+        {showCounter &&
+          (isAtLimit ? (
+            <FieldError data-testid="char-counter" className="absolute right-0 -bottom-6">
+              {t('Message limit reached ({{max}} characters)', { max: MAX_PROMPT_LENGTH })}
+            </FieldError>
+          ) : (
+            <FieldDescription data-testid="char-counter" className="absolute right-0 -bottom-6">
+              {message.length}/{MAX_PROMPT_LENGTH}
+            </FieldDescription>
+          ))}
+      </div>
+    );
+  }
+);
+PromptInput.displayName = 'PromptInput';
+
+export { PromptInput };

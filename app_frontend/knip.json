@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/knip/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/lib/utils.ts",
+    "src/components/ui/**/*.{ts,tsx}",
+    "src/theme/tailwind.config.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": ["src/global.d.ts"],
+  "ignoreBinaries": [ ],
+  "ignoreDependencies": [
+    "@fontsource/*",
+    "@radix-ui/react-toggle"
+  ]
+}

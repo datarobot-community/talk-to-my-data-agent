@@ -1,0 +1,647 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [11.6.2] - 2026-03-26
+
+### Fixed
+
+- Revert from using dr file system. (APP-5650)
+
+## [11.6.0] - 2026-03-16
+
+### Removed
+
+- Removed deprecated Streamlit frontend (`frontend/` directory, CI workflow, e2e tests, `FRONTEND_TYPE` config)
+- Removed Streamlit dependencies (`streamlit`, `st-theme`, `streamlit-javascript`, `nest-asyncio`)
+
+## [11.5.5] - 2026-03-16
+
+### Added
+
+- Support Data Connector Integration with Apache Impala (APP-5077)
+- Support Data Connector Integration with MySQL (APP-5385)
+- Updated README with Codespace links for different regions (APP-5592)
+
+### Fixed
+
+- Fix Add Data modal stuck loading on empty selections (APP-4858)
+
+## [11.5.4] - 2026-03-03
+
+### Added
+
+- Add error toasts to chat mutation hooks
+- Set a limit for input prompt length
+
+### Fixed
+
+- Handle 401 response for external users
+- Fix circular symlink between app_backend and core by moving telemetry into core
+
+## [11.5.3] - 2026-02-26
+
+### Added
+
+- Privacy notice when uploading datasets
+- App version number display on the React UI
+- Ability to use builder's token for shared applications
+- Error handler for 403 seat license with disabled data selection on access denied
+- Max length validation to chat name inputs
+- Frontend test coverage reporting to PRs
+
+### Changed
+
+- Redesigned Settings modal with instant-apply and visual overhaul
+- Moved version display from Sidebar header to Settings modal
+- Replaced all FontAwesome icons with Lucide icons
+- UX/Accessibility improvements to Add Data modal
+- Changed required API key scope level from 'user' to 'admin'
+- Replaced `tiktoken` token usage predictions with a local algorithm
+- Removed JSON-style logs in favor of standard logging
+- Set `no_database` as default for `DATABASE_CONNECTION_TYPE`
+- Added guidelines for chart titles and text in prompts
+- Minor wording improvements across the UI
+- Updated dr-ui version
+
+### Fixed
+
+- Fixed empty Data Registry dropdown on localhost with empty use case
+- Fixed handling of empty DATAROBOT_DEFAULT_USE_CASE (empty data registry, log errors)
+- Fixed whitespace-only search returning invalid results in dropdown menus
+- Fixed bug with missing builder token
+- Fixed empty "Connected as:" field in Settings modal
+- Hide download button on Raw Rows tab
+
+## [11.5.2] - 2026-02-11
+
+### Fixed
+
+- Fixed the default value for DATABASE_CONNECTION_TYPE in the CLI dotenv setup.
+
+## [11.5.1] - 2026-02-10
+
+This release significantly overhauls the developer experience of this application template. For previous users, the major important new commands are:
+
+- Running locally: `task dev` (instead of `source ./set_env.sh && make run-local-dev-backend` + `npm run dev`).
+- Deploying: `task deploy` (instead of `python quickstart.py`).
+
+For further details, refer to the `README.md`.
+
+### Changed
+
+- Switched to af-component-llm and replaced all client calls with litellm
+- Switched default model to Claude Sonnet 4.5
+- Replaced quickstart with task start and dr task compose
+- Updated af-component-base and migrate util to core
+
+### Added
+
+- Added flexible LLM options
+- Added dev-deploy task to deploy the LLM and Use case
+
+## [11.5.0] - 2026-01-27
+
+### Changed
+
+- Changing versioning to match validated DataRobot platform versions.
+
+### Added
+
+- Support Data Connector Integration with DataBricks
+- Support scoped API tokens
+
+### Fixed
+
+- Fixed compatibility with latest version of Datarobot PySDK
+
+### Changed
+
+- Updated LLM configuration system to be more flexible and easier to use with newer LLMs
+- Simplified LLM selection with configuration-based approach supporting multiple deployment options (LLM Gateway, External LLMs, Registered Models, and Deployed Models)
+
+## [0.5.3] - 2026-01-12
+
+### Added
+
+- Light theme support
+- Chat message persistence across app restarts
+
+### Changed
+
+- Improved numeric type inference for better data type detection
+- Added data type editing warning to prevent accidental changes
+- Replaced custom UI components with registry components for better maintainability
+- Replaced custom loading components with standardized versions
+
+### Fixed
+
+- Fixed DuckDB file length changing during upload causing "Too much data for declared Content-Length" errors
+- Fixed Python 3.10 and 3.11 compatibility issues with enum features
+
+## [0.5.2] - 2025-12-16
+
+### Fixes
+
+- Fixed data loading bug affecting Python version <3.12.
+- Fixed intermittent concurrency-related failures in persisting DB.
+
+### Deprecated
+
+- **Streamlit frontend is deprecated and will be removed March 20th, 2026**
+  - The React frontend (now default) provides enhanced UI features and better performance
+  - Migration: Remove `FRONTEND_TYPE="streamlit"` from your `.env` file to use the React frontend
+  - The React frontend is already the default; this only affects users who explicitly configured Streamlit
+  - See [React Frontend Development Guide](app_frontend/README.md) for more information
+  - Support and bug fixes for Streamlit will be limited during the deprecation period
+- Migrated Pulumi stack into new location. To update run `dr run infra:migrate` or `task migrate` inside the `infra` folder
+
+## [0.5.1] - 2025-12-10
+
+### Added
+
+- DataRobot CLI integration: Introduced CLI-driven quickstart and configuration via `dr start`.
+
+### Improvements
+
+- Updated `README.md` to prioritize CLI-based quickstart (`dr start`), improved setup flow and Codespace instructions.
+- Enhanced `quickstart.py` UX: made `stack_name` optional and interactive;
+
+## [0.5.0] - 2025-12-10
+
+### Improvements
+
+- Improved the text description in the upload modal.
+
+## [0.4.24] - 2025-12-8
+
+### Fixes
+
+- Async handling of external databases (Snowflake, BigQuery, SAP), allowing app to run queries in background and service other requests.
+- More robust handling of invalid JSON produced by LLMs.
+- Fixed uploading BOM-encoded CSV files.
+
+## [0.3.23] - 2025-12-2
+
+### Fixes
+
+- Bug with handling remote registry with file extensions.
+
+### Improvements
+
+- Add pre-analysis connection test for DataRobot remote registry and data source connections.
+- Track and display in UI current analysis step.
+- Bump pulumi-datarobot to version 0.10.22 and simplify resource injection into CustomApplications
+
+## [0.3.22] - 2025-11-27
+
+### Fixes
+
+- Fixed telemetry initialization in local development mode and in environments where OTLP endpoint is not configured.
+
+## [0.3.21] - 2025-11-24
+
+### Improvements
+
+- Improve scalability of DataWrangling usage.
+- Tweaked Redshift prompt to better handle epoch timestamps.
+
+### Fixes
+
+- Root cause messages not propagated for some query failures through DataRobot DataWrangling.
+
+## [0.3.20] - 2025-11-20
+
+### Improvements
+
+- Improved data type handling for DataRobot connections.
+- Unrolled templated prompts for ease of editing.
+
+## [0.3.19] - 2025-11-11
+
+### Added
+
+- Gracefully handle Context Window Limit of a chat on the UI.
+- Direct download functionality for analysis datasets.
+- Copy-to-clipboard button for code snippets in chat responses. Improved code snippet selection.
+- Improved error treatment for user messages.
+
+## [0.3.18] - 2025-10-30
+
+### Fixed
+
+- Add Data sheet back to exported chat conversations in Excel format.
+
+## [0.3.17] - 2025-10-29
+
+### Fixed
+
+- Disabled telemetry in local development mode.
+- Fixed issue where chat sometimes does not show the AI response properly.
+
+## [0.3.16] - 2025-10-23
+
+### Fix
+
+- Fixed a critical storage bug.
+
+## [0.3.15] - 2025-10-03
+
+### Added
+
+- Token usage estimate tracking for LLM calls.
+- Refactored message storage (analyst dataset) to prevent oversized chat API responses and failures.
+- Integration with DataRobot Python client 3.9.1 `CustomApplication` and `CustomApplicationSource` entities.
+- Dynamic resource fetching from CustomApplicationSource when creating CustomApplications.
+- Fixed `RuntimeError: asyncio.run() cannot be called from a running event loop` in Streamlit frontend by applying `nest_asyncio` patch.
+
+### Improvements
+
+- Performance improvements in app's database.
+  - Replace expensive + blocking check for updates with separate read/write connections.
+  - Replaced synchronous persistence methods with asynchronous methods.
+
+## Documentation
+
+- Updated README to describe connecting to DataRobot data stores.
+
+## [0.3.14] - 2025-10-03
+
+### Fixes
+
+- Reset logging level to INFO (accidentally set to DEBUG in prior release).
+- Filled out previous changelog entry.
+
+## [0.3.13] - 2025-10-03
+
+### Features
+
+- Add connection to DataRobot data stores (currently Postgres and Redshift).
+
+### Improvements
+
+- Move some expensive calls into background thread to avoid blocking main event loop.
+- Updated chat UX to progressively load components of chat response.
+- Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
+
+## [0.3.12] - 2025-09-25
+
+### Improvements
+
+- Dataset search UX improvements. Search term highlighting, updated texts, reset when switching views
+- Bump pulumi-datarobot to version 0.10.20
+
+## [0.3.11] - 2025-09-22
+
+### Improvements
+
+- Add setup prerequisites to README
+- Update localization assets
+
+### Bug Fixes
+
+- Fix streamlit local dev path issues, add new `make run-local-streamlit` helper
+- Fix issues while reloading app in browser
+- Fix streamlit e2e tests
+- Restore e2e test cleanup
+- Fixes and improvements for spark recipes
+
+## [0.3.10] - 2025-09-12
+
+### Bug Fixes
+
+- Register remote datasets before data is fetched so they appear in UI in loading.
+- Fixed an issue with spark recipes being created with invalid datasets.
+- Corrected API version needed for spark recipes.
+- Remove the remote data registry UI in cases where the DR version is too old.
+
+## [0.3.9] - 2025-09-10
+
+### Features
+
+- Add functionality to analyze large datasets with DataRobot's data wrangling platform.
+
+### Improvements
+
+- Filter Data Registry download to datasets eligible to be downloaded.
+
+## [0.3.8] - 2025-08-21
+
+### Docs
+
+- Add missing changelog notes for version 0.3.7
+
+### Improvements
+
+- Add frontend install and build commands to the makefile
+
+## [0.3.7] - 2025-08-21
+
+### Improvements
+
+- Increased in-progress message polling speed for better user experience.
+- Localized app chat responses to match user's language preference.
+- Frontend assets are now automatically built during `pulumi up`, simplifying the overall deployment process.
+
+### Bug Fixes
+
+- Fixed empty screen issue that could occur during message loading.
+- Fixed the issue with fetching the API token on STS and on-prem.
+
+## [0.3.6] - 2025-08-12
+
+### Features
+
+- Allow adding BOM when exporting and fix dictionary exports containing Japanese characters in name.
+- Performance improvements: Cache DataRobot client and Deployment ID.
+
+### Bug Fixes
+
+- Message deletion fixes.
+
+### Improvements
+
+- Hide welcome modal on close click.
+- Updated README with local React development instructions.
+
+## [0.3.5] - 2025-08-07
+
+### Added
+
+- Export individual chat message (question-answer) functionality. That includes underlying data, charts, summary and insights.
+- Integration of LLM Gateway with Model Deployments
+
+### Changed
+
+- Updated welcome modal
+- Disabled clicking follow-up suggestions while answering is in progress; replaced icon with button
+
+### Fixed
+
+- Improved overall exporting experience
+- Better visual feedback when something fails
+- UX improvements for chat messages: removed excessive auto-scrolling and enhanced the Send button
+
+## [0.3.4] - 2025-08-01
+
+### Added
+
+- Allow use of DataRobot LLM Gateway instead of DataRobot-hosted pre-built LLM (https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
+
+## [0.3.3] - 2025-07-29
+
+### Changed
+
+- Fix Snowflake connector issue by upgrading pulumi-datarobot to 0.10.13
+
+## [0.3.2] - 2025-07-24
+
+### Added
+
+- Implemented search control for each dataset dictionary
+
+### Fixed
+
+- Updates translation files after fixing automation
+
+## [0.3.1] - 2025-07-11
+
+### Changed
+
+- Fix prompt column issue by upgrading pulumi-datarobot to 0.10.8
+
+## [0.3.0] - 2025-07-08
+
+### Changed
+
+- Add chat and dataset deletion safeguards
+- Add chat time in name and add confirm modal for deletion
+
+## [0.2.2] - 2025-07-01
+
+### Fixed
+
+- Fix chat conversation context for React frontend apps
+
+## [0.2.1] - 2025-06-25
+
+### Fixed
+
+- Set LLM Gateway Inference runtime parameter to False always for user-provided credentials
+
+## [0.2.00] - 2025-06-16
+
+### Fixed
+
+- Support separate google creds for vertexAI and BQ
+- New google model name in credentials check
+- Data dictionary generation timeout
+- Data dictionary generation didn't return partial results
+- Analyst dataset incorrectly inferred schema at read time
+- Fix rare DR Catalog ingest issue
+
+### Changed
+
+- Renamed "Save chat" to "Export chat"
+
+### Added
+
+- Persistent storage functionality
+
+## [0.1.14] - 2025-05-30
+
+### Fixed
+
+- Data cleansing now automatically removes leading and trailing whitespace from string columns
+- Fixed chat endpoint when DATAROBOT_ENDPOINT has a trailing slash
+- Fixed the raw data preview for SAP (react)
+
+### Added
+
+- Ability to download a specific chat history (including charts) in the React version.
+
+### Changed
+
+- React-based Frontend as the default for the Application
+- Improved error handling when prompting (react)
+- Change react frontend `deploy` app to use AF fastapi template
+- Change react frontend to use AF react template, removes `frontend_react` in favor of `app_frontend`
+
+## [0.1.13] - 2025-05-06
+
+### Fixed
+
+- Improved Registry / File / Database toggle functionality (react)
+- React App now accepts local xlsx files (react)
+- Fixed missing @/lib/utils import (react)
+
+### Added
+
+- Ability to delete individual chat messages (streamlit)
+
+### Changed
+
+- Improved logging (react)
+
+## [0.1.12] - 2025-04-30
+
+### Changed
+
+- Pinned streamlit to version 1.44.1 to improve stability
+
+## [0.1.11] - 2025-04-29
+
+### Fixed
+
+- Fixed AI Catalog dropdown for long dataset names
+- Fixed horizontal scrolling in the raw rows view
+- Fixed issue with certain CSV file uploads and improved error messaging for failed uploads
+- Fixed scroll area for collapsible panel with Code preview
+- Fixed issue with composing message for complex character sets (Japanese/Chinese/Korean)
+- Fixed issue with constantly creating new db file for each request in some cases (rest_api)
+
+## [0.1.10] - 2025-04-17
+
+### Fixed
+
+- Fixed a bug where snowflake ssh keyfile was not working correctly
+- Fixed the incorrect max_completion_length validation in the LLMSettings schema
+
+### Added
+
+- Alternative React frontend
+- Allow users to use the app without an API token when it is externally shared
+
+### Changed
+
+- Changed the LLMSettings schema for LLM proxy settings instead of Pulumi class
+
+## [0.1.9] - 2025-04-07
+
+### Fixed
+
+- Code generation inflection logic didn't quote the last but first error at retry
+- Python generation prompt referred to SQL
+- Fixed error when user doesn't have a last name
+
+### Added
+
+- Added test suite for each supported Python version
+
+### Changed
+
+- Installed [the datarobot-pulumi-utils library](https://github.com/datarobot-oss/datarobot-pulumi-utils) to incorporate majority of reused logic in the `infra.*` subpackages.
+- Snowflake prompt more robust to lower case table and column names
+- More robust code generation
+
+## [0.1.8] - 2025-03-27
+
+### Added
+
+- Support for NIMs
+- Support for existing TextGen deployments
+- SAP Datasphere support
+
+### Fixed
+
+- AI Catalog and Database caching
+- Fix StreamlitDuplicateElementKey error
+
+### Changed
+
+- Disabled session affinity for application
+- Made REST API endpoints OpenAPI compliant
+- Better DR token handling
+- Changed AI Catalog to Data Registry
+
+## [0.1.7] - 2025-03-07
+
+### Added
+
+- Shared app will use the user's API key if available to query the data catalog
+- Polars added for faster big data processing
+- Duck Db integration
+- Datasets will be remembered as long as the session is active (the app did not restart)
+- Chat sessions will be remembered as long as the session is active (the app did not restart)
+- Added a button to clear the chat history
+- Added a button to clear the data
+- Added the ability to pick datasets used during the analysis step
+- radio button to switch between snowflake mode and python mode
+
+### Fixed
+
+- Memory usage cut by ~50%
+- Some JSON encoding errors during the analysis steps
+- Snowflake bug when table name included non-uppercase characters
+- pandas to polars conversion error when pandas.period is involved
+- data dictionary generation was confusing the LLM on snowflake
+
+### Changed
+
+- More consistent logging
+- use st.navigation
+
+## [0.1.6] - 2025-02-18
+
+### Fixed
+
+- remove information about tools from prompt if there are none
+- tools-related error fixed
+- remove hard-coded environment ID from LLM deployment
+
+## [0.1.5] - 2025-02-12
+
+### Added
+
+- LLM tool use support
+- Checkboxes allow changing conversation
+- DATABASE_CONNECTION_TYPE can be set from environment
+
+### Fixed
+
+- Fix issue where plotly charts reuse the same key
+- Fix [Clear Data] button
+- Fix logo rendering on first load
+- Fix Data Dictionary editing
+
+## [0.1.4] - 2025-02-03
+
+### Changed
+
+- Better cleansing report, showing more information
+- Better memory usage, reducing memory footprint by up to 80%
+- LLM is set to GPT 4o (4o mini can struggle with code generation)
+
+## [0.1.3] - 2025-01-30
+
+### Added
+
+- Errors are displayed consistently in the app
+- Invalid generated code is displayed on error
+
+### Changed
+
+- Additional modules provided to the code execution function
+- Improved date parsing
+- Default to GPT 4o mini to be compatible with the trial
+
+## [0.1.2] - 2025-01-29
+
+### Changed
+
+- asyncio based frontend
+- general clean-up of the interface
+- pandas based analysis dataset
+- additional tests
+- unified renderer for analysis frontend
+
+## [0.1.1] - 2025-01-24
+
+### Added
+
+- Initial functioning version of Pulumi template for data analyst
+- Changelog file to keep track of changes in the project.
+- pytest for api functions

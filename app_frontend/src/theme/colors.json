@@ -1,0 +1,64 @@
+{
+  "midnight-gray": {
+    "midnight-gray-100": "oklch(0.1933 0.0102 248.36)",
+    "midnight-gray-90": "oklch(0.2274 0.0108 242.21)",
+    "midnight-gray-80": "oklch(0.2486 0.0106 242.14)",
+    "midnight-gray-70": "oklch(0.2694 0.0104 242.08)",
+    "midnight-gray-60": "oklch(0.3058 0.0137 248.27)",
+    "midnight-gray-55": "oklch(0.3326 0.0143 244.06)",
+    "midnight-gray-50": "oklch(0.3871 0.0165 251.76)",
+    "midnight-gray-40": "oklch(0.5784 0.0175 248.13)",
+    "midnight-gray-30": "oklch(0.6731 0.0174 253.95)",
+    "midnight-gray-20": "oklch(0.8008 0.0144 248.01)",
+    "midnight-gray-10": "oklch(0.9383 0.0042 236.5)",
+    "midnight-gray-0": "oklch(1 0 0)"
+  },
+  "alpine-light": {
+    "alpine-light-100": "oklch(1 0 0)",
+    "alpine-light-90": "oklch(0.9817 0.0057 264.53)",
+    "alpine-light-80": "oklch(0.9634 0.0115 264.51)",
+    "alpine-light-70": "oklch(0.9409 0.0126 255.51)",
+    "alpine-light-60": "oklch(0.9149 0.0146 264.49)",
+    "alpine-light-55": "oklch(0.8828 0.0187 258.36)",
+    "alpine-light-50": "oklch(0.8486 0.0248 259.82)",
+    "alpine-light-40": "oklch(0.6535 0.0284 259.04)",
+    "alpine-light-30": "oklch(0.5533 0.0224 260.15)",
+    "alpine-light-20": "oklch(0.4117 0.0128 261.75)",
+    "alpine-light-10": "oklch(0.2352 0.0059 271.16)",
+    "alpine-light-0": "oklch(0.2289 0.0074 248.15)"
+  },
+  "accent": {
+    "purple-0": "oklch(0.9793 0.0083 271.33)",
+    "purple-10": "oklch(0.9592 0.019253 273.2377)",
+    "purple-40": "oklch(0.7766 0.1018 278.18)",
+    "purple-50": "oklch(0.7179 0.1312 277.26)",
+    "purple-60": "oklch(0.6226 0.1981 281.26)",
+    "purple-70": "oklch(0.5376 0.2623 279.31)"
+  },
+  "semantic": {
+    "red-40": "oklch(0.7752 0.1158 20.04)",
+    "red-50": "oklch(0.6952 0.1538 21.86)",
+    "red-70": "oklch(0.5585 0.1652 24.19)",
+    "red-80": "oklch(0.4697 0.1402 24.29)",
+    "green-40": "oklch(0.808 0.1696 152.96)",
+    "green-50": "oklch(0.7242 0.1737 153.06)",
+    "green-70": "oklch(0.5553 0.1431 152.95)",
+    "green-80": "oklch(0.4643 0.1116 156.33)",
+    "yellow-30": "oklch(0.9632 0.1493 108.9)",
+    "yellow-40": "oklch(0.8659 0.1555 103.53)",
+    "yellow-70": "oklch(0.5533 0.1149 79.08)",
+    "yellow-80": "oklch(0.48 0.101 75.51)"
+  },
+  "data-viz": {
+    "azure-50": "oklch(0.7024 0.1524 240.74)",
+    "azure-80": "oklch(0.4667 0.1532 256.44)",
+    "orange-40": "oklch(0.7828 0.1141 61.47)",
+    "orange-60": "oklch(0.6702 0.1689 52.07)",
+    "turquoise-40": "oklch(0.7497 0.0895 200.95)",
+    "turquoise-60": "oklch(0.6077 0.1036 204.08)",
+    "pink-40": "oklch(0.7578 0.1486 334.69)",
+    "pink-60": "oklch(0.6329 0.2142 336.99)",
+    "blue-40": "oklch(0.7498 0.1166 263.28)",
+    "blue-60": "oklch(0.6104 0.1897 262.22)"
+  }
+}
