@@ -62,7 +62,7 @@ st-theme>=1.2.3,<2.0
 streamlit-javascript>=0.1.5,<1.0
 
 # backend
-datarobot>=3.6.0,<4.0
+datarobot==3.8.0
 fastapi>=0.115.6,<1.0
 python-multipart>=0.0.20,<1.0
 uvicorn==0.34.2,<1.0
