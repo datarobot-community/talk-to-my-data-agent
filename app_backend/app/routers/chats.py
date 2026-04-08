@@ -49,13 +49,14 @@ from core.schema import (
     RunAnalysisResult,
     RunChartsResult,
     RunDatabaseAnalysisResult,
+    UserFeedbackUpdate,
 )
 from datarobot_genai.core.utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
     count_messages_tokens,
 )
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
@@ -284,6 +285,38 @@ async def get_chat_message(
         raise HTTPException(
             status_code=500, detail=f"Error retrieving message: {str(e)}"
         )
+
+
+@router.post("/messages/{message_id}/feedback")
+async def update_message_feedback(
+    message_id: str,
+    feedback: UserFeedbackUpdate,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> AnalystChatMessage:
+    """Add user feedback to a chat message."""
+    updated = await analyst_db.update_message_feedback(
+        message_id=message_id,
+        user_feedback=feedback.user_feedback,
+        user_rating=feedback.user_rating,
+    )
+
+    if not updated:
+        logger.warning("Update feedback called on nonexistent chat message")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No such {message_id}",
+        )
+
+    message = await analyst_db.get_chat_message(message_id=message_id)
+
+    if message is None:
+        logger.error("Update feedback, message not found after updating")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Message could not be loaded",
+        )
+
+    return message
 
 
 @router.post("/messages")

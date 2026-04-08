@@ -48,3 +48,8 @@ tasks:
     cmds:
       - echo "🧪 Running tests.."
       - "{{.UV_CMD}} run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml"
+
+  transfer-database:
+    desc: "🔁 Run transfer database script"
+    cmds:
+      - "{{.UV_CMD}} run python src/core/scripts/transfer_database.py {{.CLI_ARGS}}"

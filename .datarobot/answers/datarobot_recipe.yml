@@ -1,0 +1,9 @@
+---
+# Changes here will be overwritten by Copier
+_commit: 1fb3794
+_src_path: https://github.com/datarobot/af-component-datarobot-recipe
+base_answers_file: .datarobot/answers/base.yml
+github_owner_group: '@datarobot/applications'
+harness_org_id: No_Code_Apps
+oss_repo_name: talk-to-my-data-agent
+private_repo_name: data-analyst

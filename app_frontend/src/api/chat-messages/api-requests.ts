@@ -36,6 +36,42 @@ export const getSingleMessage = async ({
   return data;
 };
 
+interface IUpdateMessageFeedbackParams {
+  messageId: string;
+  userRating?: number;
+  userFeedback?: string;
+  signal?: AbortSignal;
+}
+
+export const updateMessageFeedback = async ({
+  messageId,
+  userRating,
+  userFeedback,
+  signal,
+}: IUpdateMessageFeedbackParams): Promise<IChatMessage> => {
+  if (!messageId) {
+    throw new Error('Message ID is required for updating feedback');
+  }
+
+  const payload: { user_rating?: number; user_feedback?: string } = {};
+
+  if (userRating !== undefined) {
+    payload.user_rating = userRating;
+  }
+
+  if (userFeedback !== undefined) {
+    payload.user_feedback = userFeedback;
+  }
+
+  const { data } = await apiClient.post<IChatMessage>(
+    `/v1/chats/messages/${messageId}/feedback`,
+    payload,
+    { signal }
+  );
+
+  return data;
+};
+
 interface IPostMessageParams {
   message: string;
   chatId?: string;

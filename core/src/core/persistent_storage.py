@@ -190,10 +190,12 @@ class AsyncDataRobotClient:
 
 
 class PersistentStorage:
-    def __init__(self, user_id: Optional[str]):
+    def __init__(self, user_id: Optional[str], global_user: bool = False):
         self.app_id: str = os.environ.get("APPLICATION_ID")  # type: ignore[assignment]
         if not self.app_id:
             raise ValueError("APPLICATION_ID env variable is not set.")
+        if global_user and user_id:
+            raise ValueError("Both user and global user specified.")
 
         endpoint = os.environ.get("DATAROBOT_ENDPOINT")
         token = os.environ.get("DATAROBOT_API_TOKEN")
@@ -203,7 +205,7 @@ class PersistentStorage:
             )
         self._async_client = AsyncDataRobotClient(endpoint=endpoint, token=token)
 
-        self.name_prefix = f"{user_id}_"
+        self.name_prefix = f"{user_id}_" if not global_user else ""
 
     @otel.meter_and_trace
     async def files(self) -> List[str]:

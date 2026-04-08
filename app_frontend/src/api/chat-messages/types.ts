@@ -83,6 +83,8 @@ export interface IChatMessage {
   created_at?: string; // ISO timestamp for message creation time
   chat_id?: string; // ID of the chat this message belongs to
   id?: string; // Unique identifier for the message
+  user_rating?: number;
+  user_feedback?: string;
   error?: string;
 }
 

@@ -35,7 +35,7 @@ tasks:
       - dr dotenv setup --if-needed
       - task install
       - task infra:start
-      - echo '✅ You are all set. Run `task dev` to start developing, or run `task deploy-dev` to deploy to DataRobot.'
+      - echo '✅ You are all set. Run `task dev` to start developing, or run `task deploy` to deploy to DataRobot.'
 
   lint:
     desc: "🧹 Run linters"

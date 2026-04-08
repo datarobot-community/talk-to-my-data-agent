@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.7.0] - 2026-05-08
+
+### Changed
+
+- Add support for using custom pre-built application execution environments.
+
+### Fixed
+
+- Updated post-setup message to recommend `task deploy` instead of `task deploy-dev`.
+
+### Added
+
+- Added feedback to UI (thumbs up, thumbs down and written feedback) for assistant messages.
+- Added a script (`task core:transfer-database`) to copy history from one instance of the application to another.
+
 ## [11.6.2] - 2026-03-26
 
 ### Fixed

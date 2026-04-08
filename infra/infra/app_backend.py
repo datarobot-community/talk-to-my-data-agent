@@ -216,9 +216,17 @@ def get_app_backend_app_files(
 app_backend_app_env_name: str = "DATAROBOT_APPLICATION_ID"
 app_backend_application_path = project_dir.parent / "app_backend"
 
+app_execution_environment_id = os.getenv(
+    "APPLICATION_EXECUTION_ENVIRONMENT_ID",
+    RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id,
+)
+app_execution_environment_version_id = os.getenv(
+    "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"
+)
+
 app_backend_app_source_args = ApplicationSourceArgs(
     resource_name=f"Talk to My Data [{PROJECT_NAME}]",
-    base_environment_id=RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id,
+    base_environment_id=app_execution_environment_id,
 ).model_dump(mode="json", exclude_none=True)
 
 app_backend_app_resource_name: str = f"Talk to My Data [{PROJECT_NAME}]"
@@ -241,6 +249,7 @@ app_backend_app_source = pulumi_datarobot.ApplicationSource(  # type: ignore[cal
         resource_label=CustomAppResourceBundles.CPU_XL.value.id,
     ),
     required_key_scope_level=required_key_scope_level,
+    base_environment_version_id=app_execution_environment_version_id,
     **app_backend_app_source_args,
 )
 

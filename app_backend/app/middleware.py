@@ -24,7 +24,7 @@ from copy import deepcopy
 from logging import getLogger
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Any
+from typing import Any, NamedTuple
 
 import datarobot as dr
 from core.analyst_db import AnalystDB
@@ -33,6 +33,15 @@ from core.telemetry import otel
 from fastapi import Request, Response
 
 logger = getLogger(__name__)
+
+
+class SessionInitializationResult(NamedTuple):
+    """Structured return value for session initialization."""
+
+    session_state: SessionState
+    session_id: str | None
+    user_id: str | None
+    user_email: str | None
 
 
 class SessionState(object):
@@ -77,6 +86,7 @@ async def get_database(user_id: str) -> AnalystDB:
         chat_db_name="chat.db",
         data_source_db_name="datasources.db",
         user_recipe_db_name="recipe.db",
+        user_metadata_db_name="user_metadata.db",
         use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
     )
     return analyst_db
@@ -86,7 +96,7 @@ async def get_database(user_id: str) -> AnalystDB:
 @otel.meter
 async def _initialize_session(
     request: Request,
-) -> tuple[SessionState, str | None, str | None]:
+) -> SessionInitializationResult:
     """Initialize the session state and return the session ID and user ID."""
     test_user_email = os.environ.get("TEST_USER_EMAIL", "")
 
@@ -116,10 +126,13 @@ async def _initialize_session(
     # Generate a new user ID if needed
     new_user_id = None
     email_header = request.headers.get("x-user-email")
+    user_email: str | None = None
     if email_header:
         new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, email_header))[:36]
+        user_email = email_header
     elif test_user_email:
         new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, test_user_email))[:36]
+        user_email = test_user_email
 
     # Determine session ID
     session_id = None
@@ -133,21 +146,36 @@ async def _initialize_session(
         async with session_lock:
             existing_session = session_store.get(session_id)
             if existing_session:
-                return existing_session, session_id, user_id or new_user_id
+                return SessionInitializationResult(
+                    session_state=existing_session,
+                    session_id=session_id,
+                    user_id=user_id or new_user_id,
+                    user_email=user_email,
+                )
             else:
                 session_store[session_id] = session_state
 
-    return session_state, session_id, user_id or new_user_id
+    return SessionInitializationResult(
+        session_state=session_state,
+        session_id=session_id,
+        user_id=user_id or new_user_id,
+        user_email=user_email,
+    )
 
 
-async def _initialize_database(request: Request, user_id: str) -> None:
+async def _initialize_database(
+    request: Request, user_id: str, user_email: str | None = None
+) -> None:
     """Initialize per-user database in the session if not already initialized."""
     if (
         not hasattr(request.state.session, "analyst_db")
         or request.state.session.analyst_db is None
     ):
         async with session_lock:
-            request.state.session.analyst_db = await get_database(user_id)
+            analyst_db = await get_database(user_id)
+            request.state.session.analyst_db = analyst_db
+            if user_email and user_email != await analyst_db.get_user_email():
+                await analyst_db.set_user_email(user_email)
 
 
 def _set_session_cookie(
@@ -169,11 +197,15 @@ async def session_middleware(request: Request, call_next):  # type: ignore[no-un
     request_methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
     session_id: str | None = None
     user_id: str | None = None
+    user_email: str | None = None
 
     if request.method in request_methods:
         # Initialize the session
-        session_state, session_id, user_id = await _initialize_session(request)
-        request.state.session = session_state
+        session_init = await _initialize_session(request)
+        session_id = session_init.session_id
+        user_id = session_init.user_id
+        user_email = session_init.user_email
+        request.state.session = session_init.session_state
 
         if not request.state.session.datarobot_account_info:
             request.state.session.datarobot_account_info = {}
@@ -198,7 +230,7 @@ async def session_middleware(request: Request, call_next):  # type: ignore[no-un
 
         # Initialize database in the session
         if user_id:
-            await _initialize_database(request, user_id)
+            await _initialize_database(request, user_id, user_email=user_email)
 
     # Process the request
     response: Response = await call_next(request)

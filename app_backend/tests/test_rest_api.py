@@ -98,10 +98,13 @@ def test_initialize_session_default_values(mock_request: MagicMockType) -> None:
     """Test that _initialize_session creates a new session with default values"""
 
     async def run_test() -> None:
-        session_state, session_id, user_id = await _initialize_session(mock_request)
+        session_state, session_id, user_id, user_email = await _initialize_session(
+            mock_request
+        )
         assert session_state is not None
         assert session_id is None
         assert user_id is None
+        assert user_email is None
         assert session_state._state["datarobot_account_info"] is None
         assert session_state._state["datarobot_api_scoped_token"] is None
         assert session_state._state["analyst_db"] is None

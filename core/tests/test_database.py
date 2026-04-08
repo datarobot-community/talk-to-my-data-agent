@@ -23,6 +23,7 @@ from core.analyst_db import (
     InternalDataSourceType,
 )
 from core.schema import (
+    AnalystChatMessage,
     AnalystDataset,
 )
 
@@ -139,3 +140,98 @@ async def test_data_source_type_saving() -> None:
     assert "file_dataset" in file_names
     assert "database_dataset" in db_names
     assert "registry_dataset" in registry_names
+
+
+@pytest.mark.asyncio
+async def test_user_email_round_trip() -> None:
+    """Test user email defaults to None and can be set/retrieved."""
+    db = await get_analyst_db(ANALYST_DATABASE_VERSION + 3)
+
+    assert await db.get_user_email() is None
+
+    expected_email = "test_user_123@example.com"
+    await db.set_user_email(expected_email)
+
+    assert await db.get_user_email() == expected_email
+
+
+@pytest.mark.asyncio
+async def test_update_message_preserves_feedback() -> None:
+    """Test that updating a message without feedback preserves existing feedback."""
+    db = await get_analyst_db(ANALYST_DATABASE_VERSION + 4)
+    await db.delete_all_tables()
+
+    # Create a chat and add a message
+    chat_id = await db.create_chat("Test Chat")
+    message = AnalystChatMessage(
+        role="assistant",
+        content="Initial response",
+        components=[],
+    )
+    message_id = await db.add_chat_message(chat_id, message)
+
+    # Add feedback to the message
+    await db.update_message_feedback(
+        message_id=message_id,
+        user_rating=1.0,
+        user_feedback="Great response!",
+    )
+
+    # Verify feedback was set
+    feedback_message = await db.get_chat_message(message_id)
+    assert feedback_message is not None
+    assert feedback_message.user_rating == 1.0
+    assert feedback_message.user_feedback == "Great response!"
+
+    # Now update the message content without explicitly setting feedback fields
+    # This simulates what happens during assistant message generation
+    content_only_update = AnalystChatMessage(
+        role="assistant",
+        content="Updated response",
+        components=[],
+    )
+    await db.update_chat_message(message_id, content_only_update)
+
+    # Verify the feedback was preserved
+    final_message = await db.get_chat_message(message_id)
+    assert final_message is not None
+    assert final_message.content == "Updated response"
+    assert final_message.user_rating == 1.0
+    assert final_message.user_feedback == "Great response!"
+
+
+@pytest.mark.asyncio
+async def test_update_message_feedback_overwrites_previous_feedback() -> None:
+    """Test that updating feedback explicitly overwrites existing feedback."""
+    db = await get_analyst_db(ANALYST_DATABASE_VERSION + 5)
+    await db.delete_all_tables()
+
+    # Create a chat and add a message
+    chat_id = await db.create_chat("Test Chat")
+    message = AnalystChatMessage(
+        role="assistant",
+        content="Initial response",
+        components=[],
+    )
+    message_id = await db.add_chat_message(chat_id, message)
+
+    # Add initial feedback
+    await db.update_message_feedback(
+        message_id=message_id,
+        user_rating=1.0,
+        user_feedback="Great response!",
+    )
+
+    # Update the feedback only; message content should be unchanged.
+    await db.update_message_feedback(
+        message_id=message_id,
+        user_rating=-1.0,
+        user_feedback="Actually, this is wrong.",
+    )
+
+    # Verify the feedback was overwritten and message content was not changed.
+    final_message = await db.get_chat_message(message_id)
+    assert final_message is not None
+    assert final_message.content == "Initial response"
+    assert final_message.user_rating == -1.0
+    assert final_message.user_feedback == "Actually, this is wrong."

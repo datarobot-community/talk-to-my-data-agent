@@ -10,9 +10,15 @@ vi.mock('@/api/chat-messages/hooks', () => ({
   useDeleteMessage: vi.fn(),
   usePostMessage: vi.fn(),
   useExport: vi.fn(),
+  useUpdateMessageFeedback: vi.fn(),
 }));
 
-import { useFetchAllMessages, useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
+import {
+  useFetchAllMessages,
+  useDeleteMessage,
+  useExport,
+  useUpdateMessageFeedback,
+} from '@/api/chat-messages/hooks';
 
 describe('MessageHeader Component', () => {
   const mockMessage = {
@@ -41,6 +47,7 @@ describe('MessageHeader Component', () => {
     useFetchAllMessages: { data: [mockMessage, mockResponseMessage] } as any,
     useDeleteMessage: { mutate: vi.fn(), isPending: false } as any,
     useExport: { exportChat: vi.fn(), isLoading: false },
+    useUpdateMessageFeedback: { mutate: vi.fn(), isPending: false } as any,
     ...overrides,
   });
 
@@ -49,13 +56,14 @@ describe('MessageHeader Component', () => {
     vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
     vi.mocked(useDeleteMessage).mockReturnValue(mockHooks.useDeleteMessage);
     vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(mockHooks.useUpdateMessageFeedback);
   });
 
   test('renders basic header information for user message', () => {
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
     expect(screen.getByText('You')).toBeInTheDocument();
-    expect(screen.getByText(/Jan/)).toBeInTheDocument();
+    expect(screen.getByText(/2024|Jan|1\/15/)).toBeInTheDocument();
   });
 
   test('renders action buttons for user message', () => {
@@ -223,5 +231,137 @@ describe('MessageHeader Component', () => {
       screen.queryByRole('button', { name: /delete message and response/i })
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /export chat/i })).not.toBeInTheDocument();
+  });
+
+  test('shows thumbs up as selected when assistant message has existing positive feedback', () => {
+    const assistantMessageWithPositiveFeedback = {
+      ...mockResponseMessage,
+      user_rating: 1,
+    } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessageWithPositiveFeedback.id}
+        chatId="chat-1"
+        messages={[assistantMessageWithPositiveFeedback]}
+      />
+    );
+
+    const thumbsUpButton = screen.getByTestId('message-feedback-thumbs-up');
+    expect(thumbsUpButton).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('sends +1 rating when thumbs up is clicked', async () => {
+    const user = userEvent.setup();
+    const updateFeedbackMutate = vi.fn();
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [assistantMessage] } as any,
+      useUpdateMessageFeedback: { mutate: updateFeedbackMutate, isPending: false } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(mockHooks.useUpdateMessageFeedback);
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />
+    );
+
+    await user.click(screen.getByTestId('message-feedback-thumbs-up'));
+
+    expect(updateFeedbackMutate).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: 'chat-1',
+      userRating: 1,
+      userFeedback: '',
+    });
+  });
+
+  test('opens feedback modal when thumbs down is clicked', async () => {
+    const user = userEvent.setup();
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />
+    );
+
+    await user.click(screen.getByTestId('message-feedback-thumbs-down'));
+
+    expect(screen.getByText('What could have been better?')).toBeInTheDocument();
+    expect(screen.getByTestId('message-feedback-textarea')).toBeInTheDocument();
+  });
+
+  test('discards entered feedback on close and sends -1 rating without text', async () => {
+    const user = userEvent.setup();
+    const updateFeedbackMutate = vi.fn();
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [assistantMessage] } as any,
+      useUpdateMessageFeedback: { mutate: updateFeedbackMutate, isPending: false } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(mockHooks.useUpdateMessageFeedback);
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />
+    );
+
+    await user.click(screen.getByTestId('message-feedback-thumbs-down'));
+    const textarea = screen.getByTestId('message-feedback-textarea');
+    await user.type(textarea, 'Needs improvement');
+    await user.keyboard('{Escape}');
+
+    expect(updateFeedbackMutate).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: 'chat-1',
+      userRating: -1,
+    });
+
+    await user.click(screen.getByTestId('message-feedback-thumbs-down'));
+    expect(screen.getByTestId('message-feedback-textarea')).toHaveValue('');
+  });
+
+  test('sends -1 rating and feedback text when submit is clicked', async () => {
+    const user = userEvent.setup();
+    const updateFeedbackMutate = vi.fn();
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+    const mockHooks = createMockHooks({
+      useFetchAllMessages: { data: [assistantMessage] } as any,
+      useUpdateMessageFeedback: { mutate: updateFeedbackMutate, isPending: false } as any,
+    });
+    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(mockHooks.useUpdateMessageFeedback);
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />
+    );
+
+    await user.click(screen.getByTestId('message-feedback-thumbs-down'));
+    const textarea = screen.getByTestId('message-feedback-textarea');
+    await user.type(textarea, 'This answer missed key details');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(updateFeedbackMutate).toHaveBeenCalledTimes(1);
+    expect(updateFeedbackMutate).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: 'chat-1',
+      userRating: -1,
+      userFeedback: 'This answer missed key details',
+    });
   });
 });

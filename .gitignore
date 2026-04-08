@@ -216,12 +216,19 @@ app_backend/app_infra.json
 
 !app_frontend/src/lib
 
-# DataRobot CLI stuff:
-#  .dr/state contains user-specific history and audit-trail while working with the CLI
-.datarobot/state/
-.datarobot/cli/state.yaml
-
 # Pulumi output from the latest stack apply
 pulumi_config.json
 
 Taskfile.gen.yaml
+
+execution_environments/artifacts/*
+execution_environments/notebook_docker_context.zip
+execution_environments/notebook_docker_context/kernels/task-sources.tgz
+execution_environments/notebook_docker_context/kernels/agent.zip
+execution_environments/notebook_docker_context/kernels/node.zip
+execution_environments/notebook_docker_context/kernels/python.zip
+
+# DataRobot CLI stuff:
+# .datarobot/cli/state.yaml contains user-specific history and audit-trail while working with the CLI
+.datarobot/cli/state.yaml
+

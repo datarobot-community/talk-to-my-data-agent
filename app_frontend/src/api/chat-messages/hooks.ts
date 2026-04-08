@@ -13,6 +13,7 @@ import {
   IChatCreated,
   postMessage,
   renameChat,
+  updateMessageFeedback,
   updateChat,
 } from './api-requests';
 import { messageKeys } from './keys';
@@ -192,6 +193,50 @@ export const useDeleteMessage = () => {
           queryKey: messageKeys.messages(variables.chatId),
         });
       }
+    },
+  });
+
+  return mutation;
+};
+
+interface IUpdateMessageFeedbackParams {
+  messageId: string;
+  chatId?: string;
+  userRating?: number;
+  userFeedback?: string;
+}
+
+export const useUpdateMessageFeedback = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<IChatMessage, Error, IUpdateMessageFeedbackParams>({
+    mutationFn: ({ messageId, userRating, userFeedback }) =>
+      updateMessageFeedback({
+        messageId,
+        userRating,
+        userFeedback,
+      }),
+    onSuccess: (updatedMessage, variables) => {
+      if (!variables.chatId) {
+        return;
+      }
+
+      queryClient.setQueryData<IChatMessage[]>(messageKeys.messages(variables.chatId), oldData =>
+        (oldData || []).map(message =>
+          message.id === updatedMessage.id
+            ? {
+                ...message,
+                user_rating: updatedMessage.user_rating,
+                user_feedback: updatedMessage.user_feedback,
+              }
+            : message
+        )
+      );
+
+      queryClient.invalidateQueries({ queryKey: messageKeys.messages(variables.chatId) });
+    },
+    onError: () => {
+      toast.error(i18n.t('There was a problem saving your feedback.'));
     },
   });
 

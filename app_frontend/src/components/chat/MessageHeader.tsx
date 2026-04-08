@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
+import { useDeleteMessage, useExport, useUpdateMessageFeedback } from '@/api/chat-messages/hooks';
 import { getMessage, getResponseMessage } from '@/api/chat-messages/selectors';
 import { UserAvatar, DataRobotAvatar } from './Avatars';
 import { Button } from '@/components/ui/button';
-import { Trash2, FileDown } from 'lucide-react';
+import { Trash2, FileDown, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { ConfirmDialog } from '../ui-custom/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatMessageDate } from './utils';
 import { toast } from 'sonner';
 import { IChatMessage } from '@/api/chat-messages/types';
@@ -19,8 +26,13 @@ interface MessageHeaderProps {
 export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId, messages }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [shouldSubmitNegativeOnClose, setShouldSubmitNegativeOnClose] = useState(false);
   const { mutate: deleteMessage, isPending: isDeleting } = useDeleteMessage();
   const { exportChat, isLoading: isExporting } = useExport();
+  const { mutate: updateMessageFeedback, isPending: isUpdatingFeedback } =
+    useUpdateMessageFeedback();
 
   // If no message is found by id - get optimistically created one (it has no id yet).
   const message = getMessage(messages, messageId) || messages?.[0];
@@ -79,6 +91,72 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
     ? t('Cannot delete message without response')
     : t('Delete message and response');
 
+  const handleThumbsUp = () => {
+    if (!message.id) {
+      return;
+    }
+
+    updateMessageFeedback({
+      messageId: message.id,
+      chatId,
+      userRating: 1,
+      userFeedback: '', // empty feedback to clear potential prior negative feedback.
+    });
+  };
+
+  const handleThumbsDown = () => {
+    setFeedbackText('');
+    setShouldSubmitNegativeOnClose(true);
+    setIsFeedbackDialogOpen(true);
+  };
+
+  const handleFeedbackSubmit = () => {
+    if (!message.id) {
+      return;
+    }
+
+    updateMessageFeedback({
+      messageId: message.id,
+      chatId,
+      userRating: -1,
+      userFeedback: feedbackText,
+    });
+    setShouldSubmitNegativeOnClose(false);
+    setIsFeedbackDialogOpen(false);
+  };
+
+  const handleFeedbackKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    const isSubmitShortcutPressed = event.metaKey || event.ctrlKey;
+
+    if (!isSubmitShortcutPressed) {
+      return;
+    }
+
+    event.preventDefault();
+    handleFeedbackSubmit();
+  };
+
+  const handleFeedbackDialogOpenChange = (open: boolean) => {
+    if (!open && shouldSubmitNegativeOnClose && message.id) {
+      updateMessageFeedback({
+        messageId: message.id,
+        chatId,
+        userRating: -1,
+      });
+      setShouldSubmitNegativeOnClose(false);
+    }
+
+    setIsFeedbackDialogOpen(open);
+  };
+
+  const isPositiveSelected = message.user_rating === 1;
+  const isNegativeSelected = message.user_rating === -1;
+  const feedbackDisabled = !message.id || isUpdatingFeedback || message.role !== 'assistant';
+
   return (
     <>
       <ConfirmDialog
@@ -92,6 +170,26 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
         variant="destructive"
         isLoading={isDeleting}
       />
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={handleFeedbackDialogOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('What could have been better?')}</DialogTitle>
+          </DialogHeader>
+          <textarea
+            value={feedbackText}
+            onChange={event => setFeedbackText(event.target.value)}
+            onKeyDown={handleFeedbackKeyDown}
+            className="min-h-24 w-full rounded border border-border bg-input px-3 py-2 text-sm outline-none hover:border-muted-foreground focus:border-accent"
+            placeholder={t('Describe the issue (optional)')}
+            data-testid="message-feedback-textarea"
+          />
+          <DialogFooter>
+            <Button variant="secondary" onClick={handleFeedbackSubmit}>
+              {t('Submit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="inline-flex items-center justify-between gap-1 self-stretch">
         <div className="flex h-6 shrink grow basis-0 items-center justify-start gap-2">
           {avatar()}
@@ -117,6 +215,42 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
               disabled={isDeleteDisabled}
             >
               <Trash2 />
+            </Button>
+          </div>
+        )}
+        {!isUserMessage && (
+          <div className="flex items-center gap-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleThumbsUp}
+              disabled={feedbackDisabled}
+              title={t('Leave positive feedback')}
+              testId="message-feedback-thumbs-up"
+              aria-pressed={isPositiveSelected}
+              className={
+                isPositiveSelected
+                  ? 'text-success drop-shadow-[0_0_6px_hsl(var(--success)/0.85)] hover:drop-shadow-none'
+                  : undefined
+              }
+            >
+              <ThumbsUp />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleThumbsDown}
+              disabled={feedbackDisabled}
+              title={t('Leave negative feedback')}
+              testId="message-feedback-thumbs-down"
+              aria-pressed={isNegativeSelected}
+              className={
+                isNegativeSelected
+                  ? 'text-destructive drop-shadow-[0_0_6px_hsl(var(--destructive)/0.85)] hover:drop-shadow-none'
+                  : undefined
+              }
+            >
+              <ThumbsDown />
             </Button>
           </div>
         )}

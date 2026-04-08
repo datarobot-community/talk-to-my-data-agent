@@ -725,6 +725,8 @@ class AnalystChatMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     chat_id: str | None = None
     error: str | None = None
+    user_rating: float | None = None
+    user_feedback: str | None = None
 
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime) -> str:
@@ -854,6 +856,18 @@ class ChatMessagePayload(BaseModel):
     enable_business_insights: bool = True
     data_source: str = "file"
     chatName: Optional[str] = "New Chat"
+
+
+class UserFeedbackUpdate(BaseModel):
+    user_rating: float
+    user_feedback: str | None = None
+
+    @field_validator("user_rating")
+    @classmethod
+    def validate_user_rating(cls, value: float) -> float:
+        if value not in (-1, 1):
+            raise ValueError("user_rating must be either -1 or 1")
+        return float(value)
 
 
 class DownloadedRegistryDataset(BaseModel):

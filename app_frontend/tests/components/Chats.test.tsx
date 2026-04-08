@@ -12,6 +12,7 @@ vi.mock('@/api/chat-messages/hooks', () => ({
   useExport: vi.fn(),
   useRenameChat: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   usePollInProgressMessage: vi.fn(),
+  useUpdateMessageFeedback: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock('@/api/dictionaries/hooks', () => ({

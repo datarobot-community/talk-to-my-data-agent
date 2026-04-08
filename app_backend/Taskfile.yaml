@@ -37,8 +37,8 @@ tasks:
       TEST_USER_EMAIL: "dev@example.com"
     cmds:
       - echo "🔨 Starting development server"
-      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --reload-dir .
-        --reload-dir '../core'
+      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --reload-dir
+        . --reload-dir '../core'
 
   lint:
     silent: true
