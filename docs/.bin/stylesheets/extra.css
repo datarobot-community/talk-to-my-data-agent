@@ -1,0 +1,66 @@
+/* DataRobot Brand — matches docs.datarobot.com style */
+
+/* DM Sans (brand font, closest public equivalent to proprietary STK Miso) + Roboto Mono for code */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Roboto+Mono:opsz,wght@6..40,400;6..40,500&display=swap');
+
+:root {
+  --md-text-font: "DM Sans";
+  --md-code-font: "Roboto Mono";
+}
+
+/* Custom primary: DataRobot Black header/nav */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #0B0B0B;
+  --md-primary-fg-color--light: #6C6A6B;
+  --md-primary-fg-color--dark: #0B0B0B;
+  --md-primary-bg-color: #FFFFFF;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+
+/* Custom accent: DataRobot Green (key brand color) */
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #81FBA5;
+  --md-accent-fg-color--transparent: rgba(129, 251, 165, 0.1);
+  --md-accent-bg-color: #0B0B0B;
+}
+
+/* Dark (slate) scheme — DataRobot brand colors */
+[data-md-color-scheme="slate"] {
+  /* Background: near-black, closer to DataRobot's dark UI */
+  --md-default-bg-color: #111111;
+  --md-default-bg-color--light: rgba(17, 17, 17, 0.54);
+  --md-default-bg-color--lighter: rgba(17, 17, 17, 0.26);
+  --md-default-bg-color--lightest: rgba(17, 17, 17, 0.07);
+
+  /* Links: Green (DataRobot key color) on dark background */
+  --md-typeset-a-color: #81FBA5;
+
+  /* Code block background */
+  --md-code-bg-color: #1A1A1A;
+  --md-code-fg-color: #E4E4E4;
+
+  /* Footer */
+  --md-footer-bg-color: #0B0B0B;
+  --md-footer-bg-color--dark: #0B0B0B;
+  --md-footer-fg-color: rgba(255, 255, 255, 0.7);
+  --md-footer-fg-color--light: rgba(255, 255, 255, 0.45);
+  --md-footer-fg-color--lighter: rgba(255, 255, 255, 0.28);
+}
+
+/* Light (default) scheme — DataRobot brand colors */
+[data-md-color-scheme="default"] {
+  /* Links: Indigo (best contrast on white per brand guidelines) */
+  --md-typeset-a-color: #5C41FF;
+}
+
+/* Sidebar active item highlight with brand green */
+[data-md-color-scheme="slate"] .md-nav__link--active,
+[data-md-color-scheme="slate"] .md-nav__link:is(:focus, :hover) {
+  color: #81FBA5;
+}
+
+/* Admonition accent override */
+[data-md-color-scheme="slate"] .md-typeset .admonition,
+[data-md-color-scheme="slate"] .md-typeset details {
+  border-color: #81FBA5;
+}

@@ -12,13 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
+
+import hashlib
+from pathlib import Path
 
 import pulumi
 import pulumi_command as command  # type: ignore[import-not-found]
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 
 from . import project_dir
+
+FRONTEND_SOURCE_GLOBS = [
+    "src/**/*",
+    "public/**/*",
+    "package.json",
+    "package-lock.json",
+    "index.html",
+    "tsconfig*.json",
+    "vite.config.*",
+    "tailwind.config.*",
+    "postcss.config.*",
+    "eslint.config.*",
+    "components.json",
+    ".prettierrc*",
+    ".npmrc",
+]
+
+
+def _hash_frontend_sources(frontend_dir: Path) -> str:
+    """Compute a SHA-256 hash of all relevant frontend source files."""
+    h = hashlib.sha256()
+    seen: set[Path] = set()
+    paths: list[Path] = []
+    for pattern in FRONTEND_SOURCE_GLOBS:
+        for p in frontend_dir.glob(pattern):
+            if p.is_file() and p not in seen:
+                seen.add(p)
+                paths.append(p)
+    for p in sorted(paths):
+        h.update(str(p.relative_to(frontend_dir)).encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()
 
 
 def build_frontend() -> command.local.Command:
@@ -27,11 +61,12 @@ def build_frontend() -> command.local.Command:
     Split into two stages: install dependencies and build application.
     """
     frontend_dir = project_dir.parent / "app_frontend"
+    source_hash = _hash_frontend_sources(frontend_dir)
 
     build_react_app = command.local.Command(
         f"Talk to My Data [{PROJECT_NAME}] Build Frontend",
         create=f"cd {frontend_dir} && npm install && npm run build",
-        triggers=[str(time.time())],  # This will cause rebuild every time
+        triggers=[source_hash],
         opts=pulumi.ResourceOptions(
             # This resource should be created first
             depends_on=[]

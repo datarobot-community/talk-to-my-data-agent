@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from types import TracebackType
 from typing import Any, Type
@@ -33,10 +34,12 @@ from openai import (
     NotFoundError,
     RateLimitError,
 )
+from opentelemetry import trace
 
 from core.config import Config
 
 log = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 
 class InstructorClientWrapper:
@@ -113,20 +116,36 @@ class CompletionsWrapper:
             f"messages_count: {len(messages)}, timeout: {kwargs.get('timeout')}s"
         )
 
-        try:
-            # Call underlying implementation
-            result = await self._completions.create(*args, **kwargs)
+        with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+            span.set_attribute("gen_ai.prompt", json.dumps(messages, default=str))
+            span.set_attribute("gen_ai.request.model", model)
+            span.set_attribute("gen_ai.system", "datarobot")
 
-            # Track tokens if tracker is available
-            if self._tracker:
-                self._tracker.track_call(messages, result, model)
+            try:
+                result = await self._completions.create(*args, **kwargs)
 
-            log.debug(f"LLM API call completed successfully - model: {model}")
-            return result
+                # Track tokens if tracker is available
+                if self._tracker:
+                    self._tracker.track_call(messages, result, model)
 
-        except Exception as e:
-            self._log_llm_error(e, model, kwargs)
-            raise
+                try:
+                    completion_text = (
+                        result.model_dump_json()
+                        if hasattr(result, "model_dump_json")
+                        else json.dumps(result, default=str)
+                    )
+                    span.set_attribute("gen_ai.completion", completion_text)
+                except Exception:
+                    log.warning(
+                        "Failed to serialize LLM completion for tracing", exc_info=True
+                    )
+
+                log.debug(f"LLM API call completed successfully - model: {model}")
+                return result
+
+            except Exception as e:
+                self._log_llm_error(e, model, kwargs)
+                raise
 
     def _log_llm_error(self, e: Exception, model: str, kwargs: dict[str, Any]) -> None:
         """Log detailed error information for LLM API failures."""

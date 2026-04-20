@@ -1,0 +1,37 @@
+---
+# https://taskfile.dev
+version: '3'
+
+vars:
+  UV_CMD:
+    sh: |
+      if command -v env >/dev/null 2>&1; then
+        echo "env -u PYTHONPATH -u VIRTUAL_ENV uv"
+      else
+        echo "uv"
+      fi
+
+tasks:
+  install:
+    desc: Install documentation dependencies
+    dir: ".bin"
+    cmds:
+      - "{{.UV_CMD}} sync"
+
+  build:
+    desc: Compile component docs into README.md and static site
+    dir: ".bin"
+    cmds:
+      - "{{.UV_CMD}} run properdocs build --config-file properdocs.yml"
+
+  validate:
+    desc: Validate documentation completeness and links
+    dir: ".bin"
+    cmds:
+      - "{{.UV_CMD}} run properdocs build --strict --config-file properdocs.yml"
+
+  serve:
+    desc: Serve documentation locally for preview
+    dir: ".bin"
+    cmds:
+      - "{{.UV_CMD}} run properdocs serve --config-file properdocs.yml"

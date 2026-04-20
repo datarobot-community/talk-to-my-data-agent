@@ -17,6 +17,14 @@ import {
   useUpdateChatDataSource,
 } from '@/api/chat-messages/hooks';
 
+// Disable axios-retry so error-rollback assertions don't wait through
+// exponential backoff. Production retry behavior (apiClient.ts) is unaffected.
+vi.mock('axios-retry', () => {
+  const noop = () => {};
+  noop.exponentialDelay = () => 0;
+  return { default: noop };
+});
+
 vi.mock('sonner', () => ({
   toast: { error: vi.fn() },
 }));

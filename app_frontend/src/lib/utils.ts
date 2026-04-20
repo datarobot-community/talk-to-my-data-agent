@@ -1,7 +1,11 @@
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { VITE_STATIC_DEFAULT_PORT, VITE_DEFAULT_PORT } from '@/constants/dev';
 import { useRef, useEffect, useCallback } from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export function getApiPort() {
   return window.ENV?.API_PORT || VITE_STATIC_DEFAULT_PORT;
@@ -22,10 +26,6 @@ export function getBaseUrl() {
 
 export function getApiUrl() {
   return `${window.location.origin}${getBaseUrl()}api`;
-}
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
 }
 
 export function useDebounce<T extends (...args: unknown[]) => unknown>(func: T, delay: number) {

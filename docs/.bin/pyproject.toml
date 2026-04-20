@@ -1,0 +1,9 @@
+[project]
+name = "af-component-docs"
+version = "0.1.0"
+description = "Documentation compilation and serving tools"
+requires-python = ">=3.11"
+dependencies = [
+    "properdocs>=1.6.7",
+    "mkdocs-material>=9.5.0",
+]

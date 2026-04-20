@@ -10,7 +10,7 @@
     "src/**/*.{ts,tsx}",
     "tests/**/*.{ts,tsx}"
   ],
-  "ignore": ["src/global.d.ts"],
+  "ignore": ["src/global.d.ts", "src/components/block/theme-toggle.tsx"],
   "ignoreBinaries": [ ],
   "ignoreDependencies": [
     "@fontsource/*",

@@ -39,6 +39,7 @@ from core.schema import (
     RunAnalysisResultMetadata,
     RunChartsResult,
 )
+from core.telemetry import otel
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
@@ -151,6 +152,26 @@ def test_set_session_cookie() -> None:
         header for header in response.raw_headers if header[0].decode() == "set-cookie"
     ]
     assert not cookies, "Cookie was set when it shouldn't have been"
+
+
+def test_trace_excludes_initialize_session_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OTEL_EXCLUDED_TRACE_SPAN_NAMES", raising=False)
+
+    assert otel._is_trace_span_excluded("app.middleware._initialize_session") is True
+
+
+def test_trace_excludes_configured_span_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "OTEL_EXCLUDED_TRACE_SPAN_NAMES",
+        "custom.span, another.span ",
+    )
+
+    assert otel._is_trace_span_excluded("custom.span") is True
+    assert otel._is_trace_span_excluded("another.span") is True
 
 
 @pytest.mark.usefixtures("clean_environ")

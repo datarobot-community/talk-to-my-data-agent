@@ -120,7 +120,7 @@ function textSetUp({
   fontSize,
   lineHeight = '1.5',
   color = 'var(--foreground)',
-  fontFamily = 'var(--font-serif)',
+  fontFamily = 'var(--font-sans)',
   letterSpacing = 'normal',
 }: {
   fontWeight: string;
