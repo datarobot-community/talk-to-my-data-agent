@@ -9,7 +9,7 @@ import {
 } from '@/api/dictionaries/hooks';
 import { DatasetCardActionBar } from '@/components/data';
 import { useDatasetMetadata } from '@/api/cleansed-datasets/hooks';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, TriangleAlert } from 'lucide-react';
 import { DictionaryTable } from './DictionaryTable';
 import { CleansedDataTable } from './CleansedDataTable';
 import { ValueOf } from '@/state/types';
@@ -34,6 +34,8 @@ export const DatasetCardDescriptionPanel = forwardRef<
   HTMLDivElement,
   DatasetCardDescriptionPanelProps
 >(({ dictionary, isProcessing = true, viewMode = 'description', fullHeight = false }, ref) => {
+  const errorMessage = dictionary.error || null;
+  const effectiveIsProcessing = isProcessing && !errorMessage;
   const { t } = useTranslation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { searchText, setSearchText, filteredDictionary, getOriginalRowIndex } =
@@ -62,10 +64,10 @@ export const DatasetCardDescriptionPanel = forwardRef<
   // initially as 0 rows before being updated after the data is fetched. This will be updated before the dictionary
   // is generated, so we can just refetch once the dictionary is updated.
   useEffect(() => {
-    if (isProcessing === false && refetch !== undefined) {
+    if (effectiveIsProcessing === false && refetch !== undefined) {
       refetch();
     }
-  }, [isProcessing, refetch]);
+  }, [effectiveIsProcessing, refetch]);
 
   // Format file size from bytes to KB/MB/GB as appropriate
   const formatFileSize = (bytes: number): string => {
@@ -113,7 +115,7 @@ export const DatasetCardDescriptionPanel = forwardRef<
     <div
       ref={ref}
       className={cn('flex w-full shrink-0 flex-col bg-card p-4', {
-        'h-[300px]': isProcessing,
+        'h-[300px]': effectiveIsProcessing || errorMessage,
         'h-full overflow-hidden': fullHeight,
       })}
     >
@@ -150,7 +152,17 @@ export const DatasetCardDescriptionPanel = forwardRef<
             <Badge type="outline" className="text-sm leading-tight">
               {metadata?.data_source ? friendlySourceName(metadata.data_source) : t('file')}
             </Badge>
-            {isProcessing ? (
+            {errorMessage ? (
+              <Badge
+                type="outline"
+                variant="destructive"
+                testId="data-failed-badge"
+                className="text-sm leading-tight"
+              >
+                <TriangleAlert className="mr-1 size-4" />
+                {t('Failed')}
+              </Badge>
+            ) : isProcessing ? (
               <Badge type="outline" className="text-sm leading-tight">
                 <Loader2 className="mr-2 size-4 animate-spin" />
                 {t('Processing...')}
@@ -170,19 +182,32 @@ export const DatasetCardDescriptionPanel = forwardRef<
           <DatasetCardActionBar
             onSearch={setSearchText}
             onDownload={
-              viewMode === DATA_TABS.DESCRIPTION
+              !errorMessage && viewMode === DATA_TABS.DESCRIPTION
                 ? () => downloadDictionary({ name: dictionary.name, includeBom: includeCsvBom })
                 : undefined
             }
             onDelete={() => setIsDeleteDialogOpen(true)}
             isDownloading={isDownloading}
-            isProcessing={isProcessing}
+            isProcessing={effectiveIsProcessing}
             viewMode={viewMode}
           />
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden mn-label-large">
-        {isProcessing ? (
+        {errorMessage ? (
+          <div
+            className="flex flex-1 flex-col items-center justify-center gap-2 text-center"
+            data-testid="data-dictionary-error"
+          >
+            <div className="font-semibold text-destructive">
+              {t("Couldn't generate column descriptions")}
+            </div>
+            <div className="max-w-xl text-sm text-destructive">{errorMessage}</div>
+            <div className="max-w-xl text-xs text-muted-foreground">
+              {t('Check your LLM configuration, then remove this dataset and upload it again.')}
+            </div>
+          </div>
+        ) : effectiveIsProcessing ? (
           <div className="flex flex-1 flex-col items-center justify-center">
             {t('Processing the dataset may take a few minutes...')}
           </div>

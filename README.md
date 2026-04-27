@@ -189,6 +189,16 @@ These DataStores will be queried via DataRobot's data wrangling platform ([see d
 Unlike the app's bespoke database integration (see [Change the database](#change-the-database)), a data store will not be visible to all users of the app, only to those who have access to
 the data store and its default credentials in the DataRobot platform.
 
+#### Supported remote data connections
+
+If you've configured any of the below data stores in the DataRobot platform, you can connect to them from your application to query data:
+
+- PostgreSQL
+- Redshift
+- Databricks
+- MySQL
+- Snowflake
+
 ![Add Remote Data Connection](_docs/images/screenshot-remote-data-connections.png)
 
 ## Architecture overview

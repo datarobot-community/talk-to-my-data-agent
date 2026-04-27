@@ -86,10 +86,13 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
         ? t('Wait for agent to finish responding')
         : t('Export prompt and response');
 
-  const isDeleteDisabled = !responseMessage;
+  const userMessageFailed = isUserMessage && !!message.error;
+  const isDeleteDisabled = !responseMessage && !userMessageFailed;
   const deleteButtonTooltip = isDeleteDisabled
     ? t('Cannot delete message without response')
-    : t('Delete message and response');
+    : userMessageFailed
+      ? t('Delete message')
+      : t('Delete message and response');
 
   const handleThumbsUp = () => {
     if (!message.id) {
@@ -198,15 +201,17 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
         </div>
         {isUserMessage && (
           <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => exportMessage(messageId)}
-              title={exportButtonTooltip}
-              disabled={isExportDisabled}
-            >
-              <FileDown />
-            </Button>
+            {!userMessageFailed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportMessage(messageId)}
+                title={exportButtonTooltip}
+                disabled={isExportDisabled}
+              >
+                <FileDown />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

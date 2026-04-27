@@ -21,6 +21,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -60,7 +61,7 @@ from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 from plotly.subplots import make_subplots
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from core.api_exceptions import ApplicationUsageException, UsageExceptionType
 from core.chat_dataset_helper import extract_and_store_datasets
@@ -620,102 +621,197 @@ async def _get_dictionary_batch(
         ]
 
 
+_LLM_DETAIL_RE = re.compile(r'"detail"\s*:\s*"([^"]+)"')
+_MODEL_NOT_FOUND_RE = re.compile(
+    r"Model\s+(\S+?)\s+not found in catalog", re.IGNORECASE
+)
+_FRIENDLY_ERROR_MAX_LEN = 200
+_UNWRAP_DEPTH_CAP = 3
+
+
+def _unwrap_instructor_exception(exc: BaseException) -> BaseException:
+    """Return the root cause inside an ``InstructorRetryException``.
+
+    Its ``__str__`` is an ``<failed_attempts>...`` XML dump that must not reach
+    the UI; the real cause lives in ``failed_attempts`` or ``__cause__``.
+    """
+    try:
+        from instructor.core.exceptions import InstructorRetryException
+    except ImportError:
+        return exc
+
+    current: BaseException = exc
+    for _ in range(_UNWRAP_DEPTH_CAP):
+        if not isinstance(current, InstructorRetryException):
+            return current
+        failed = getattr(current, "failed_attempts", None) or []
+        if failed:
+            last = failed[-1]
+            inner = getattr(last, "exception", None)
+            if isinstance(inner, BaseException):
+                current = inner
+                continue
+        cause = cast(BaseException | None, current.__cause__)
+        if isinstance(cause, BaseException):
+            current = cause
+            continue
+        return cast(BaseException, current)
+    return current
+
+
+def _extract_detail(raw: str) -> str | None:
+    match = _LLM_DETAIL_RE.search(raw)
+    if not match:
+        return None
+    detail = match.group(1).strip()
+    model_match = _MODEL_NOT_FOUND_RE.search(detail)
+    if model_match:
+        return f"model '{model_match.group(1).strip()}' not found in catalog"
+    if len(detail) > 120:
+        detail = detail[:120].rstrip() + "..."
+    return detail or None
+
+
+def _classify_llm_error(exc: BaseException) -> str:
+    try:
+        from openai import (
+            APIConnectionError,
+            APIError,
+            APIStatusError,
+            APITimeoutError,
+            AuthenticationError,
+            BadRequestError,
+            InternalServerError,
+            NotFoundError,
+            PermissionDeniedError,
+            RateLimitError,
+        )
+    except ImportError:
+        return "The LLM service returned an unexpected error."
+
+    if isinstance(exc, (asyncio.TimeoutError, APITimeoutError)):
+        return "The LLM service did not respond in time. Please try again."
+    if isinstance(exc, AuthenticationError):
+        return "The configured LLM credentials are invalid or expired."
+    if isinstance(exc, PermissionDeniedError):
+        return "The configured LLM credentials are not authorized to use this model."
+    if isinstance(exc, NotFoundError):
+        return "The configured LLM model or deployment was not found."
+    if isinstance(exc, RateLimitError):
+        return "The LLM service is rate-limiting requests. Please try again shortly."
+    if isinstance(exc, BadRequestError):
+        return (
+            "The LLM request was rejected as invalid. Check the configured model name."
+        )
+    if isinstance(exc, APIConnectionError):
+        return "Could not reach the LLM service. Check network connectivity and endpoint URL."
+    if isinstance(exc, InternalServerError):
+        return (
+            "The LLM service reported an internal error. "
+            "The deployment may be misconfigured or down."
+        )
+    if isinstance(exc, APIStatusError):
+        status = getattr(exc, "status_code", None) or getattr(
+            getattr(exc, "response", None), "status_code", None
+        )
+        if status:
+            return f"The LLM service returned an HTTP error (status {status})."
+        return "The LLM service returned an HTTP error."
+    if isinstance(exc, APIError):
+        return "The LLM service returned an API error."
+    return str(exc) or "The LLM service returned an unexpected error."
+
+
+def _friendly_llm_error(exc: BaseException) -> str:
+    """Map a raw LLM / instructor exception to a short, user-facing message.
+
+    The full exception chain is still available in operator logs via
+    ``exc_info=True`` at the call site.
+    """
+    root = _unwrap_instructor_exception(exc)
+    base = _classify_llm_error(root)
+    detail = _extract_detail(str(root))
+    message = f"{base} Detail: {detail}" if detail else base
+    message = message.replace("<", "").replace(">", "")
+    if len(message) > _FRIENDLY_ERROR_MAX_LEN:
+        message = message[: _FRIENDLY_ERROR_MAX_LEN - 3].rstrip() + "..."
+    return message
+
+
 @log_api_call
 @otel.meter_and_trace
 async def get_dictionary(dataset: AnalystDataset) -> DataDictionary:
-    """Process a single dataset with parallel column batch processing"""
+    """Process a single dataset with parallel column batch processing.
 
-    try:
-        logger.info(f"Processing dataset {dataset.name} init")
-        # Convert JSON to DataFrame
-        df_full = dataset.to_df()
-        df = df_full.sample(n=min(10000, len(df_full)), seed=42)
+    Raises:
+        RuntimeError: when every batch failed. Partial failures still return a
+            dictionary with placeholder rows for the failed batches.
+    """
 
-        # Add debug logging
-        logger.info(f"Processing dataset {dataset.name} with shape {df.shape}")
+    logger.info(f"Processing dataset {dataset.name} init")
+    df_full = dataset.to_df()
+    df = df_full.sample(n=min(10000, len(df_full)), seed=42)
 
-        # Handle empty dataset
-        if df.is_empty():
-            logger.warning(f"Dataset {dataset.name} is empty")
-            return DataDictionary(
-                name=dataset.name,
-                column_descriptions=[],
+    logger.info(f"Processing dataset {dataset.name} with shape {df.shape}")
+
+    if df.is_empty():
+        logger.warning(f"Dataset {dataset.name} is empty")
+        return DataDictionary(
+            name=dataset.name,
+            column_descriptions=[],
+        )
+
+    column_batches = [
+        list(df.columns[i : i + DICTIONARY_BATCH_SIZE])
+        for i in range(0, len(df.columns), DICTIONARY_BATCH_SIZE)
+    ]
+    logger.info(f"Created {len(column_batches)} batches for {len(df.columns)} columns")
+
+    sem = asyncio.Semaphore(DICTIONARY_PARALLEL_BATCH_SIZE)
+
+    async def throttled_get_dictionary_batch(
+        batch: list[str],
+    ) -> list[DataDictionaryColumn]:
+        async with sem:
+            return await asyncio.wait_for(
+                _get_dictionary_batch(batch, df, DICTIONARY_BATCH_SIZE),
+                timeout=DICTIONARY_TIMEOUT,
             )
 
-        # Split columns into batches
-        column_batches = [
-            list(df.columns[i : i + DICTIONARY_BATCH_SIZE])
-            for i in range(0, len(df.columns), DICTIONARY_BATCH_SIZE)
-        ]
-        logger.info(
-            f"Created {len(column_batches)} batches for {len(df.columns)} columns"
-        )
+    tasks = [throttled_get_dictionary_batch(batch) for batch in column_batches]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Create a semaphore to limit concurrent tasks to 2
-        sem = asyncio.Semaphore(DICTIONARY_PARALLEL_BATCH_SIZE)
-
-        async def throttled_get_dictionary_batch(
-            batch: list[str],
-        ) -> list[DataDictionaryColumn]:
-            try:
-                async with sem:
-                    return await asyncio.wait_for(
-                        _get_dictionary_batch(batch, df, DICTIONARY_BATCH_SIZE),
-                        timeout=DICTIONARY_TIMEOUT,
-                    )
-            except asyncio.TimeoutError:
+    dictionary: list[DataDictionaryColumn] = []
+    failures: list[BaseException] = []
+    for batch, result in zip(column_batches, results):
+        if isinstance(result, BaseException):
+            if isinstance(result, asyncio.TimeoutError):
                 logger.warning(f"Timeout processing batch: {batch}")
-                return [
-                    DataDictionaryColumn(
-                        column=col,
-                        description="No Description Available",
-                        data_type=str(df[col].dtype),
-                    )
-                    for col in batch
-                ]
-            except Exception as e:
-                logger.error(f"Error processing batch {batch}: {str(e)}")
-                return [
-                    DataDictionaryColumn(
-                        column=col,
-                        description="No Description Available",
-                        data_type=str(df[col].dtype),
-                    )
-                    for col in batch
-                ]
-
-        tasks = [throttled_get_dictionary_batch(batch) for batch in column_batches]
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        # Filter out any exceptions and flatten results
-        dictionary: list[DataDictionaryColumn] = []
-        for result in results:
-            if isinstance(result, BaseException):
-                logger.error(f"Task failed with error: {str(result)}")
-                continue
+            else:
+                logger.error(f"Error processing batch {batch}: {result!s}")
+            failures.append(result)
+            dictionary.extend(
+                DataDictionaryColumn(
+                    column=col,
+                    description="No Description Available",
+                    data_type=str(df[col].dtype),
+                )
+                for col in batch
+            )
+        else:
             dictionary.extend(result)
 
-        logger.info(
-            f"Created dictionary with {len(dictionary)} entries for dataset {dataset.name}"
-        )
+    if failures and len(failures) == len(column_batches):
+        raise RuntimeError(_friendly_llm_error(failures[0])) from failures[0]
 
-        return DataDictionary(
-            name=dataset.name,
-            column_descriptions=dictionary,
-        )
+    logger.info(
+        f"Created dictionary with {len(dictionary)} entries for dataset {dataset.name}"
+    )
 
-    except Exception:
-        return DataDictionary(
-            name=dataset.name,
-            column_descriptions=[
-                DataDictionaryColumn(
-                    column=c,
-                    data_type=str(dataset.to_df()[c].dtype),
-                    description="No Description Available",
-                )
-                for c in dataset.columns
-            ],
-        )
+    return DataDictionary(
+        name=dataset.name,
+        column_descriptions=dictionary,
+    )
 
 
 @otel.trace
@@ -1047,7 +1143,12 @@ async def summarize_conversation(
     """
 
     class ConversationSummary(BaseModel):
-        summary: str
+        summary: str = Field(
+            description=(
+                "Plain prose summary of the conversation. "
+                "No JSON, no code blocks, no schema text, no formatting instructions."
+            )
+        )
 
     try:
         messages_str = "\n".join(
@@ -1344,8 +1445,8 @@ async def get_business_analysis(
             bottom_line="",
         )
     except Exception as e:
-        msg = type(e).__name__ + f": {str(e)}"
-        logger.error(f"Error in get_business_analysis: {msg}")
+        msg = f"{type(e).__name__}: {_friendly_llm_error(e)}"
+        logger.error(f"Error in get_business_analysis: {msg}", exc_info=True)
         return GetBusinessAnalysisResult(
             status="error",
             metadata=GetBusinessAnalysisMetadata(exception_str=msg),
@@ -1913,7 +2014,7 @@ async def run_complete_analysis(
     except Exception as e:
         logger.error(f"Error rephrasing message: {e}", exc_info=True)
         analysis_context.user_message.error = (
-            f"Failed to process your question: {str(e)}"
+            f"Failed to process your question: {_friendly_llm_error(e)}"
         )
         analysis_context.user_message.in_progress = False
         analysis_context.stage_message_update(target="user")
@@ -2092,7 +2193,9 @@ async def run_complete_analysis(
         analysis_context.stage_message_update()
 
     except Exception as e:
-        error_message = f"Error running initial analysis. Try rephrasing: {str(e)}"
+        error_message = (
+            f"Error running initial analysis. Try rephrasing: {_friendly_llm_error(e)}"
+        )
         analysis_context.assistant_message.in_progress = False
         analysis_context.assistant_message.error = error_message
         analysis_context.stage_message_update()
@@ -2156,7 +2259,9 @@ async def run_complete_analysis(
         analysis_context.stage_message_update()
 
     except Exception as e:
-        error_message = f"Error setting up additional analysis: {str(e)}"
+        error_message = (
+            f"Error setting up additional analysis: {_friendly_llm_error(e)}"
+        )
         analysis_context.assistant_message.in_progress = False
         analysis_context.assistant_message.error = error_message
         analysis_context.stage_message_update()
@@ -2240,34 +2345,45 @@ async def process_data_and_update_state(
     logger.info("Data processing successful, generating dictionaries")
     yield "Data processing successful, generating dictionaries"
     log_memory()
-    try:
-        for analysis_dataset_name in new_dataset_names:
-            try:
-                existing_dictionary = await analyst_db.get_data_dictionary(
-                    analysis_dataset_name
-                )
-                logger.info(
-                    f"Found existing dictionary for dataset: {analysis_dataset_name}"
-                )
-                if existing_dictionary is not None:
-                    continue
+    for analysis_dataset_name in new_dataset_names:
+        try:
+            existing_dictionary = await analyst_db.get_data_dictionary(
+                analysis_dataset_name
+            )
+            logger.info(
+                f"Found existing dictionary for dataset: {analysis_dataset_name}"
+            )
+            if existing_dictionary is not None:
+                await analyst_db.clear_dictionary_error(analysis_dataset_name)
+                continue
+        except Exception:
+            pass
 
-            except Exception:
-                pass
-            logger.info(f"Creating dictionary for dataset: {analysis_dataset_name}")
+        logger.info(f"Creating dictionary for dataset: {analysis_dataset_name}")
+        try:
             analysis_dataset = await analyst_db.get_dataset(analysis_dataset_name)
             new_dictionary = await get_dictionary(analysis_dataset)
-            logger.info(new_dictionary.to_application_df())
             del analysis_dataset
             await analyst_db.register_data_dictionary(new_dictionary, clobber=True)
+            await analyst_db.clear_dictionary_error(analysis_dataset_name)
             logger.info(f"Registered dictionary for dataset: {analysis_dataset_name}")
             yield f"Registered data dictionary: {analysis_dataset_name}"
-            log_memory()
-            continue
-    except Exception:
-        logger.error("Failed to generate data dictionaries", exc_info=True)
-        yield "Failed to generate data dictionaries"
-        raise
+        except Exception as e:
+            logger.error(
+                f"Failed to generate data dictionary for {analysis_dataset_name}",
+                exc_info=True,
+            )
+            try:
+                await analyst_db.mark_dictionary_failed(
+                    analysis_dataset_name, _friendly_llm_error(e)
+                )
+            except Exception:
+                logger.error(
+                    f"Also failed to persist dictionary error for {analysis_dataset_name}",
+                    exc_info=True,
+                )
+            yield f"Failed to generate data dictionary: {analysis_dataset_name}"
+        log_memory()
     log_memory()
     # Final completion message
     yield "Processing complete"

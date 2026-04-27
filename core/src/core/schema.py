@@ -402,6 +402,7 @@ class DataDictionary(BaseModel):
 
 class DataDictionaryResponse(DataDictionary):
     in_progress: bool = False
+    error: Optional[str] = None
 
 
 class DictionaryGeneration(SanitizedJsonModel):
@@ -645,7 +646,12 @@ class DatabaseAnalysisCodeGeneration(SanitizedJsonModel):
 
 
 class EnhancedQuestionGeneration(SanitizedJsonModel):
-    enhanced_user_message: str
+    enhanced_user_message: str = Field(
+        description=(
+            "The rephrased user question as plain natural language only. "
+            "No JSON, no code blocks, no schema text, no markdown fences."
+        )
+    )
 
 
 class CodeGeneration(SanitizedJsonModel):

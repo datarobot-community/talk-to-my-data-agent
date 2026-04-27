@@ -104,3 +104,52 @@ async def test_initialize_database_fetches_when_db_missing(mocks: Mocks) -> None
         test_db.db_path.name, str(test_db.db_path.absolute())
     )
     assert test_db._initialized is True
+
+
+# --- Persisted dictionary-generation error tracking -------------------------
+
+
+@pytest.mark.asyncio
+async def test_dictionary_error_upsert_and_clear(tmp_path: Path) -> None:
+    from core.analyst_db import AnalystDB
+
+    db = await AnalystDB.create(user_id="err_upsert", db_path=tmp_path)
+
+    assert await db.get_dictionary_error("ds") is None
+
+    await db.mark_dictionary_failed("ds", "boom")
+    assert await db.get_dictionary_error("ds") == "boom"
+
+    await db.mark_dictionary_failed("ds", "new")
+    assert await db.get_dictionary_error("ds") == "new"
+
+    await db.clear_dictionary_error("ds")
+    assert await db.get_dictionary_error("ds") is None
+
+
+@pytest.mark.asyncio
+async def test_dictionary_error_survives_restart(tmp_path: Path) -> None:
+    from core.analyst_db import AnalystDB
+
+    db1 = await AnalystDB.create(user_id="err_restart", db_path=tmp_path)
+    await db1.mark_dictionary_failed("ds", "invalid model")
+
+    db2 = await AnalystDB.create(user_id="err_restart", db_path=tmp_path)
+    assert await db2.get_dictionary_error("ds") == "invalid model"
+
+
+@pytest.mark.asyncio
+async def test_dictionary_error_cleared_on_dataset_delete(tmp_path: Path) -> None:
+    import polars as pl
+
+    from core.analyst_db import AnalystDB, InternalDataSourceType
+    from core.schema import AnalystDataset
+
+    db = await AnalystDB.create(user_id="err_delete", db_path=tmp_path)
+
+    dataset = AnalystDataset(name="ds", data=pl.DataFrame({"a": [1, 2]}))
+    await db.register_dataset(dataset, data_source=InternalDataSourceType.FILE)
+    await db.mark_dictionary_failed("ds", "boom")
+
+    await db.delete_table("ds")
+    assert await db.get_dictionary_error("ds") is None

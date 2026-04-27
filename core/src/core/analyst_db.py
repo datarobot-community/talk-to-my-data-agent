@@ -448,7 +448,7 @@ class DatasetHandler(BaseDuckDBHandler):
     async def _initialize_child(self) -> None:
         all_tables_exists = await async_all(
             self._table_exists(table)
-            for table in ["dataset_metadata", "cleansing_reports"]
+            for table in ["dataset_metadata", "cleansing_reports", "dictionary_errors"]
         )
 
         if not all_tables_exists:
@@ -478,6 +478,17 @@ class DatasetHandler(BaseDuckDBHandler):
                         dataset_name VARCHAR,
                         report JSON,
                         PRIMARY KEY (dataset_name)
+                    )
+                    """,
+                )
+
+                await self.execute_query(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS dictionary_errors (
+                        dataset_name VARCHAR PRIMARY KEY,
+                        error VARCHAR NOT NULL,
+                        updated_at TIMESTAMP NOT NULL
                     )
                     """,
                 )
@@ -863,6 +874,10 @@ class DatasetHandler(BaseDuckDBHandler):
                 conn, "DELETE FROM cleansing_reports WHERE dataset_name = ?", [name]
             )
 
+            await self.execute_query(
+                conn, "DELETE FROM dictionary_errors WHERE dataset_name = ?", [name]
+            )
+
         logger.info(f"Deleted dataset {name}")
 
     async def delete_related_datasets(self, name: str) -> None:
@@ -912,6 +927,38 @@ class DatasetHandler(BaseDuckDBHandler):
                 await self.delete_dataset(dataset.name)
 
         logger.info("Deleted all empty datasets")
+
+    async def mark_dictionary_failed(self, dataset_name: str, error: str) -> None:
+        async with self._write_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                INSERT OR REPLACE INTO dictionary_errors
+                    (dataset_name, error, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                [dataset_name, error, datetime.now(timezone.utc)],
+            )
+
+    async def clear_dictionary_error(self, dataset_name: str) -> None:
+        async with self._write_connection() as conn:
+            await self.execute_query(
+                conn,
+                "DELETE FROM dictionary_errors WHERE dataset_name = ?",
+                [dataset_name],
+            )
+
+    async def get_dictionary_error(self, dataset_name: str) -> str | None:
+        async with self._read_connection() as conn:
+            result = await self.execute_query(
+                conn,
+                "SELECT error FROM dictionary_errors WHERE dataset_name = ?",
+                [dataset_name],
+            )
+            row = await asyncio.get_running_loop().run_in_executor(
+                None, result.fetchone
+            )
+            return row[0] if row else None
 
 
 class ChatHandler(BaseDuckDBHandler):
@@ -2147,6 +2194,15 @@ class AnalystDB:
         except Exception:
             logger.error(f"Failed to get data dictionary {name}", exc_info=True)
         return None
+
+    async def mark_dictionary_failed(self, name: str, error: str) -> None:
+        await self.dataset_handler.mark_dictionary_failed(name, error)
+
+    async def clear_dictionary_error(self, name: str) -> None:
+        await self.dataset_handler.clear_dictionary_error(name)
+
+    async def get_dictionary_error(self, name: str) -> str | None:
+        return await self.dataset_handler.get_dictionary_error(name)
 
     async def get_cleansing_report(
         self, dataset_name: str

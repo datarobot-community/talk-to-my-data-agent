@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import io
-from typing import cast
 
 from core.analyst_db import AnalystDB
 from core.schema import (
@@ -44,12 +43,22 @@ async def get_dictionaries(
     dictionaries = []
     for name in dataset_names:
         dictionary = await analyst_db.get_data_dictionary(name)
+        error = await analyst_db.get_dictionary_error(name)
         if dictionary and len(dictionary.column_descriptions):
-            dictionaries.append(cast(DataDictionaryResponse, dictionary))
+            dictionaries.append(
+                DataDictionaryResponse(
+                    name=dictionary.name,
+                    column_descriptions=dictionary.column_descriptions,
+                    error=error,
+                )
+            )
         else:
             dictionaries.append(
                 DataDictionaryResponse(
-                    name=name, column_descriptions=[], in_progress=True
+                    name=name,
+                    column_descriptions=[],
+                    in_progress=error is None,
+                    error=error,
                 )
             )
 

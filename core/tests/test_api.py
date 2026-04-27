@@ -417,3 +417,216 @@ def run_business_result_canned() -> GetBusinessAnalysisResult:
 
 
 # TODO: add tests of reflection in run_analysis once test_api refactored/cleaned up
+
+
+# --- Tests for _friendly_llm_error -----------------------------------------
+
+
+def _mk_response(status: int = 400, body: str = "") -> "Any":
+    import httpx
+
+    return httpx.Response(
+        status_code=status,
+        request=httpx.Request("POST", "https://example.invalid/v1/chat"),
+        content=body.encode() if body else b"",
+    )
+
+
+def _mk_request() -> "Any":
+    import httpx
+
+    return httpx.Request("POST", "https://example.invalid/v1/chat")
+
+
+def test_friendly_llm_error_timeout() -> None:
+    from core.api import _friendly_llm_error
+
+    assert "did not respond in time" in _friendly_llm_error(TimeoutError())
+
+
+def test_friendly_llm_error_openai_api_timeout() -> None:
+    from openai import APITimeoutError
+
+    from core.api import _friendly_llm_error
+
+    assert "did not respond in time" in _friendly_llm_error(
+        APITimeoutError(_mk_request())
+    )
+
+
+def test_friendly_llm_error_authentication() -> None:
+    from openai import AuthenticationError
+
+    from core.api import _friendly_llm_error
+
+    exc = AuthenticationError("bad token", response=_mk_response(401), body=None)
+    assert "credentials are invalid or expired" in _friendly_llm_error(exc)
+
+
+def test_friendly_llm_error_rate_limit() -> None:
+    from openai import RateLimitError
+
+    from core.api import _friendly_llm_error
+
+    exc = RateLimitError("slow down", response=_mk_response(429), body=None)
+    assert "rate-limiting" in _friendly_llm_error(exc)
+
+
+def test_friendly_llm_error_not_found_enriched() -> None:
+    from openai import NotFoundError
+
+    from core.api import _friendly_llm_error
+
+    exc = NotFoundError(
+        'DatarobotException - {"detail":"Deployment X not found"}',
+        response=_mk_response(404),
+        body=None,
+    )
+    result = _friendly_llm_error(exc)
+    assert "model or deployment was not found" in result
+    assert "Detail: Deployment X not found" in result
+
+
+def test_friendly_llm_error_reporter_case() -> None:
+    from openai import APIConnectionError
+
+    from core.api import _friendly_llm_error
+
+    exc = APIConnectionError(
+        message=(
+            'DatarobotException - {"detail":"Model '
+            'azure/gpt-5-1-2025-11-13- not found in catalog"}'
+        ),
+        request=_mk_request(),
+    )
+    result = _friendly_llm_error(exc)
+    assert "Could not reach the LLM service" in result
+    assert "model 'azure/gpt-5-1-2025-11-13-' not found in catalog" in result
+
+
+def test_friendly_llm_error_internal_server() -> None:
+    from openai import InternalServerError
+
+    from core.api import _friendly_llm_error
+
+    exc = InternalServerError("kaboom", response=_mk_response(500), body=None)
+    assert "internal error" in _friendly_llm_error(exc)
+
+
+def test_friendly_llm_error_bad_request_no_detail() -> None:
+    from openai import BadRequestError
+
+    from core.api import _friendly_llm_error
+
+    exc = BadRequestError("invalid request", response=_mk_response(400), body=None)
+    result = _friendly_llm_error(exc)
+    assert "rejected as invalid" in result
+    assert "Detail:" not in result
+
+
+def test_friendly_llm_error_status_error_includes_code() -> None:
+    from openai import APIStatusError
+
+    from core.api import _friendly_llm_error
+
+    exc = APIStatusError("teapot", response=_mk_response(418), body=None)
+    result = _friendly_llm_error(exc)
+    assert "418" in result
+
+
+def test_friendly_llm_error_unwraps_instructor_retry() -> None:
+    from instructor.core.exceptions import InstructorRetryException
+    from instructor.core.retry import FailedAttempt
+    from openai import AuthenticationError
+
+    from core.api import _friendly_llm_error
+
+    inner = AuthenticationError("bad token", response=_mk_response(401), body=None)
+    retry = InstructorRetryException(
+        "retry exhausted",
+        n_attempts=2,
+        total_usage=0,
+        failed_attempts=[
+            FailedAttempt(attempt_number=1, exception=inner, completion=None)
+        ],
+    )
+    result = _friendly_llm_error(retry)
+    assert "credentials are invalid or expired" in result
+    assert "<failed_attempts>" not in result
+    assert "<" not in result
+
+
+def test_friendly_llm_error_unwraps_via_cause() -> None:
+    from instructor.core.exceptions import InstructorRetryException
+    from openai import APITimeoutError
+
+    from core.api import _friendly_llm_error
+
+    cause = APITimeoutError(_mk_request())
+    retry = InstructorRetryException(
+        "retry exhausted",
+        n_attempts=1,
+        total_usage=0,
+        failed_attempts=[],
+    )
+    retry.__cause__ = cause
+    assert "did not respond in time" in _friendly_llm_error(retry)
+
+
+def test_friendly_llm_error_unknown_type_passes_through_message() -> None:
+    from core.api import _friendly_llm_error
+
+    result = _friendly_llm_error(RuntimeError("boom"))
+    assert "boom" in result
+    assert len(result) <= 200
+
+
+def test_friendly_llm_error_empty_message_falls_back_to_generic() -> None:
+    from core.api import _friendly_llm_error
+
+    result = _friendly_llm_error(RuntimeError(""))
+    assert "unexpected error" in result
+    assert len(result) <= 200
+
+
+def test_friendly_llm_error_strips_xml_and_clamps_length() -> None:
+    from core.api import _friendly_llm_error
+
+    noisy = RuntimeError("<x>" * 2000)
+    result = _friendly_llm_error(noisy)
+    assert len(result) <= 200
+    assert "<" not in result and ">" not in result
+
+
+def test_chat_message_error_uses_friendly_helper() -> None:
+    from instructor.core.exceptions import InstructorRetryException
+    from instructor.core.retry import FailedAttempt
+    from openai import APIConnectionError
+
+    from core.api import _friendly_llm_error
+
+    inner = APIConnectionError(
+        message=(
+            'DatarobotException - {"detail":"Model '
+            'azure/gpt-5-1-2025-11-13- not found in catalog"}'
+        ),
+        request=_mk_request(),
+    )
+    retry = InstructorRetryException(
+        "retry exhausted",
+        n_attempts=2,
+        total_usage=0,
+        failed_attempts=[
+            FailedAttempt(attempt_number=1, exception=inner, completion=None),
+        ],
+    )
+
+    prefix = "Failed to process your question: "
+    rendered = f"{prefix}{_friendly_llm_error(retry)}"
+
+    assert rendered.startswith(prefix)
+    assert "Could not reach the LLM service" in rendered
+    assert "model 'azure/gpt-5-1-2025-11-13-' not found in catalog" in rendered
+    assert "<failed_attempts>" not in rendered
+    assert "<" not in rendered and ">" not in rendered
+    assert len(rendered) <= len(prefix) + 200

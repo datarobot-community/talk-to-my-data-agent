@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.7.2] - 2026-04-27
+
+### Changed
+
+- Updated the README’s “Connecting to Data Stores in the DataRobot Platform” section by adding an explicit Supported remote data connections list.
+- Added explicit Field(description=...) guidance on ConversationSummary.summary and EnhancedQuestionGeneration.enhanced_user_message to discourage smaller LLMs from returning JSON/markdown or other structured formatting.
+- Improved LLM dictionary-generation failures processing.
+
 ## [11.7.1] - 2026-04-20
 
 ### Changed
