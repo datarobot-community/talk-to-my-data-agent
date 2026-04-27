@@ -117,7 +117,9 @@ class CompletionsWrapper:
         )
 
         with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
-            span.set_attribute("gen_ai.prompt", json.dumps(messages, default=str))
+            span.set_attribute(
+                "gen_ai.input.messages", json.dumps(messages, default=str)
+            )
             span.set_attribute("gen_ai.request.model", model)
             span.set_attribute("gen_ai.system", "datarobot")
 
@@ -134,7 +136,7 @@ class CompletionsWrapper:
                         if hasattr(result, "model_dump_json")
                         else json.dumps(result, default=str)
                     )
-                    span.set_attribute("gen_ai.completion", completion_text)
+                    span.set_attribute("gen_ai.output.messages", completion_text)
                 except Exception:
                     log.warning(
                         "Failed to serialize LLM completion for tracing", exc_info=True
