@@ -34,8 +34,8 @@ from core.analyst_db import UserRecipe
 from core.api_exceptions import ApplicationUsageException
 from core.data_connections.datarobot.datarobot_dataset_handler import (
     DatasetSparkRecipe,
-    DataSourceVerifySQLRecipe,
     DataSourceRecipe,
+    DataSourceVerifySQLRecipe,
     load_or_create_spark_recipe,
 )
 from core.data_connections.datarobot.helpers import (

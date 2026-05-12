@@ -9,6 +9,8 @@ on:
   pull_request:
     paths:
       - 'infra/**.py'
+      - 'infra/uv.lock'
+      - 'infra/pyproject.toml'
   workflow_dispatch:
 
 jobs:
@@ -55,7 +57,7 @@ jobs:
 
       - name: Get Cover
         if: steps.run_unit_tests.outputs.coverage_report_exists == 'true' && github.event_name == 'pull_request'
-        uses: orgoro/coverage@v3.2
+        uses: orgoro/coverage@v3.3
         with:
           coverageFile: infra/coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -60,6 +60,13 @@ i18n.use(initReactI18next).init({
   },
 });
 
+const syncHtmlLang = (lng: string) => {
+  document.documentElement.lang = lng.replace(/_/g, '-');
+};
+
+syncHtmlLang(i18n.language);
+i18n.on('languageChanged', syncHtmlLang);
+
 export const useTranslation = () => {
   const { t, i18n } = useI18nTranslation();
 

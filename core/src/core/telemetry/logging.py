@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import json
 import logging
+import re
 import sys
 import time
 import traceback
@@ -167,6 +169,54 @@ class TextFormatter(logging.Formatter):
         return message
 
 
+class RedactingFormatter(logging.Formatter):
+    """Wraps another formatter to redact sensitive values from log output."""
+
+    sensitive_keys: list[str] = ["access_token", "refresh_token", "api_key"]
+
+    def __init__(self, original_formatter: logging.Formatter):
+        super().__init__()
+        self.original_formatter = original_formatter
+        self.patterns = []
+        for key in self.sensitive_keys:
+            pattern = re.compile(
+                rf"{re.escape(key)}=(['\"]?)([^'\"\s,)}}]+)\1", re.IGNORECASE
+            )
+            self.patterns.append((key, pattern))
+
+    def _redact_dict(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {
+                k: "[REDACTED]" if k in self.sensitive_keys else self._redact_dict(v)
+                for k, v in obj.items()
+            }
+        elif isinstance(obj, (list, tuple)):
+            return type(obj)(self._redact_dict(item) for item in obj)
+        elif hasattr(obj, "__dict__"):
+            try:
+                obj_copy = copy.copy(obj)
+                for key in self.sensitive_keys:
+                    if hasattr(obj_copy, key):
+                        setattr(obj_copy, key, "[REDACTED]")
+                return obj_copy
+            except (TypeError, AttributeError):
+                return obj
+        return obj
+
+    def format(self, record: logging.LogRecord) -> str:
+        record = copy.copy(record)
+        for key in self.sensitive_keys:
+            if hasattr(record, key):
+                setattr(record, key, "[REDACTED]")
+        for key, value in list(record.__dict__.items()):
+            if key not in _ALL_EXCLUDED_LOG_RECORD_ATTRS:
+                record.__dict__[key] = self._redact_dict(value)
+        formatted = self.original_formatter.format(record)
+        for key, pattern in self.patterns:
+            formatted = pattern.sub(rf"{key}=\1[REDACTED]\1", formatted)
+        return formatted
+
+
 def init_logging(
     level: LogLevel = LogLevel.INFO,
     format_type: FormatType = "text",
@@ -194,15 +244,15 @@ def init_logging(
     # Create handler with appropriate formatter
     handler = logging.StreamHandler(stream)
     if format_type == "json":
-        handler.setFormatter(JsonFormatter())
+        base_formatter: logging.Formatter = JsonFormatter()
     elif format_type == "readable":
-        handler.setFormatter(ReadableFormatter())
+        base_formatter = ReadableFormatter()
     else:
-        text_formatter = TextFormatter(
+        base_formatter = TextFormatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        text_formatter.converter = time.gmtime
-        handler.setFormatter(text_formatter)
+        base_formatter.converter = time.gmtime
+    handler.setFormatter(RedactingFormatter(base_formatter))
 
     root_logger.addHandler(handler)
 
@@ -232,15 +282,13 @@ def get_logger(
     # Create handler with appropriate formatter
     handler = logging.StreamHandler(stream)
     if format_type == "json":
-        handler.setFormatter(JsonFormatter())
+        base_fmt: logging.Formatter = JsonFormatter()
     elif format_type == "readable":
-        handler.setFormatter(ReadableFormatter())
+        base_fmt = ReadableFormatter()
     else:
-        text_formatter = TextFormatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        text_formatter.converter = time.gmtime
-        handler.setFormatter(text_formatter)
+        base_fmt = TextFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        base_fmt.converter = time.gmtime
+    handler.setFormatter(RedactingFormatter(base_fmt))
 
     # Configure logger
     logger = logging.getLogger(name)

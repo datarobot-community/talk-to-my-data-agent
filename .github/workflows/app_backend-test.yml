@@ -4,13 +4,12 @@ name: Test app_backend
 on:
   push:
     branches: ["main"]
-    paths:
-      - 'app_backend/**.py'
-
   pull_request:
     branches: ["main"]
     paths:
       - 'app_backend/**.py'
+      - 'app_backend/uv.lock'
+      - 'app_backend/pyproject.toml'
 
 jobs:
   tests:
@@ -63,7 +62,7 @@ jobs:
         run: task test
 
       - name: Get Cover
-        uses: orgoro/coverage@v3.2
+        uses: orgoro/coverage@v3.3
         with:
           coverageFile: app_backend/.coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}

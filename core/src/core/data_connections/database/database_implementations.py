@@ -22,6 +22,7 @@ from typing import Any, AsyncGenerator, cast
 import pandas as pd
 import polars as pl
 import snowflake.connector
+import snowflake.connector.cursor as snowflake_cursor
 from google.cloud import bigquery
 from hdbcli import dbapi
 from openai.types.chat.chat_completion_system_message_param import (
@@ -172,7 +173,8 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
         conn: snowflake.connector.SnowflakeConnection
         try:
             async with self.create_connection() as conn:
-                with await loop.run_in_executor(None, conn.cursor) as cursor:
+                cursor: snowflake_cursor.SnowflakeCursor
+                with await loop.run_in_executor(None, lambda: conn.cursor()) as cursor:
                     # Log current session info
                     logger.info("Checking current session settings...")
                     await loop.run_in_executor(
@@ -272,7 +274,8 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
         dataframes = []
         try:
             async with self.create_connection() as conn:
-                with await loop.run_in_executor(None, conn.cursor) as cursor:
+                cursor: snowflake_cursor.SnowflakeCursor
+                with await loop.run_in_executor(None, lambda: conn.cursor()) as cursor:
                     for table in table_names:
                         try:
                             qualified_table = f'{self._credentials.database}.{self._credentials.db_schema}."{table}"'

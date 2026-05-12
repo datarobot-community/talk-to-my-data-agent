@@ -56,15 +56,9 @@ class ExFormatter(logging.Formatter):
 
 
 def get_logger(name: str = "DataAnalystBackend") -> logging.Logger:
-    formatter = ExFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    consoleHandle = logging.StreamHandler()
-    consoleHandle.setLevel(logging.INFO)
-    consoleHandle.setFormatter(formatter)
     logger = logging.getLogger(name)
-    logger.propagate = False  # Prevent propagation to root logger
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
-    logger.addHandler(consoleHandle)
+    logger.propagate = True
+    logger.setLevel(logging.INFO)
     return logger
 
 

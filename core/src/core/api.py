@@ -1015,6 +1015,12 @@ async def _generate_run_analysis_python_code(
             role="user", content=f"Business Question: {request.question}"
         ),
         ChatCompletionUserMessageParam(
+            role="user",
+            content=f"Available dataset keys in dfs: {json.dumps(request.dataset_names)}\n"
+            "IMPORTANT: Only use these exact strings as keys when accessing dfs. "
+            "Do not derive key names from the business question or any other source.",
+        ),
+        ChatCompletionUserMessageParam(
             role="user", content=f"Data Shapes:\n{shape_info}"
         ),
         ChatCompletionUserMessageParam(

@@ -21,6 +21,7 @@ for specific Custom Applications while maintaining consistent datavolt patterns.
 
 from __future__ import annotations
 
+import contextvars
 import functools
 import inspect
 import logging
@@ -44,8 +45,6 @@ from opentelemetry._logs import set_logger_provider
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-# Note: LoggingInstrumentor not needed for basic telemetry setup
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import Histogram, MeterProvider
@@ -57,6 +56,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from typing_extensions import ParamSpec, Self, TypeVar
+
+from core.telemetry.logging import RedactingFormatter
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -77,10 +78,37 @@ try:
 except ImportError:
     HTTPXClientInstrumentor = None  # type: ignore[assignment, misc]
 
+try:
+    from opentelemetry.instrumentation.logging import LoggingInstrumentor
+except ImportError:
+    LoggingInstrumentor = None  # type: ignore[assignment, misc]
+
+try:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+except ImportError:
+    SQLAlchemyInstrumentor = None  # type: ignore[assignment, misc]
+
 P = ParamSpec("P")
 T = TypeVar("T")
 
 DEFAULT_EXCLUDED_TRACE_SPAN_NAMES = frozenset({"app.middleware._initialize_session"})
+
+_otel_handler_active: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_otel_handler_active", default=False
+)
+
+
+class _SafeLoggingHandler(LoggingHandler):
+    """LoggingHandler with ContextVar recursion guard (backport of opentelemetry-python-contrib #4302)."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if _otel_handler_active.get():
+            return
+        token = _otel_handler_active.set(True)
+        try:
+            super().emit(record)
+        finally:
+            _otel_handler_active.reset(token)
 
 
 class OTLPConnectionErrorFilter(logging.Filter):
@@ -168,6 +196,7 @@ class OTel:
         self._logger_provider: Optional[LoggerProvider] = None
         self._meter_provider: Optional[MeterProvider] = None
         self._tracer_provider: Optional[TracerProvider] = None
+        self._resource: Optional[Resource] = None
         self._configured: bool = False
         self._startup_logged: bool = False  # Track if startup has been logged
         self._otlp_warning_logged: bool = (
@@ -184,6 +213,24 @@ class OTel:
             self._auto_instrumentation_setup = True
 
         self._initialized = True
+
+    def _get_resource(self) -> Resource:
+        if self._resource is None:
+            attrs: dict[str, str] = {
+                "datarobot.service.priority": "p1",
+            }
+            # Only set service.name if the platform hasn't already provided OTEL_SERVICE_NAME.
+            # Resource.create() merges env vars at lower precedence than explicit attrs, so
+            # setting it here would shadow the platform value if they ever diverge.
+            if not os.environ.get("OTEL_SERVICE_NAME"):
+                attrs["service.name"] = f"{self.entity_type}-{self.entity_id}"
+            if self.entity_id:
+                attrs["datarobot.application.id"] = self.entity_id
+            pod_name = os.environ.get("HOSTNAME")
+            if pod_name:
+                attrs["k8s.pod.name"] = pod_name
+            self._resource = Resource.create(attrs)
+        return self._resource
 
     def _install_otlp_error_filter(self) -> None:
         """Install logging filter to suppress OTLP connection errors."""
@@ -258,6 +305,17 @@ class OTel:
                     f"Failed to setup httpx auto-instrumentation: {e}"
                 )
 
+        if SQLAlchemyInstrumentor is not None:
+            try:
+                SQLAlchemyInstrumentor().instrument()
+                logging.getLogger(__name__).info(
+                    "Auto-instrumentation enabled for SQLAlchemy"
+                )
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    f"Failed to setup SQLAlchemy auto-instrumentation: {e}"
+                )
+
     def instrument_fastapi_app(self, app: FastAPI) -> None:
         """
         Instrument a FastAPI application for automatic tracing.
@@ -307,16 +365,8 @@ class OTel:
         if self._logger_provider:
             return self._logger_provider
 
-        # Create resource with application context
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
-
         # Create logger provider
-        logger_provider = LoggerProvider(resource=resource)
+        logger_provider = LoggerProvider(resource=self._get_resource())
         set_logger_provider(logger_provider)
 
         # Create OTLP exporter
@@ -331,7 +381,19 @@ class OTel:
                 f"Failed to initialize OTLP logging exporter: {e}"
             )
 
-        # Note: LoggingHandler will be created per logger in get_logger() method
+        # Inject trace_id/span_id into every stdlib log record so stdout formatters
+        # include them automatically (picked up as extra fields by Json/TextFormatter).
+        if LoggingInstrumentor is not None:
+            LoggingInstrumentor().instrument()
+
+        # Attach to root logger so every logger in the process exports via propagation,
+        # regardless of how it was created (logging.getLogger() vs otel.get_logger()).
+        root_handler = _SafeLoggingHandler(
+            level=logging.INFO, logger_provider=logger_provider
+        )
+        root_handler.setFormatter(RedactingFormatter(logging.Formatter()))
+        logging.getLogger().addHandler(root_handler)
+
         self._logger_provider = logger_provider
         return logger_provider
 
@@ -341,14 +403,6 @@ class OTel:
         """
         if self._meter_provider:
             return self._meter_provider
-
-        # Create resource
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
 
         # Create OTLP exporter
         try:
@@ -361,12 +415,12 @@ class OTel:
             # Create metric reader
             reader = PeriodicExportingMetricReader(
                 exporter=otlp_exporter,
-                export_interval_millis=1000,
+                export_interval_millis=30000,
             )
 
             # Create meter provider
             meter_provider = MeterProvider(
-                resource=resource,
+                resource=self._get_resource(),
                 metric_readers=[
                     reader,
                 ],
@@ -378,7 +432,7 @@ class OTel:
             logging.getLogger(__name__).warning(
                 f"Failed to initialize OTLP metrics exporter: {e}"
             )
-            meter_provider = MeterProvider(resource=resource)
+            meter_provider = MeterProvider(resource=self._get_resource())
             metrics.set_meter_provider(meter_provider)
             self._meter_provider = meter_provider
             return meter_provider
@@ -390,16 +444,8 @@ class OTel:
         if self._tracer_provider:
             return self._tracer_provider
 
-        # Create resource
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
-
         # Create tracer provider
-        tracer_provider = TracerProvider(resource=resource)
+        tracer_provider = TracerProvider(resource=self._get_resource())
         trace.set_tracer_provider(tracer_provider)
 
         # Create OTLP exporter
@@ -434,37 +480,14 @@ class OTel:
         """
         Get a Python logger configured to send logs through OpenTelemetry.
         """
-        # Skip OpenTelemetry handler if telemetry is disabled
         if not self.telemetry_enabled:
             return logging.getLogger(name)
 
         if not self._logger_provider:
             self.configure_logging()
 
-        # Create a standard Python logger
         logger = logging.getLogger(name)
-
-        # Check if we already added the OpenTelemetry handler to avoid duplicates
-        otel_handler_exists = any(
-            isinstance(handler, LoggingHandler) for handler in logger.handlers
-        )
-
-        if not otel_handler_exists:
-            # Create OpenTelemetry logging handler
-            handler = LoggingHandler(
-                level=logging.INFO, logger_provider=self._logger_provider
-            )
-
-            # Set a formatter for better log structure
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            handler.setFormatter(formatter)
-
-            # Add the handler to the logger
-            logger.addHandler(handler)
-            logger.setLevel(logging.INFO)
-
+        logger.setLevel(logging.INFO)
         return logger
 
     def get_meter(self, name: str) -> metrics.Meter:

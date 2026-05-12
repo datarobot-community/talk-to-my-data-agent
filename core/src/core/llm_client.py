@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import logging
 from types import TracebackType
@@ -34,12 +35,91 @@ from openai import (
     NotFoundError,
     RateLimitError,
 )
-from opentelemetry import trace
+from opentelemetry import metrics, propagate, trace
 
 from core.config import Config
 
 log = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
+
+
+@functools.cache
+def _token_counter() -> metrics.Counter:
+    return metrics.get_meter("gen_ai").create_counter(
+        "gen_ai.client.token.usage",
+        unit="{token}",
+        description="Number of tokens used in GenAI API calls",
+    )
+
+
+def _otel_input_messages(messages: list[Any]) -> str:
+    """Convert OpenAI message format to OTel gen_ai.input.messages spec format."""
+    result = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role", "unknown")
+        parts: list[dict[str, Any]] = []
+
+        content = msg.get("content")
+        tool_call_id = msg.get("tool_call_id")
+
+        if tool_call_id:
+            # Tool response message
+            parts.append(
+                {
+                    "type": "tool_call_response",
+                    "id": tool_call_id,
+                    "result": content
+                    if isinstance(content, str)
+                    else json.dumps(content, default=str),
+                }
+            )
+        elif isinstance(content, str) and content:
+            parts.append({"type": "text", "content": content})
+        elif isinstance(content, list):
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "text":
+                    parts.append({"type": "text", "content": item.get("text", "")})
+                else:
+                    parts.append(item)
+
+        for tc in msg.get("tool_calls") or []:
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function") or {}
+            raw_args = fn.get("arguments", {})
+            try:
+                arguments = (
+                    json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                )
+            except (json.JSONDecodeError, TypeError):
+                arguments = raw_args
+            parts.append(
+                {
+                    "type": "tool_call",
+                    "id": tc.get("id", ""),
+                    "name": fn.get("name", ""),
+                    "arguments": arguments,
+                }
+            )
+
+        result.append({"role": role, "parts": parts})
+    return json.dumps(result, default=str)
+
+
+def _otel_output_messages(content: Any) -> str:
+    """Convert instructor result to OTel gen_ai.output.messages spec format."""
+    if isinstance(content, str):
+        text = content
+    else:
+        text = json.dumps(content, default=str)
+    return json.dumps(
+        [{"role": "assistant", "parts": [{"type": "text", "content": text}]}],
+        default=str,
+    )
 
 
 class InstructorClientWrapper:
@@ -111,17 +191,45 @@ class CompletionsWrapper:
         if "max_retries" not in kwargs:
             kwargs["max_retries"] = 2
 
-        log.debug(
+        log.info(
             f"LLM API call starting - model: {model}, api_base: {kwargs.get('api_base', 'default')}, "
             f"messages_count: {len(messages)}, timeout: {kwargs.get('timeout')}s"
         )
 
+        provider = model.split("/")[0] if "/" in model else model
+        user_prompt = next(
+            (
+                m.get("content", "")
+                for m in reversed(messages)
+                if m.get("role") == "user"
+            ),
+            "",
+        )
         with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
-            span.set_attribute(
-                "gen_ai.input.messages", json.dumps(messages, default=str)
-            )
+            # Inject W3C context now that the LLM span is active so downstream
+            # services become children of this span, not the grandparent.
+            otel_headers: dict[str, str] = {}
+            propagate.inject(otel_headers)
+            if otel_headers:
+                kwargs["extra_headers"] = {
+                    **(kwargs.get("extra_headers") or {}),
+                    **otel_headers,
+                }
+
+            span.set_attribute("gen_ai.operation.name", "chat")
             span.set_attribute("gen_ai.request.model", model)
-            span.set_attribute("gen_ai.system", "datarobot")
+            span.set_attribute("gen_ai.provider.name", provider)
+            if self._api_base:
+                from urllib.parse import urlparse
+
+                span.set_attribute(
+                    "server.address",
+                    urlparse(self._api_base).hostname or self._api_base,
+                )
+            span.set_attribute(
+                "gen_ai.prompt", user_prompt if isinstance(user_prompt, str) else ""
+            )
+            span.set_attribute("gen_ai.input.messages", _otel_input_messages(messages))
 
             try:
                 result = await self._completions.create(*args, **kwargs)
@@ -131,10 +239,15 @@ class CompletionsWrapper:
                     self._tracker.track_call(messages, result, model)
 
                 try:
-                    completion_text = (
-                        result.model_dump_json()
-                        if hasattr(result, "model_dump_json")
-                        else json.dumps(result, default=str)
+                    content: Any = (
+                        result.model_dump()
+                        if hasattr(result, "model_dump")
+                        else str(result)
+                    )
+                    completion_text = _otel_output_messages(content)
+                    span.set_attribute(
+                        "gen_ai.completion",
+                        str(content) if not isinstance(content, str) else content,
                     )
                     span.set_attribute("gen_ai.output.messages", completion_text)
                 except Exception:
@@ -142,7 +255,32 @@ class CompletionsWrapper:
                         "Failed to serialize LLM completion for tracing", exc_info=True
                     )
 
-                log.debug(f"LLM API call completed successfully - model: {model}")
+                # Record token usage if available on the raw response
+                raw = getattr(result, "_raw_response", None) or result
+                usage = getattr(raw, "usage", None)
+                if usage:
+                    token_attrs = {
+                        "gen_ai.request.model": model,
+                        "gen_ai.provider.name": provider,
+                    }
+                    prompt_tokens = getattr(usage, "prompt_tokens", None)
+                    if prompt_tokens is not None:
+                        span.set_attribute("gen_ai.usage.input_tokens", prompt_tokens)
+                        _token_counter().add(
+                            prompt_tokens,
+                            {**token_attrs, "gen_ai.token.type": "input"},
+                        )
+                    completion_tokens = getattr(usage, "completion_tokens", None)
+                    if completion_tokens is not None:
+                        span.set_attribute(
+                            "gen_ai.usage.output_tokens", completion_tokens
+                        )
+                        _token_counter().add(
+                            completion_tokens,
+                            {**token_attrs, "gen_ai.token.type": "output"},
+                        )
+
+                log.info(f"LLM API call completed successfully - model: {model}")
                 return result
 
             except Exception as e:

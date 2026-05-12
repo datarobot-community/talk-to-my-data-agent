@@ -186,8 +186,8 @@ NECESSARY CONSIDERATIONS:
 - Consider appropriate joins/merges between dataframes when needed
 - Document the code with comments at the top of the function explaining at a high level what the code does
 - Include comments at each step to explain the code in more detail
-- The function must return a single DataFrame with the analysis results
-- The function shall not return a list of dataframes, a dict of dataframes, or anything other than a single dataframe.
+- The function must return a dict with a single key "data" whose value is the result DataFrame, e.g. `return {"data": result_df}`.
+- The function shall not return a bare DataFrame, a list of dataframes, or anything other than `{"data": <dataframe>}`.
 - You may perform advanced analysis using statsmodels, scipy, numpy, pandas, polars and scikit-learn.
 - If the user mentions anything about charting, plotting or graphing the data, you do not need to include code to actually visualize the data. You only need to ensure that the data will be available in the dataframe for downstream analysis and charting later.
 - Please try to be memory efficient if the data is large (more than 1M rows)
