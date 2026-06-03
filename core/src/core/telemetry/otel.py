@@ -207,8 +207,11 @@ class OTel:
         # We keep this even if telemetry is disabled, just in case something tries to force it
         self._install_otlp_error_filter()
 
-        # Setup auto-instrumentation on first init
-        if not self._auto_instrumentation_setup:
+        # Setup auto-instrumentation on first init.
+        # Skip when telemetry is disabled: the httpx instrumentor wraps every
+        # AsyncClient process-wide and can hang KeyValue pagination in CLI
+        # scripts that set DISABLE_TELEMETRY=true (no exporter configured).
+        if self.telemetry_enabled and not self._auto_instrumentation_setup:
             self._setup_auto_instrumentation()
             self._auto_instrumentation_setup = True
 
