@@ -44,11 +44,18 @@ async def test_iter_key_value(httpx_async_client: AsyncMock) -> None:
         x.json.return_value = v
         return x
 
-    async def get_key_values(path: str, *, params: dict[str, Any]) -> Any:
-        assert params == {"entityId": "e", "entityType": "customApplication"}
+    async def get_key_values(
+        path: str, *, params: dict[str, Any] | None = None
+    ) -> Any:
         if path == "keyValues/":
+            # Initial page: params are explicitly passed by unpaginate().
+            assert params == {"entityId": "e", "entityType": "customApplication"}
             return r({"data": [1, 2], "next": "keyValues/next/"})
         elif path == "keyValues/next/":
+            # Subsequent pages: the server's `next` URL already contains the
+            # original query string, so unpaginate() must NOT re-pass params
+            # (doing so duplicates entityId/entityType in the URL).
+            assert params is None
             return r(
                 {
                     "data": [3],
@@ -67,6 +74,23 @@ async def test_iter_key_value(httpx_async_client: AsyncMock) -> None:
         key_values.append(key_value)
 
     assert key_values == [1, 2, 3]
+
+
+def test_async_client_uses_explicit_timeout(httpx_async_client: AsyncMock) -> None:
+    """``AsyncDataRobotClient`` must construct ``httpx.AsyncClient`` with an
+    explicit timeout. Without one, calls inherit httpx's default of 5 seconds,
+    and when the OTEL httpx instrumentor is installed process-wide a default
+    timeout can be masked altogether — leading to silent indefinite hangs on
+    the KeyValue listing endpoint in long-running CLI tools.
+    """
+    AsyncDataRobotClient(token="t", endpoint="https://dr.example")
+
+    httpx_async_client.assert_called_once()
+    _, kwargs = httpx_async_client.call_args
+    assert (
+        "timeout" in kwargs
+    ), "AsyncDataRobotClient must pass an explicit timeout to httpx.AsyncClient"
+    assert isinstance(kwargs["timeout"], httpx.Timeout)
 
 
 @pytest.mark.asyncio
