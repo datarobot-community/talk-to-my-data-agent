@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.8.2] - 2026-06-04
+
+### Fixed
+
+- Fixed CLI scripts (e.g. `task core:transfer-database`) hanging on custom applications with >100 KeyValues due to three interacting bugs: OTel httpx auto-instrumentation running even with telemetry disabled, missing explicit httpx timeout, and pagination duplicating query parameters on follow-up pages.
+
 ## [11.7.2] - 2026-04-27
 
 ### Changed

@@ -950,7 +950,7 @@ async def _generate_run_analysis_python_code(
     validation_error: InvalidGeneratedCode | None = None,
     attempt: int = 0,
     token_tracker: TokenUsageTracker | None = None,
-) -> str:
+) -> CodeGeneration:
     """
     Generate Python analysis code based on JSON data and question.
 
@@ -959,7 +959,7 @@ async def _generate_run_analysis_python_code(
     - validation_errors: Past validation errors to include in prompt
 
     Returns:
-    - Generated code
+    - The full LLM completion (code + description + used_datasets)
     """
     # Convert dictionary data structure to list of columns for all datasets
     logger.info("Starting code gen")
@@ -1084,7 +1084,7 @@ async def _generate_run_analysis_python_code(
                 timeout=900,
             )
     logger.info("Code Gen complete")
-    return completion.code
+    return completion
 
 
 @otel.meter_and_trace
@@ -1486,13 +1486,14 @@ async def _run_analysis(
         analysis_context.assistant_message.step_reattempt = len(exception_history)
         analysis_context.stage_message_update()
 
-    code = await _generate_run_analysis_python_code(
+    completion = await _generate_run_analysis_python_code(
         request,
         analyst_db,
         next(iter(exception_history[::-1]), None),
         attempt=len(exception_history),
         token_tracker=token_tracker,
     )
+    code = completion.code
     logger.info("Code generated, preparing execution")
 
     if analysis_context.assistant_message_id and analysis_context.assistant_message:
@@ -1564,6 +1565,7 @@ async def _run_analysis(
                 len(df.columns) for df in dataframes.values() if not df.is_empty()
             ),
         ),
+        used_datasets=completion.used_datasets,
     )
 
 

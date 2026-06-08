@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from core.telemetry import configure_uvicorn_logging, init_logging
+from core.telemetry import configure_uvicorn_logging, init_logging, otel
 from datarobot_asgi_middleware import DataRobotASGIMiddleware
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -114,6 +114,7 @@ def create_app(
     if config is None:
         config = Config()
 
+    otel.configure(config)
     init_logging(level=config.log_level, format_type=config.log_format)
 
     # Configure uvicorn logging with health check filtering and custom formatting

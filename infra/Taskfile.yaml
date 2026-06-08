@@ -24,7 +24,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_PLUGIN_VERSION:-}" ]; then
         echo "${PULUMI_DATAROBOT_PLUGIN_VERSION}"
       else
-        echo "v0.10.30"
+        echo "v0.10.36"
       fi
 
   PULUMI_DATAROBOT_DEFAULT_URL:
@@ -35,7 +35,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_DEFAULT_URL:-}" ]; then
         echo "${PULUMI_DATAROBOT_DEFAULT_URL}"
       else
-        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.30"
+        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.36"
       fi
 
 tasks:

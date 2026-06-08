@@ -29,6 +29,7 @@ export interface IAnalysisComponent extends IComponent {
   metadata?: IMetadata;
   dataset_id?: string | null;
   code?: string | null;
+  used_datasets?: string[] | null;
 }
 
 export interface IChartsComponent extends IComponent {

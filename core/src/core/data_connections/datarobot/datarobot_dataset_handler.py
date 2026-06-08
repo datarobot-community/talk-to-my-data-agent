@@ -450,7 +450,7 @@ class BaseRecipe(abc.ABC):
         preview: dr.models.recipe.RecipePreview = await loop.run_in_executor(
             None, self._recipe.get_preview, timeout_seconds
         )
-        schema: list[dict[str, Any]] = preview.result_schema
+        schema = cast(list[dict[str, Any]], preview.result_schema)
 
         # Unfortunately the Python SDK currently doesn't have a nice API for Previews
         all_rows: list[Any] = preview.data

@@ -11,10 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from core.telemetry import FormatType, LogLevel
+from core.telemetry.enums import FormatType, LogLevel
 from datarobot.core.config import DataRobotAppFrameworkBaseSettings
+from pydantic import field_validator
 
 
 class Config(DataRobotAppFrameworkBaseSettings):
     log_level: LogLevel = LogLevel.INFO
     log_format: FormatType = "readable"
+    otel_exporter_otlp_endpoint: str = ""
+    otel_exporter_otlp_headers: str = ""
+    otel_sdk_disabled: bool = False
+
+    @field_validator("otel_sdk_disabled", mode="before")
+    @classmethod
+    def _coerce_empty_string(cls, v: object) -> object:
+        return False if v == "" else v

@@ -17,7 +17,7 @@ Pytests for core/datarobot_dataset_helper.
 
 import datetime
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any, Generator, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import datarobot
@@ -446,12 +446,12 @@ async def test_preview_dataset(mocks: Mocks) -> None:
         stored_count=2,
         byte_size=10,
         estimated_size_exceeds_limit=False,
-        result_schema=[
+        result_schema=cast(Any, [
             {"name": "id", "dataType": "INT_TYPE"},
             {"name": "double", "dataType": "DOUBLE_TYPE"},
             {"name": "string", "dataType": "STRING_TYPE"},
             {"name": "other", "dataType": "STRING_TYPE"},
-        ],
+        ]),
         data=[[1, 1.0, "1", "A"], [2, 2.0, "2", "B"]],
         next=None,
     )
@@ -485,12 +485,12 @@ async def test_preview_dataset__snake_case_data_type(mocks: Mocks) -> None:
         stored_count=2,
         byte_size=10,
         estimated_size_exceeds_limit=False,
-        result_schema=[
+        result_schema=cast(Any, [
             {"name": "id", "data_type": "INT_TYPE"},
             {"name": "double", "dataType": "DOUBLE_TYPE"},
             {"name": "string", "data_type": "STRING_TYPE"},
             {"name": "other", "data_type": "STRING_TYPE"},
-        ],
+        ]),
         data=[[1, 1.0, "1", "A"], [2, 2.0, "2", "B"]],
         next=None,
     )
@@ -535,12 +535,12 @@ async def test_preview_dataset_retryable_error(mocks: Mocks) -> None:
                 stored_count=2,
                 byte_size=10,
                 estimated_size_exceeds_limit=False,
-                result_schema=[
+                result_schema=cast(Any, [
                     {"name": "id", "dataType": "INT_TYPE"},
                     {"name": "double", "dataType": "DOUBLE_TYPE"},
                     {"name": "string", "dataType": "STRING_TYPE"},
                     {"name": "other", "dataType": "STRING_TYPE"},
-                ],
+                ]),
                 data=[[1, "INVALID", "1", "A"], [2, "2.0", "2", "B"]],
                 next=None,
             )

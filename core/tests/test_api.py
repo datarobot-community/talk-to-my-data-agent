@@ -630,3 +630,22 @@ def test_chat_message_error_uses_friendly_helper() -> None:
     assert "<failed_attempts>" not in rendered
     assert "<" not in rendered and ">" not in rendered
     assert len(rendered) <= len(prefix) + 200
+
+
+def test_code_generation_used_datasets_coerces_malformed_llm_output() -> None:
+    """If the LLM omits, nulls, or wrongly shapes used_datasets, validation must not fail."""
+    from core.schema import CodeGeneration
+
+    # Going through model_validate to exercise the `before` validator with arbitrary
+    # JSON-shaped inputs that bypass the constructor's typed signature.
+    def build(used_datasets: Any) -> CodeGeneration:
+        return CodeGeneration.model_validate(
+            {"code": "x", "description": "y", "used_datasets": used_datasets}
+        )
+
+    assert CodeGeneration(code="x", description="y").used_datasets == []
+    assert build(None).used_datasets == []
+    assert build("solo").used_datasets == []
+    assert build({"k": "v"}).used_datasets == []
+    assert build([1, "ok", None]).used_datasets == ["ok"]
+    assert build(["a", "b"]).used_datasets == ["a", "b"]

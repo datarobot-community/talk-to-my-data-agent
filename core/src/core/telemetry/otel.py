@@ -60,6 +60,7 @@ from typing_extensions import ParamSpec, Self, TypeVar
 from core.telemetry.logging import RedactingFormatter
 
 if TYPE_CHECKING:
+    from app.config import Config
     from fastapi import FastAPI
 
 # Optional imports for auto-instrumentation
@@ -160,6 +161,9 @@ class OTel:
     Implements singleton pattern to ensure only one instance exists per process.
     """
 
+    _SERVICE_PRIORITY = "p1"
+    _METRIC_EXPORT_INTERVAL_MILLIS = 5_000
+
     _instance: Optional[OTel] = None
     _initialized: bool = False
     _auto_instrumentation_setup: bool = False
@@ -174,53 +178,62 @@ class OTel:
     def __init__(
         self, entity_type: str = "custom_application", entity_id: Optional[str] = None
     ):
-        # Only initialize once
         if self._initialized:
             return
 
         self.entity_type = entity_type
         self.entity_id = entity_id or os.environ.get("APPLICATION_ID")
 
-        # Telemetry enabled by default, disabled in local dev (start scripts set DISABLE_TELEMETRY=true)
-        self.telemetry_enabled = os.environ.get("DISABLE_TELEMETRY") != "true"
-
-        # Auto-disable telemetry if OTLP endpoint is not configured
-        if self.telemetry_enabled and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
-            # Check if internal endpoint is set (fallback)
-            if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT_INTERNAL"):
-                self.telemetry_enabled = False
-                logging.getLogger(__name__).warning(
-                    "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
-                )
+        self.telemetry_enabled = False
 
         self._logger_provider: Optional[LoggerProvider] = None
         self._meter_provider: Optional[MeterProvider] = None
         self._tracer_provider: Optional[TracerProvider] = None
         self._resource: Optional[Resource] = None
         self._configured: bool = False
-        self._startup_logged: bool = False  # Track if startup has been logged
-        self._otlp_warning_logged: bool = (
-            False  # Track if OTLP connection warning has been logged
-        )
+        self._startup_logged: bool = False
+        self._otlp_warning_logged: bool = False
 
-        # Install filter to suppress OTLP connection errors from spamming logs
-        # We keep this even if telemetry is disabled, just in case something tries to force it
         self._install_otlp_error_filter()
 
-        # Setup auto-instrumentation on first init.
-        # Skip when telemetry is disabled: the httpx instrumentor wraps every
-        # AsyncClient process-wide and can hang KeyValue pagination in CLI
-        # scripts that set DISABLE_TELEMETRY=true (no exporter configured).
+        self._initialized = True
+
+    def configure(self, config: Config) -> None:
+        """Apply OTel settings from app Config. Call once during app startup."""
+        self.telemetry_enabled = not config.otel_sdk_disabled
+
+        if self.telemetry_enabled and not config.otel_exporter_otlp_endpoint:
+            if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT_INTERNAL"):
+                self.telemetry_enabled = False
+                logging.getLogger(__name__).warning(
+                    "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
+                )
+
+        _endpoint = config.otel_exporter_otlp_endpoint
+        _is_remote = (
+            _endpoint and "localhost" not in _endpoint and "127.0.0.1" not in _endpoint
+        )
+        if (
+            self.telemetry_enabled
+            and _is_remote
+            and not config.otel_exporter_otlp_headers
+        ):
+            self.telemetry_enabled = False
+            logging.getLogger(__name__).error(
+                "OTEL_EXPORTER_OTLP_ENDPOINT is set to a remote URL but OTEL_EXPORTER_OTLP_HEADERS is missing. "
+                "All telemetry requests will be rejected (401). Disabling telemetry. "
+                "Run `dr start` to get the required credentials, "
+                "then add OTEL_EXPORTER_OTLP_HEADERS to your .env file."
+            )
+
         if self.telemetry_enabled and not self._auto_instrumentation_setup:
             self._setup_auto_instrumentation()
             self._auto_instrumentation_setup = True
 
-        self._initialized = True
-
     def _get_resource(self) -> Resource:
         if self._resource is None:
             attrs: dict[str, str] = {
-                "datarobot.service.priority": "p1",
+                "datarobot.service.priority": self._SERVICE_PRIORITY,
             }
             # Only set service.name if the platform hasn't already provided OTEL_SERVICE_NAME.
             # Resource.create() merges env vars at lower precedence than explicit attrs, so
@@ -418,7 +431,7 @@ class OTel:
             # Create metric reader
             reader = PeriodicExportingMetricReader(
                 exporter=otlp_exporter,
-                export_interval_millis=30000,
+                export_interval_millis=self._METRIC_EXPORT_INTERVAL_MILLIS,
             )
 
             # Create meter provider

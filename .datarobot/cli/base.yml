@@ -39,6 +39,9 @@ root:
       - name: SAP Datasphere
         value: sap
         requires: sap_datasphere_config
+      - name: JDBC (PostgreSQL / MySQL / SQL Server)
+        value: datarobot_jdbc
+        requires: jdbc_config
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"
@@ -165,6 +168,16 @@ bigquery_config:
     type: string
     optional: false
     help: "The Google Cloud BigQuery schema"
+
+jdbc_config:
+  - env: JDBC_URI
+    type: secret_string
+    optional: false
+    help: "The full JDBC connection string, e.g. jdbc:postgresql://host:5432/db. Credentials may be embedded in the URI or passed via JDBC_CONNECTION_PARAMETERS."
+  - env: JDBC_CONNECTION_PARAMETERS
+    type: secret_string
+    optional: true
+    help: 'Optional JSON object of JDBC connection parameters, e.g. {"user": "dbuser", "password": "secret"}.'
 
 sap_datasphere_config:
   - env: SAP_DATASPHERE_HOST

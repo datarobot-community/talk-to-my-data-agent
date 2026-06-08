@@ -86,6 +86,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     fig2_json,
     code,
     datasetId,
+    usedDatasets,
     tabStates,
     analysisErrors,
     chartsErrors,
@@ -107,6 +108,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     const fig2_json = chartsComponent?.fig2_json || '';
     const code = analysisComponent?.code || chartsComponent?.code;
     const datasetId = analysisComponent?.dataset_id || null;
+    const usedDatasets = analysisComponent?.used_datasets ?? null;
 
     const messageStep = getTranslatedMessageStep(message);
 
@@ -155,6 +157,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
       fig2_json,
       code,
       datasetId,
+      usedDatasets,
       tabStates,
       analysisErrors,
       chartsErrors,
@@ -230,7 +233,7 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
                 componentType="Analysis"
               />
             )}
-            <CodeTabContent code={code} datasetId={datasetId} />
+            <CodeTabContent code={code} datasetId={datasetId} usedDatasets={usedDatasets} />
           </>
         )}
       </div>

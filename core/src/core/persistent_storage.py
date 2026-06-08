@@ -61,9 +61,6 @@ class AsyncDataRobotClient:
             yield row
         while resp_data.get("next") is not None:
             next_url = resp_data["next"]
-            # next_url is an absolute URL that already contains the query
-            # string; passing initial_params again duplicates entityId/
-            # entityType in the URL and can confuse the server.
             r = await self._client.get(next_url)
             resp_data = r.json()
             for row in resp_data["data"]:

@@ -19,20 +19,10 @@ import sys
 import time
 import traceback
 from datetime import datetime, timezone
-from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Coroutine, Dict, Literal, ParamSpec, TypeVar, Union
+from typing import Any, Callable, Coroutine, Dict, ParamSpec, TypeVar, Union
 
-
-class LogLevel(str, Enum):
-    ERROR = "ERROR"
-    WARN = "WARNING"
-    WARNING = "WARNING"
-    INFO = "INFO"
-    DEBUG = "DEBUG"
-
-
-FormatType = Literal["json", "text", "readable"]
+from core.telemetry.enums import FormatType, LogLevel
 
 _READABLE_INDENT = "   "
 

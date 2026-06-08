@@ -24,6 +24,7 @@ import pydantic
 from core.credentials import (  # type: ignore[import-not-found]
     DRCredentials,
     GoogleCredentialsBQ,
+    JDBCCredentials,
     NoDatabaseCredentials,
     SAPDatasphereCredentials,
     SnowflakeCredentials,
@@ -145,6 +146,28 @@ def get_credential_runtime_parameter_values(
                 }
             )
         credential_rtp_dicts = rtps
+    elif isinstance(credentials, JDBCCredentials):
+        rtps = [
+            {
+                "key": "DATABASE_CONNECTION_TYPE",
+                "type": "string",
+                "value": "datarobot_jdbc",
+            },
+            {
+                "key": "JDBC_URI",
+                "type": "credential",
+                "value": credentials.jdbc_uri,
+            },
+        ]
+        if credentials.jdbc_connection_parameters:
+            rtps.append(
+                {
+                    "key": "JDBC_CONNECTION_PARAMETERS",
+                    "type": "credential",
+                    "value": json.dumps(credentials.jdbc_connection_parameters),
+                }
+            )
+        credential_rtp_dicts = rtps
     elif isinstance(credentials, SAPDatasphereCredentials):
         rtps = [
             {
@@ -235,12 +258,14 @@ def get_database_credentials(
     SnowflakeCredentials
     | GoogleCredentialsBQ
     | SAPDatasphereCredentials
+    | JDBCCredentials
     | NoDatabaseCredentials
 ):
     credentials: (
         SnowflakeCredentials
         | GoogleCredentialsBQ
         | SAPDatasphereCredentials
+        | JDBCCredentials
         | NoDatabaseCredentials
     )
 
@@ -326,6 +351,19 @@ def get_database_credentials(
                 bq_con = google.cloud.bigquery.Client(credentials=google_credentials)
                 bq_con.close()  # type: ignore[no-untyped-call]
             return credentials
+        elif database == "datarobot_jdbc":
+            credentials = JDBCCredentials()  # type: ignore[call-arg]
+            if test_credentials:
+                from core.data_connections.database.database_implementations import (  # type: ignore[import-not-found]
+                    JdbcPreviewOperator,
+                )
+
+                try:
+                    JdbcPreviewOperator(credentials).validate_connection()
+                except Exception as e:
+                    raise ValueError("Failed to connect via JDBC.") from e
+            return credentials
+
         elif database == "sap":
             credentials = SAPDatasphereCredentials()  # type: ignore[call-arg]
             if test_credentials:
