@@ -49,14 +49,6 @@ datarobot_base_url = (
 )
 export("OTEL_EXPORTER_OTLP_ENDPOINT", f"{datarobot_base_url}/otel")
 export(
-    "OTEL_EXPORTER_OTLP_HEADERS",
-    pulumi.Output.format(
-        "x-datarobot-entity-id=experiment_container-{0},x-datarobot-api-key={1}",
-        use_case.id,
-        os.environ.get("DATAROBOT_API_TOKEN", ""),
-    ),
-)
-pulumi.export(
-    "Local tracing dashboard (open in browser to view traces)",
-    pulumi.Output.format("{0}/usecases/{1}/tracing", datarobot_base_url, use_case.id),
+    "OTEL_ENTITY_ID",
+    pulumi.Output.format("experiment_container-{0}", use_case.id),
 )

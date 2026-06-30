@@ -71,10 +71,22 @@ proxy_llm_registered_model = datarobot.RegisteredModel.get(
     id=TEXTGEN_REGISTERED_MODEL_ID,
 )
 
-prediction_environment = datarobot.PredictionEnvironment(
-    resource_name="LLM Prediction Environment " + llm_resource_name,
-    platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
-)
+if prediction_environment_id := os.environ.get(
+    "DATAROBOT_DEFAULT_PREDICTION_ENVIRONMENT"
+):
+    pulumi.info(f"Using existing prediction environment '{prediction_environment_id}'")
+
+    prediction_environment = datarobot.PredictionEnvironment.get(
+        id=prediction_environment_id,
+        resource_name="LLM Prediction Environment "
+        + llm_resource_name
+        + " [PRE-EXISTING]",
+    )
+else:
+    prediction_environment = datarobot.PredictionEnvironment(
+        resource_name="LLM Prediction Environment " + llm_resource_name,
+        platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
+    )
 
 # Create the deployment for the passed in registered model
 proxy_llm_deployment = datarobot.Deployment(

@@ -70,7 +70,7 @@ default_llm_friendly_name: str = os.environ.get(
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
-llm_credential_runtime_params = get_runtime_values(default_model)
+llm_credential_runtime_params = get_runtime_values(default_llm_id)
 # This will ensure your credentials are working properly
 # https://docs.litellm.ai/docs/providers for more details
 # on what string to pass to `verify_llm` This default
@@ -108,10 +108,22 @@ llm_custom_model = datarobot.CustomModel(
     runtime_parameter_values=llm_credential_runtime_params,
 )
 
-prediction_environment = datarobot.PredictionEnvironment(
-    resource_name="LLM Prediction Environment " + llm_resource_name,
-    platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
-)
+if prediction_environment_id := os.environ.get(
+    "DATAROBOT_DEFAULT_PREDICTION_ENVIRONMENT"
+):
+    pulumi.info(f"Using existing prediction environment '{prediction_environment_id}'")
+
+    prediction_environment = datarobot.PredictionEnvironment.get(
+        id=prediction_environment_id,
+        resource_name="LLM Prediction Environment "
+        + llm_resource_name
+        + " [PRE-EXISTING]",
+    )
+else:
+    prediction_environment = datarobot.PredictionEnvironment(
+        resource_name="LLM Prediction Environment " + llm_resource_name,
+        platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
+    )
 
 # Register the custom model
 llm_registered_model = datarobot.RegisteredModel(
@@ -154,7 +166,7 @@ app_runtime_parameters = [
         value=default_model,
     ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="LLM_default_llm_friendly_name",
+        key="LLM_DEFAULT_MODEL_FRIENDLY_NAME",
         type="string",
         value=default_llm_friendly_name,
     ),
@@ -176,8 +188,29 @@ custom_model_runtime_parameters = [
         value=default_model,
     ),
 ]
+
+# TODO(APP-5859): Move datarobot_url to af-component-base infra/__init__.py
+datarobot_url = (
+    os.getenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    .rstrip("/")
+    .removesuffix("/api/v2")
+)
+rag_playground_url = pulumi.Output.format(
+    "{0}/usecases/{1}/playgrounds/{2}/comparison/chats",
+    datarobot_url,
+    use_case.id,
+    playground.id,
+)
+deployment_url = pulumi.Output.format(
+    "{0}/console-nextgen/deployments/{1}/overview",
+    datarobot_url,
+    llm_deployment.id,
+)
+
 pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
+pulumi.export("Deployment Console " + llm_resource_name, deployment_url)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
-export("LLM_default_llm_friendly_name", default_llm_friendly_name)
+export("LLM_DEFAULT_MODEL_FRIENDLY_NAME", default_llm_friendly_name)
 export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
+pulumi.export("RAG Playground URL " + llm_resource_name, rag_playground_url)

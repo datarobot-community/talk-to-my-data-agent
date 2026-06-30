@@ -38,6 +38,7 @@ from openai import (
 from opentelemetry import metrics, propagate, trace
 
 from core.config import Config
+from core.telemetry.metrics import track_chat_request
 
 log = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -205,7 +206,10 @@ class CompletionsWrapper:
             ),
             "",
         )
-        with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+        with (
+            track_chat_request(model=model),
+            _tracer.start_as_current_span(f"gen_ai.chat {model}") as span,
+        ):
             # Inject W3C context now that the LLM span is active so downstream
             # services become children of this span, not the grandparent.
             otel_headers: dict[str, str] = {}

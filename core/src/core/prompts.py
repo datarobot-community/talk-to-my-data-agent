@@ -216,7 +216,6 @@ You will also be provided a small sample of data from each table. This will help
 You will also be provided a list of frequently occurring values from VARCHAR / categorical columns. This will be helpful when adding where clauses in your query.
 Based on this metadata, build your query so that it will run without error and return some data.
 Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
-Your query will be executed from Python using the Snowflake Python Connector.
 
 RESPONSE:
 Your response shall be a single, executable Snowflake SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
@@ -234,18 +233,12 @@ Your response shall be formatted as JSON with the following fields:
 1) code: Snowflake SQL code that will execute and return the data
 2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
 
-SNOWFLAKE ENVIRONMENT:
-Warehouse: {warehouse}
-Database: {database}
-Schema: {schema}
-
 NECESSARY CONSIDERATIONS:
 Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
 When performing date operations on a date column, consider casting that column as a DATE for error redundancy.
 To ensure case sensitivity of column names, use quotes around column names.
-This query will be executed using the Snowflake Python Connector. Make sure the query will be compatible with the Snowflake Python Connector.
-Always reference tables fully quoted and qualified, as in '{database}.{schema}."TABLE_NAME"' and quote any column names in the query.
+Always quote table and column names in your query.
 
 LANGUAGE:
 Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
@@ -272,8 +265,6 @@ You will also be provided a small sample of data from each table. This will help
 You will also be provided a list of frequently occurring values from STRING / categorical columns. This will be helpful when adding WHERE clauses in your query.
 Based on this metadata, build your query so that it will run without error and return some data.
 Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
-Your query will be executed from Python using the Google Cloud BigQuery Python client library.
-
 RESPONSE:
 Your response shall be a single, executable BigQuery SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
 In addition, your response should return any relevant, supporting or contextual information to help the user better understand the results.
@@ -290,15 +281,10 @@ Your response shall be formatted as JSON with the following fields:
 1) code: BigQuery SQL code that will execute and return the data
 2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
 
-BIGQUERY ENVIRONMENT:
-Project: {project}
-Dataset: {dataset}
-
 NECESSARY CONSIDERATIONS:
 Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
 When performing date operations on a date column, consider using SAFE_CAST, PARSE_DATE, or the appropriate BigQuery date functions for error redundancy.
-This query will be executed using the BigQuery Python client library. Make sure the query is compatible with standard SQL in BigQuery.
 
 LANGUAGE:
 Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
@@ -513,7 +499,6 @@ You will also be provided a small sample of data from each table. This will help
 You will also be provided a list of frequently occurring values from VARCHAR / categorical columns. This will be helpful when adding where clauses in your query.
 Based on this metadata, build your query so that it will run without error and return some data.
 Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
-Your query will be executed from Python using the SAP hdbcli Python Connector.
 
 RESPONSE:
 Your response shall be a single, executable SAP HANA SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
@@ -531,9 +516,6 @@ Your response shall be formatted as JSON with the following fields:
 1) code: SAP HANA SQL code that will execute and return the data
 2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
 
-SAP ENVIRONMENT:
-Schema: {schema}
-
 NECESSARY CONSIDERATIONS:
 Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
@@ -542,9 +524,8 @@ To ensure case sensitivity of column names, use quotes around column names.
 When generating SQL for SAP Data Sphere, follow these guidelines:
 
 1. SAP Data Sphere uses HANA SQL syntax, which is different from other SQL dialects.
-2. Use schema format `{schema}` for all table references.
-3. Pay attention to case sensitivity in table and column names.
-4. Use double quotes around identifiers that contain special characters or mixed case.
+2. Pay attention to case sensitivity in table and column names.
+3. Use double quotes around identifiers that contain special characters or mixed case.
 
 Common HANA SQL syntax differences:
 - For TOP N queries: 'SELECT TOP n columns FROM table'

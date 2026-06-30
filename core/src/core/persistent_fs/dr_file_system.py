@@ -20,17 +20,28 @@ import shutil
 import tempfile
 import time
 import uuid
+from datetime import datetime
 from typing import (
     Any,
     BinaryIO,
     Callable,
+    List,
+    Optional,
     ParamSpec,
+    Tuple,
     TypeVar,
+    Union,
     cast,
 )
 
 import datarobot as dr
-from fsspec import AbstractFileSystem
+from datarobot.enums import FilesOverwriteStrategy
+from datarobot.enums import KeyValueEntityType as DRKeyValueEntityType
+from datarobot.errors import ClientError
+from datarobot.fs import DataRobotFile, DataRobotFileSystem
+from datarobot.fs.file_system import FileInfo as BaseFileInfo
+from datarobot.models.files import File, Files, FilesDetails
+from fsspec.spec import AbstractFileSystem
 
 from core.persistent_fs.kv_custom_app_implementattion import (
     KeyValue,
@@ -52,9 +63,36 @@ logger = logging.getLogger(__name__)
 
 METADATA_STORAGE_NAME = "fs_metadata"
 TIMESTAMP_STORAGE_NAME = "fs_timestamp"
+CATALOG_STORAGE_NAME = "fs_catalog"
 
 FILE_API_CONNECT_TIMEOUT = float(os.environ.get("FILE_API_CONNECT_TIMEOUT", 180))
 FILE_API_READ_TIMEOUT = float(os.environ.get("FILE_API_READ_TIMEOUT", 180))
+
+
+class FileInfo(BaseFileInfo):
+    """
+    Information about a file or directory in DataRobot File System.
+
+    Attributes
+    ----------
+    name:
+        The path of the file or directory. Does not include the protocol prefix.
+    size:
+        The size of the file in bytes. For directories, this is 0.
+    type:
+        The type of the item, either 'file' or 'directory'.
+    format:
+        The file format (e.g., 'csv', 'pdf') if the item is a file; None for directories.
+    created_at:
+        The file creation timestamp if the item is a file; None for directories.
+    catalog_id:
+        The catalog id of the file; None for legacy directories.
+    modified_at:
+        The modification timestamp of the file.
+    """
+
+    catalog_id: Optional[str]
+    modified_at: Optional[float]
 
 
 def _keep_metadata_in_sync(
@@ -95,7 +133,479 @@ def _keep_metadata_in_sync(
     return wrapper
 
 
-class DRFileSystem(AbstractFileSystem):  # type: ignore[misc]
+class DRFileSystem(DataRobotFileSystem):
+    """DRFileSystem is fsspec implementation to interact with the DataRobot filesystem."""
+
+    _catalog_id: str = ""
+
+    def __init__(
+        self,
+        dr_client: dr.rest.RESTClientObject | None = None,
+        catalog_id: str | None = None,
+        default_overwrite_strategy: FilesOverwriteStrategy = FilesOverwriteStrategy.REPLACE,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._legacy_fs = LegacyDRFileSystem(dr_client, *args, **kwargs)
+        self.client = dr_client or dr.Client(
+            token=os.environ.get("DATAROBOT_API_TOKEN"),
+            endpoint=os.environ.get("DATAROBOT_ENDPOINT"),
+        )
+        self.default_overwrite_strategy = default_overwrite_strategy
+        self.app_id: str | None = None
+        if catalog_id:
+            self._catalog_id = catalog_id
+        else:
+            self.app_id = os.environ.get("APPLICATION_ID")
+            if not self.app_id:
+                raise ValueError("APPLICATION_ID env variable is not set.")
+            self._catalog_id = ""
+            self._initialize_catalog_id()
+
+    def _initialize_catalog_id(self) -> None:
+        """Create or get catalog id used for the storing files for this application."""
+        with self.client:
+            catalog_stored = dr.KeyValue.find(
+                cast(str, self.app_id),
+                DRKeyValueEntityType.CUSTOM_APPLICATION,
+                CATALOG_STORAGE_NAME,
+            )
+            if catalog_stored:
+                self._catalog_id = catalog_stored.value
+                logger.info(
+                    "Found existing catalog id=%s from key value storage",
+                    self._catalog_id,
+                )
+                return
+
+            self._catalog_id = self.create_catalog_item_dir()
+            dr.KeyValue.create(
+                entity_id=cast(str, self.app_id),
+                entity_type=DRKeyValueEntityType.CUSTOM_APPLICATION,
+                name=CATALOG_STORAGE_NAME,
+                category=dr.KeyValueCategory.ARTIFACT,
+                value_type=dr.KeyValueType.STRING,
+                value=self._catalog_id,
+            )
+            logger.info(
+                "Created new catalog id=%s and stored it in key value storage",
+                self._catalog_id,
+            )
+
+    def current_version_id(self) -> str | None:
+        """Return the catalog item's latest version id with a single request.
+
+        The catalog version advances every time a file is uploaded, so this is a
+        cheap change-detection signal: if the version is unchanged since a prior
+        download, the persisted files have not changed and a re-download can be
+        skipped. Returns None if the version cannot be determined.
+        """
+        with self.client:
+            try:
+                return FilesDetails.get(self._catalog_id).version_id
+            except ClientError:
+                logger.debug(
+                    "Could not fetch catalog version id.",
+                    extra={"catalog_id": self._catalog_id},
+                )
+                return None
+
+    def download_file(self, rpath: str, lpath: str) -> None:
+        """Download the latest version of a known file directly to ``lpath``.
+
+        ``DRFileSystem.get()`` resolves a path through fsspec's generic
+        machinery, which lists the parent directory and re-derives file info
+        several times (each doubled by a legacy-filesystem probe), then signs the
+        file and streams it from object storage. When the exact path is known and
+        the latest version is wanted, the Files API ``downloads`` endpoint streams
+        the bytes in a single request, skipping all of that.
+
+        If the file is not found in the new filesystem, this falls back to the
+        legacy filesystem so files that have not yet been migrated are still
+        served.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist in either the new or legacy filesystem.
+        """
+        internal_path = self._strip_protocol(rpath)
+        files = self._get_files_wrapper_for_folder_id(self._catalog_id)
+        try:
+            with self._try_convert_to_fsspec_exception():
+                files.download(file_name=internal_path, file_path=lpath)
+        except FileNotFoundError:
+            logger.debug(
+                "download_file - File %s not found in new fs, using legacy fs.",
+                rpath,
+                extra={"path": rpath},
+            )
+            self._legacy_fs.get_file(rpath, lpath)
+
+    def _strip_catalog(self, path: str) -> str:
+        """Remove catalog prefix from path."""
+        return path.removeprefix(f"{self._catalog_id}/")
+
+    def unstrip_protocol(self, name: str) -> str:
+        """Prefix path with protocol and catalog id."""
+        name = name.lstrip("/")
+        if name.startswith(f"{self.protocol}://{self._catalog_id}/"):
+            return f"{self.protocol}://{self._catalog_id}/{name.removeprefix(f'{self.protocol}://{self._catalog_id}/')}"
+        elif name.startswith(f"{self.protocol}://"):
+            return f"{self.protocol}://{self._catalog_id}/{name.removeprefix(f'{self.protocol}://')}"
+
+        return f"{self.protocol}://{self._catalog_id}/{name}"
+
+    def _split_path(self, path: str) -> Tuple[str, str]:
+        """Split path into catalog id and path without protocol."""
+        if path.strip() == "/" or path.strip() == f"{self.protocol}://":
+            return self._catalog_id, ""
+
+        path_without_protocol = self._strip_protocol(path)
+        return self._catalog_id, path_without_protocol
+
+    def _format_path_details_for_files(  # type: ignore[override]
+        self, catalog_id: str, files: List[File], show_details: bool
+    ) -> Union[List[str], List[FileInfo]]:
+        """Format path details for a list of files. Files can represent both files and directories."""
+        ret = super()._format_path_details_for_files(catalog_id, files, show_details)
+        if show_details:
+            for file in ret:
+                file = cast(FileInfo, file)
+                file["catalog_id"] = self._catalog_id
+                file["name"] = self._strip_catalog(file["name"])
+                if file["type"] != "directory" and file["created_at"] is not None:
+                    file["modified_at"] = file["created_at"].timestamp()
+                else:
+                    file["modified_at"] = None
+            return cast(List[FileInfo], ret)
+        return [self._strip_catalog(file_path) for file_path in ret]  # type: ignore[arg-type]
+
+    def _augment_path_details(self, detail: BaseFileInfo) -> FileInfo:
+        """Add fields to path details that might be missing to harmonize between new and legacy systems."""
+        detail = cast(FileInfo, detail)
+        if "created_at" in detail and detail["created_at"] is not None:
+            back_up_modified_at = detail["created_at"].timestamp()
+        else:
+            back_up_modified_at = None
+        if detail["type"] == "directory":
+            detail["catalog_id"] = detail.get("catalog_id", None)
+            detail["format"] = detail.get("format", None)
+            detail["modified_at"] = detail.get("modified_at", back_up_modified_at)
+            detail["created_at"] = detail.get("created_at", None)
+            detail["size"] = detail.get("size", 0)
+            return detail
+
+        detail["catalog_id"] = detail.get("catalog_id", self._catalog_id)
+        detail["format"] = detail.get("format", "unknown")
+        detail["modified_at"] = detail.get("modified_at", back_up_modified_at)
+        detail["created_at"] = detail.get("created_at", None)
+        detail["size"] = detail.get("size", 0)
+        return detail
+
+    def ls(  # type: ignore[override]
+        self, path: str, detail: bool = True, **kwargs: Any
+    ) -> Union[List[str], List[FileInfo]]:
+        """List paths in the filesystem."""
+        new_paths: Optional[List[BaseFileInfo]] = None
+        legacy_paths: Optional[List[BaseFileInfo]] = None
+
+        try:
+            new_paths = super().ls(path, detail=True, **kwargs)
+        except FileNotFoundError:
+            logger.debug("ls - No paths found in new fs.", extra={"path": path})
+
+        try:
+            legacy_paths = cast(
+                List[BaseFileInfo], self._legacy_fs.ls(path, detail=True, **kwargs)
+            )
+        except FileNotFoundError:
+            logger.debug("ls - No paths found in legacy fs.", extra={"path": path})
+
+        if new_paths is None and legacy_paths is None:
+            raise FileNotFoundError(f"Path {path} not found.")
+
+        new_paths = new_paths or []
+        legacy_paths = legacy_paths or []
+        all_paths = {p["name"]: p for p in new_paths}
+        for legacy_path in legacy_paths:
+            name_if_dir = f"{legacy_path['name'].rstrip('/')}/"
+            if legacy_path["type"] == "directory" and name_if_dir not in all_paths:
+                logger.debug(
+                    "ls - Found directory %s in legacy fs with no corresponding entry in new fs.",
+                    name_if_dir,
+                    extra={"path": name_if_dir},
+                )
+                legacy_path["name"] = name_if_dir
+                all_paths[name_if_dir] = legacy_path
+            elif (
+                legacy_path["type"] != "directory"
+                and legacy_path["name"] not in all_paths
+            ):
+                logger.debug(
+                    "ls - Found file %s in legacy fs with no corresponding entry in new fs.",
+                    legacy_path["name"],
+                    extra={"path": legacy_path["name"]},
+                )
+                all_paths[legacy_path["name"]] = legacy_path
+
+        if not detail:
+            return list(all_paths.keys())
+        return list(map(self._augment_path_details, all_paths.values()))
+
+    def info(self, path: str, **kwargs: Any) -> FileInfo:
+        """Get info for file or directory at path."""
+        path_without_protocol = self._strip_protocol(path)
+        if path_without_protocol == self.root_marker:
+            return {
+                "name": self.root_marker,
+                "type": "directory",
+                "size": 0,
+                "format": None,
+                "modified_at": None,
+                "created_at": None,
+                "catalog_id": self._catalog_id,
+            }
+        return super().info(path, **kwargs)  # type: ignore[return-value]
+
+    def _open(  # type: ignore[override]
+        self, path: str, mode: str = "rb", **kwargs: Any
+    ) -> Union[DataRobotFile, BinaryIO]:
+        overwrite_strategy = kwargs.pop(
+            "overwrite_strategy", self.default_overwrite_strategy
+        )
+        if mode == "rb":
+            try:
+                new_exists = self.info(path).get("catalog_id") == self._catalog_id
+            except FileNotFoundError:
+                new_exists = False
+            if new_exists:
+                return super()._open(
+                    path, mode=mode, overwrite_strategy=overwrite_strategy, **kwargs
+                )
+            logger.debug(
+                "open - File %s not found in new fs, using legacy fs.",
+                path,
+                extra={"path": path},
+            )
+            return self._legacy_fs._open(path, mode=mode, **kwargs)
+        else:
+            has_legacy_file = self._legacy_fs.exists(path) and self._legacy_fs.isfile(
+                path
+            )
+            file_handle = super()._open(
+                path, mode=mode, overwrite_strategy=overwrite_strategy, **kwargs
+            )
+            original_upload_chunk = file_handle._upload_chunk
+
+            def upload_and_cleanup(final: bool = False) -> bool:
+                file_was_uploaded = original_upload_chunk(final=final)
+                if not has_legacy_file or not file_was_uploaded:
+                    return file_was_uploaded
+
+                logger.debug(
+                    "open - Existing file %s found in legacy fs, removing it.",
+                    path,
+                    extra={"path": path},
+                )
+                self._legacy_fs.rm_file(path)
+                return file_was_uploaded
+
+            # monkey patch to only delete legacy file on new file upload completion.
+            file_handle._upload_chunk = upload_and_cleanup  # type: ignore[method-assign]
+            return file_handle
+
+    def open(  # type: ignore[override]
+        self, path: str, mode: str = "rb", **kwargs: Any
+    ) -> Union[DataRobotFile, BinaryIO]:
+        """Open file at path for reading or writing."""
+        overwrite_strategy = kwargs.pop(
+            "overwrite_strategy", self.default_overwrite_strategy
+        )
+        return super().open(
+            path, mode=mode, overwrite_strategy=overwrite_strategy, **kwargs
+        )
+
+    def put(  # type: ignore[override]
+        self, lpath: Union[str, List[str]], rpath: Union[str, List[str]], **kwargs: Any
+    ) -> None:
+        """Upload file from local path to remote path."""
+        overwrite_strategy = kwargs.pop(
+            "overwrite_strategy", self.default_overwrite_strategy
+        )
+        return super().put(
+            lpath, rpath, overwrite_strategy=overwrite_strategy, **kwargs
+        )
+
+    def cp_file(self, path1: str, path2: str, **kwargs: Any) -> None:  # type: ignore[override]
+        """Copy file from source path to destination path."""
+        try:
+            new_exists = self.info(path1).get("catalog_id") == self._catalog_id
+        except FileNotFoundError:
+            new_exists = False
+        legacy_exists = self._legacy_fs.exists(path1)
+        overwrite_strategy = kwargs.pop(
+            "overwrite_strategy", self.default_overwrite_strategy
+        )
+
+        if new_exists and self.isfile(path1):
+            super().cp_file(
+                path1, path2, overwrite_strategy=overwrite_strategy, **kwargs
+            )
+        elif legacy_exists and self._legacy_fs.isfile(path1):
+            logger.debug(
+                "cp_file - Moving legacy file %s from legacy fs to new fs before copy.",
+                path1,
+                extra={"path": path1},
+            )
+            info = self._legacy_fs.info(path1)
+            source_path = os.path.basename(path1.rstrip("/"))
+            Files(info["catalog_id"], "", "", [], datetime.now(), "").copy(
+                source_path=source_path,
+                target=path1,
+                target_files=Files(self._catalog_id, "", "", [], datetime.now(), ""),
+                overwrite=FilesOverwriteStrategy.SKIP,
+            )
+            self._legacy_fs.rm_file(path1)
+            super().cp_file(
+                path1, path2, overwrite_strategy=overwrite_strategy, **kwargs
+            )
+        elif (
+            new_exists
+            and legacy_exists
+            and self.isdir(path1)
+            and self._legacy_fs.isdir(path1)
+        ):
+            for file_name, file_info in self._legacy_fs.find(
+                path1, withdirs=False, detail=True
+            ).items():
+                logger.debug(
+                    "cp_file - Moving legacy file %s from legacy fs to new fs before copy.",
+                    file_name,
+                    extra={"path": file_name},
+                )
+                source_path = os.path.basename(file_name.rstrip("/"))
+                Files(file_info["catalog_id"], "", "", [], datetime.now(), "").copy(
+                    source_path=source_path,
+                    target=file_name,
+                    target_files=Files(
+                        self._catalog_id, "", "", [], datetime.now(), ""
+                    ),
+                    overwrite=FilesOverwriteStrategy.SKIP,
+                )
+            self._legacy_fs.rm(path1, recursive=True)
+            super().cp_file(
+                path1, path2, overwrite_strategy=overwrite_strategy, **kwargs
+            )
+        elif new_exists and self.isdir(path1):
+            super().cp_file(path1, path2, **kwargs)
+        elif legacy_exists and self._legacy_fs.isdir(path1):
+            for file_name, file_info in self._legacy_fs.find(
+                path1, withdirs=False, detail=True
+            ).items():
+                logger.debug(
+                    "cp_file - Moving legacy file %s from legacy fs to new fs before copy.",
+                    file_name,
+                    extra={"path": file_name},
+                )
+                source_path = os.path.basename(file_name.rstrip("/"))
+                Files(file_info["catalog_id"], "", "", [], datetime.now(), "").copy(
+                    source_path=source_path,
+                    target=file_name,
+                    target_files=Files(
+                        self._catalog_id, "", "", [], datetime.now(), ""
+                    ),
+                    overwrite=FilesOverwriteStrategy.SKIP,
+                )
+                self._legacy_fs.rm_file(file_name)
+            self._legacy_fs.rm(path1, recursive=True)
+            super().cp_file(
+                path1, path2, overwrite_strategy=overwrite_strategy, **kwargs
+            )
+        else:
+            raise FileNotFoundError(f"File {path1} not found")
+
+    def cp_directory(self, path1: str, path2: str, **kwargs: Any) -> None:  # type: ignore[override]
+        """Copy directory from source path to destination path."""
+        overwrite_strategy = kwargs.pop(
+            "overwrite_strategy", self.default_overwrite_strategy
+        )
+        super().cp_directory(
+            path1, path2, overwrite_strategy=overwrite_strategy, **kwargs
+        )
+
+    def rm_file(self, path: Union[str, List[str]], **kwargs: Any) -> None:
+        """Remove file at path."""
+        super().rm_file(path, **kwargs)
+        # in new fs rm_file is always recursive, and also deletes directories
+        # also supports deleting multiple paths at once, similar to rm (without globs)
+        legacy_paths = [path] if isinstance(path, str) else path
+        for legacy_path in legacy_paths:
+            path_to_delete = legacy_path.rstrip("/")
+            if self._legacy_fs.exists(path_to_delete):
+                if self._legacy_fs.isdir(path_to_delete):
+                    self._legacy_fs.rm(path_to_delete, recursive=True, **kwargs)
+                else:
+                    self._legacy_fs.rm_file(path_to_delete, **kwargs)
+
+    def rm_directory(self, path: Union[str, List[str]], **kwargs: Any) -> None:
+        """Remove directory at path."""
+        super().rm_directory(path, **kwargs)
+        legacy_paths = [path] if isinstance(path, str) else path
+        for legacy_path in legacy_paths:
+            if self._legacy_fs.exists(legacy_path):
+                if not self._legacy_fs.isdir(legacy_path):
+                    raise ValueError(f"{legacy_path} is not a directory")
+                path_to_delete = legacy_path.rstrip("/")
+                self._legacy_fs.rm(path_to_delete, recursive=True, **kwargs)
+
+    def mv(
+        self,
+        path1: Union[str, List[str]],
+        path2: Union[str, List[str]],
+        recursive: bool = False,
+        maxdepth: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Move file(s) or directory from source path to destination path."""
+        # Override definition to simply things and handle new/legacy system
+        self.copy(path1, path2, recursive=recursive, maxdepth=maxdepth, **kwargs)
+        self.rm(path1, recursive=recursive, maxdepth=maxdepth, **kwargs)
+
+    def list_unmigrated_files(self, path: str) -> List[FileInfo]:
+        """
+        List files that are not migrated to the new filesystem.
+        If all files are migrated, return an empty list, and it is safe to upgrade to the new filesystem.
+        """
+        unmigrated_files = []
+        for _, details in self.find(path, withdirs=False, detail=True).items():
+            if details.get("catalog_id") != self._catalog_id:
+                unmigrated_files.append(details)
+        return unmigrated_files  # type: ignore[return-value]
+
+    def mkdir(self, path: str, create_parents: bool = True, **kwargs: Any) -> None:  # type: ignore[override]
+        """Create empty directory at path. Only persists directory in legacy filesystem."""
+        self._legacy_fs.mkdir(path, create_parents=create_parents, **kwargs)
+
+    def makedirs(self, path: str, exist_ok: bool = False, **kwargs: Any) -> None:  # type: ignore[override]
+        """Create directories at path. Only persists directories in legacy filesystem."""
+        self._legacy_fs.makedirs(path, exist_ok=exist_ok, **kwargs)
+
+    def rmdir(self, path: str, **kwargs: Any) -> None:  # type: ignore[override]
+        """Delete empty directory at path. Only affects legacy filesystem."""
+        self._legacy_fs.rmdir(path, **kwargs)
+
+    def modified(self, path: str, **kwargs: Any) -> float:  # type: ignore[override]
+        """Get the modification time of the file at path. Directory paths are not supported."""
+        if self.exists(path):
+            created_at = self.info(path)["created_at"]
+            if created_at:
+                return created_at.timestamp()
+        return self._legacy_fs.modified(path)
+
+
+class LegacyDRFileSystem(AbstractFileSystem):  # type: ignore[misc]
     """
     DRFileSystem is fsspec implementation for interact with Datarobot
     KeyValue and File storage for having persistent storage inside

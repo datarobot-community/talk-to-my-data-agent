@@ -27,10 +27,7 @@ from openai.types.chat.chat_completion_system_message_param import (
 
 from core.analyst_db import AnalystDB
 from core.credentials import (
-    GoogleCredentialsBQ,
     NoDatabaseCredentials,
-    SAPDatasphereCredentials,
-    SnowflakeCredentials,
 )
 from core.logging_helper import get_logger
 
@@ -38,21 +35,6 @@ logger = get_logger("DatabaseHelper")
 
 T = TypeVar("T")
 _DEFAULT_DB_QUERY_TIMEOUT = 300
-
-
-@dataclass
-class SnowflakeCredentialArgs:
-    credentials: SnowflakeCredentials
-
-
-@dataclass
-class BigQueryCredentialArgs:
-    credentials: GoogleCredentialsBQ
-
-
-@dataclass
-class SAPDatasphereCredentialArgs:
-    credentials: SAPDatasphereCredentials
 
 
 @dataclass

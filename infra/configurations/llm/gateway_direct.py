@@ -61,6 +61,8 @@ print("\n.   - ".join(
 default_model: str = os.environ.get(
     "LLM_DEFAULT_MODEL", "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
 )
+if not default_model.startswith("datarobot/"):
+    default_model = f"datarobot/{default_model}"
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is configured properly for this configuration option.
@@ -73,7 +75,7 @@ verify_llm_gateway_model_availability(default_model)
 
 # LiteLLM support DataRobot as a provider, so this validates
 # everything is working and the default LLM you've chosen is available
-verify_llm(f"{default_model}")
+verify_llm(f"{default_model}", use_llm_gateway=True)
 
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(

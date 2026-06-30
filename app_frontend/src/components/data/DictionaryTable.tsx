@@ -11,6 +11,8 @@ import { useTranslation } from '@/i18n';
 import { DictionaryTable as DT, DictionaryRow } from '@/api/dictionaries/types';
 import { Input } from '@/components/ui/input';
 import { HighlightText } from '@/components/ui-custom/highlight-text';
+import { Button } from '@/components/ui/button';
+import { Pencil } from 'lucide-react';
 
 interface DictionaryTableProps {
   data: DT;
@@ -77,10 +79,20 @@ const EditableCell: React.FC<EditableCellProps> = ({
   ) : (
     <div
       onDoubleClick={handleDoubleClick}
-      className="min-h-[28px] cursor-pointer rounded p-1 text-muted-foreground hover:bg-secondary"
+      className="flex min-h-[28px] cursor-pointer items-center justify-between gap-1 rounded p-1 text-muted-foreground hover:bg-secondary"
       title="Double-click to edit"
     >
       <HighlightText text={value} searchText={searchText || ''} />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => setEditing(true)}
+        title="Edit"
+        aria-label="Edit"
+      >
+        <Pencil className="size-3" />
+      </Button>
     </div>
   );
 };

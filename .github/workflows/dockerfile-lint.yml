@@ -20,7 +20,7 @@ jobs:
     name: lint-dockerfile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Run Hadolint
         uses: hadolint/hadolint-action@v3.3.0
         with:

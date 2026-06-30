@@ -19,11 +19,10 @@ For that, you'll need to choose the "registered_model_llm.py" option
 """
 
 import os
-
-import pulumi
-import pulumi_datarobot as datarobot
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
+import pulumi
+import pulumi_datarobot as datarobot
 
 from . import use_case
 from .libllm import (
@@ -46,25 +45,26 @@ REQUIRED_FEATURE_FLAGS = {
     "ENABLE_MLOPS_TEXT_GENERATION_TARGET_TYPE": True,
 }
 
-LLM_DEPLOYMENT_ID = os.environ["LLM_DEPLOYMENT_ID"]
+LLM_NIM_DEPLOYMENT_ID = os.environ.get(
+    "LLM_NIM_DEPLOYMENT_ID", os.environ["NIM_DEPLOYMENT_ID"]
+)
 
 llm_application_name: str = "llm"
 llm_resource_name: str = "[llm]"
 default_model: str = os.environ.get(
     "LLM_DEFAULT_MODEL", "datarobot/datarobot-deployed-llm"
 )
-default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is working
 validate_feature_flags(REQUIRED_FEATURE_FLAGS)
-verify_llm(model_id=f"{default_model}", deployment_id=LLM_DEPLOYMENT_ID)
+verify_llm(model_id=f"{default_model}", deployment_id=LLM_NIM_DEPLOYMENT_ID)
 
 playground = datarobot.Playground(
     use_case_id=use_case.id,
     resource_name=f"LLM Playground [{PROJECT_NAME}] " + llm_resource_name,
 )
 proxy_llm_deployment = datarobot.Deployment.get(
-    resource_name="Existing LLM Deployment", id=LLM_DEPLOYMENT_ID
+    resource_name="Existing LLM Deployment", id=LLM_NIM_DEPLOYMENT_ID
 )
 prediction_environment = datarobot.PredictionEnvironment.get(
     resource_name="Existing LLM Prediction Environment",
@@ -72,7 +72,7 @@ prediction_environment = datarobot.PredictionEnvironment.get(
 )
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="LLM_DEPLOYMENT_ID",
+        key="LLM_NIM_DEPLOYMENT_ID",
         type="string",
         value=proxy_llm_deployment.id,
     ),
@@ -82,16 +82,6 @@ app_runtime_parameters = [
         value=default_model,
     ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="LLM_DEFAULT_MODEL_FRIENDLY_NAME",
-        type="string",
-        value=proxy_llm_deployment.label,
-    ),
-    datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="USE_BUILDER_API_TOKEN",
-        type="string",
-        value=default_use_builder_api_token,
-    ),
-    datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key="USE_DATAROBOT_LLM_GATEWAY",
         type="string",
         value="0",
@@ -99,7 +89,7 @@ app_runtime_parameters = [
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
-        key="LLM_DEPLOYMENT_ID",
+        key="LLM_NIM_DEPLOYMENT_ID",
         type="string",
         value=proxy_llm_deployment.id,
     ),
@@ -116,8 +106,6 @@ custom_model_runtime_parameters = [
 ]
 
 pulumi.export("Deployment ID " + llm_resource_name, proxy_llm_deployment.id)
-export("LLM_DEPLOYMENT_ID", proxy_llm_deployment.id)
+export("LLM_NIM_DEPLOYMENT_ID", proxy_llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
-export("LLM_DEFAULT_MODEL_FRIENDLY_NAME", proxy_llm_deployment.label)
-export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
 export("USE_DATAROBOT_LLM_GATEWAY", "0")

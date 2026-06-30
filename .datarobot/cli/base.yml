@@ -30,18 +30,14 @@ root:
     options:
       - name: None
         value: no_database
-      - name: Snowflake
-        value: snowflake
-        requires: snowflake_config
-      - name: BigQuery
-        value: bigquery
-        requires: bigquery_config
-      - name: SAP Datasphere
-        value: sap
-        requires: sap_datasphere_config
-      - name: JDBC (PostgreSQL / MySQL / SQL Server)
+      - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery)
         value: datarobot_jdbc
         requires: jdbc_config
+  - env: OTEL_SDK_DISABLED
+    type: string
+    default: ""
+    optional: true
+    help: "Set to 'true' to disable all OpenTelemetry tracing. Leave empty to keep tracing enabled."
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"
@@ -109,66 +105,6 @@ openai_config:
     optional: false
     help: "The API version for OpenAI."
 
-snowflake_config:
-  - key: snowflake_authentication
-    help: "Choose which authentication method to use for Snowflake"
-    multiple: false
-    options:
-      - name: "password authentication"
-        requires: "snowflake_password_authentication_config"
-      - name: "key file authentication"
-        requires: "snowflake_key_file_authentication_config"
-  - env: SNOWFLAKE_ACCOUNT
-    type: string
-    optional: false
-    help: "The Snowflake account"
-  - env: SNOWFLAKE_WAREHOUSE
-    type: string
-    optional: false
-    help: "The Snowflake warehouse"
-  - env: SNOWFLAKE_DATABASE
-    type: string
-    optional: false
-    help: "The Snowflake database"
-  - env: SNOWFLAKE_SCHEMA
-    type: string
-    optional: false
-    help: "The Snowflake schema"
-  - env: SNOWFLAKE_ROLE
-    type: string
-    optional: false
-    help: "The Snowflake role"
-
-snowflake_password_authentication_config:
-  - env: SNOWFLAKE_USER
-    type: string
-    optional: false
-    help: "The Snowflake user"
-  - env: SNOWFLAKE_PASSWORD
-    type: secret_string
-    optional: false
-    help: "The Snowflake password"
-
-snowflake_key_file_authentication_config:
-  - env: SNOWFLAKE_KEY_PATH
-    type: string
-    optional: false
-    help: "The Snowflake key path"
-
-bigquery_config:
-  - env: GOOGLE_SERVICE_ACCOUNT_BQ
-    type: string
-    optional: false
-    help: "The Google Service Account JSON file content for BigQuery"
-  - env: GOOGLE_REGION_BQ
-    type: string
-    optional: false
-    help: "The Google Cloud Region for BigQuery"
-  - env: GOOGLE_DB_SCHEMA_BQ
-    type: string
-    optional: false
-    help: "The Google Cloud BigQuery schema"
-
 jdbc_config:
   - env: JDBC_URI
     type: secret_string
@@ -179,24 +115,3 @@ jdbc_config:
     optional: true
     help: 'Optional JSON object of JDBC connection parameters, e.g. {"user": "dbuser", "password": "secret"}.'
 
-sap_datasphere_config:
-  - env: SAP_DATASPHERE_HOST
-    type: string
-    optional: false
-    help: "The SAP DataSphere host"
-  - env: SAP_DATASPHERE_PORT
-    type: string
-    optional: false
-    help: "The SAP DataSphere port"
-  - env: SAP_DATASPHERE_USER
-    type: string
-    optional: false
-    help: "The SAP DataSphere user"
-  - env: SAP_DATASPHERE_PASSWORD
-    type: secret_string
-    optional: false
-    help: "The SAP DataSphere password"
-  - env: SAP_DATASPHERE_SCHEMA
-    type: string
-    optional: false
-    help: "The SAP DataSphere schema"

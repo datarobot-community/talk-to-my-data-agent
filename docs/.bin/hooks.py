@@ -32,8 +32,8 @@ def _get_doc_files(docs_dir: Path) -> list[Path]:
             readme = item / "README.md"
             if readme.exists():
                 doc_files.append(readme)
-            for subfile in sorted(item.iterdir()):
-                if subfile.is_file() and subfile.suffix == ".md" and subfile != readme:
+            for subfile in sorted(item.rglob("*.md")):
+                if subfile.is_file() and subfile != readme:
                     doc_files.append(subfile)
     return doc_files
 

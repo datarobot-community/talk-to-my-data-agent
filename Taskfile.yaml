@@ -14,10 +14,9 @@ includes:
   core:
     taskfile: ./core/Taskfile.yaml
     dir: ./core
-  e2e:
-    taskfile: ./tests/e2e/Taskfile.yaml
-    dir: ./tests/e2e
-    optional: true
+  docs:
+    taskfile: ./docs/Taskfile.yaml
+    dir: ./docs
   infra:
     taskfile: ./infra/Taskfile.yaml
     dir: ./infra
@@ -51,6 +50,7 @@ tasks:
       - task: app_backend:install
       - task: app_frontend:install
       - task: core:install
+      - task: docs:install
       - task: infra:install
 
   reinstall:
@@ -65,32 +65,7 @@ tasks:
   dev:
     desc: "🚀 Run all services together"
     cmds:
-      - |
-        task app_backend:dev &
-        sleep 3
-        task app_frontend:dev &
-        sleep 8
-        echo "✅ All servers started!"
-        if [[ -n "$NOTEBOOK_ID" ]]; then
-          prefix="${DATAROBOT_API_ENDPOINT//api\/v2/}notebook-sessions/$NOTEBOOK_ID/ports/"
-        else
-          prefix="http://localhost:"
-        fi
-        echo "🔗 Backend: ${prefix}8080"
-        echo "🔗 Frontend: ${prefix}5173"
-        wait
-  tracing:start:
-    desc: "📡 Start the local experimentation tracing dashboard (Ctrl+C to stop)"
-    cmds:
-      - |
-        USE_CASE_ID=$(cd infra && uv run pulumi stack output DATAROBOT_USE_CASE_ID 2>/dev/null)
-        if [[ -z "$USE_CASE_ID" ]]; then
-          echo "No Use Case found in current Pulumi stack. Run 'task start' first."
-          exit 1
-        fi
-        dr xp --entity-type experiment_container --entity-id "$USE_CASE_ID"
-    silent: true
-
+      - drdev
   deploy:
     desc: "🚀 Deploy all services"
     env:

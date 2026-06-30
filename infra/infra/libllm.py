@@ -305,7 +305,11 @@ def verify_llm_gateway_model_availability(model_id: str) -> None:
         )
 
 
-def verify_llm(model_id: str | None = None, deployment_id: str | None = None) -> None:
+def verify_llm(
+    model_id: str | None = None,
+    deployment_id: str | None = None,
+    use_llm_gateway: bool = False,
+) -> None:
     """
     Verify that the specified LLM is valid, available, and you can say hello
     """
@@ -324,6 +328,16 @@ def verify_llm(model_id: str | None = None, deployment_id: str | None = None) ->
 
     if model_id is None:
         raise ValueError("model_id must be provided to verify_llm")
+
+    use_llm_gateway_enabled = use_llm_gateway or os.environ.get(
+        "USE_DATAROBOT_LLM_GATEWAY", ""
+    ).lower() in {"1", "true", "yes"}
+    if use_llm_gateway_enabled and not model_id.startswith("datarobot/"):
+        err_message = f"""Default model must be prefixed with 'datarobot/' provider when using LLM gateway.
+        Edit the 'LLM_DEFAULT_MODEL' environment variable to include the prefix and run again.
+        Example value: 'LLM_DEFAULT_MODEL=datarobot/{model_id}'
+        """
+        raise ValueError(err_message)
 
     # Map legacy to LiteLLM
     if "-" in model_id:

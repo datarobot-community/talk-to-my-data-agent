@@ -77,11 +77,22 @@ tasks:
           --server {{.PULUMI_DATAROBOT_DEFAULT_URL}}
         fi
 
-  install:
-    desc: "🔧 Install dependencies"
+  dr-experimentation-plugin-check:
+    silent: true
+    desc: "⬇️ Ensure DataRobot experimentation plugin is installed"
     cmds:
-      - echo "🔧 Installing dependencies.."
-      - "{{.UV_CMD}} sync --all-extras --dev"
+      - |
+        if command -v dr &> /dev/null; then
+          if dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then
+            echo "ℹ️  DataRobot experimentation plugin 'xp' is already installed"
+            dr plugin update xp
+          else
+            echo "⬇️ Installing DataRobot experimentation plugin 'xp'"
+            dr plugin install xp || true
+          fi
+        else
+          echo "ℹ️  Skipping experimentation plugin check (dr CLI not available)"
+        fi
 
   start:
     silent: true
@@ -90,6 +101,46 @@ tasks:
       - auth-check
     cmds:
       - task: deploy-dev
+      - task: dr-experimentation-plugin-check
+      - |
+        echo ""
+        echo "✅ Infrastructure deployed."
+        echo ""
+
+  deploy-dev:
+    silent: true
+    aliases: [up-dev]
+    desc: "🔨 Deploy the backend infrastructure for local development"
+    deps:
+      - auth-check
+    cmds:
+      - task: pulumi-datarobot-plugin-check
+      - echo "🔨 Deploying the backend infrastructure.."
+      # Downstream divergence from the af-component-base template: we also target
+      # "**[llm]" so a deployment-based LLM config (INFRA_ENABLE_LLM) is provisioned
+      # by `dr start`, not only via `task up`. Keep this target on template sync.
+      - |
+        export PULUMI_SKIP_UPDATE_CHECK=1 && {{.UV_CMD}} run pulumi up -y \
+          --target "**[llm]" \
+          --target "**datarobot:index/useCase:UseCase**"
+  dev:
+    silent: true
+    dir: ../
+    desc: "📡 Start the local experimentation tracing dashboard (with experiment_container as the default entity-type)"
+    cmds:
+      - |
+        if dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then
+            DR_SKIP_PLUGIN_UPDATE_CHECK=true dr xp --plain-output
+          else
+            echo "DataRobot experimentation plugin not found. Please install it with 'dr plugin install xp' to use the tracing dashboard."
+            exit 1
+        fi
+
+  install:
+    desc: "🔧 Install dependencies"
+    cmds:
+      - echo "🔧 Installing dependencies.."
+      - "{{.UV_CMD}} sync --all-extras --dev"
 
   lint:
     silent: true
@@ -207,20 +258,6 @@ tasks:
       - echo "📜 Checking license headers"
       - docker run  --rm -v $PWD:/github/workspace ghcr.io/apache/skywalking-eyes/license-eye:eb0e0b091ea41213f712f622797e37526ca1e5d6
         -v info -c .licenserc.yaml header check
-
-  deploy-dev:
-    silent: true
-    aliases: [up-dev]
-    desc: "🔨 Deploy the backend infrastructure"
-    deps:
-      - auth-check
-    cmds:
-      - task: pulumi-datarobot-plugin-check
-      - echo "🔨 Deploying the backend infrastructure.."
-      - |
-        export PULUMI_SKIP_UPDATE_CHECK=1 && uv run pulumi up -y \
-          --target "**[llm]" \
-          --target "**datarobot:index/useCase:UseCase**"
 
   unit:
     desc: "Run unit tests"

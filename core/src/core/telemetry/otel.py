@@ -55,6 +55,7 @@ from opentelemetry.sdk.metrics.view import ExponentialBucketHistogramAggregation
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import Span
 from typing_extensions import ParamSpec, Self, TypeVar
 
 from core.telemetry.logging import RedactingFormatter
@@ -145,6 +146,24 @@ class OTLPConnectionErrorFilter(logging.Filter):
             if "ConnectionError" in message and ":4318" in message:
                 should_suppress = True
 
+        # Suppress opentelemetry SDK export errors caused by connection failures
+        if (
+            not should_suppress
+            and record.name.startswith("opentelemetry.sdk.")
+            and record.levelno == logging.ERROR
+        ):
+            if record.exc_info:
+                exc = record.exc_info[1]
+                while exc is not None:
+                    if type(exc).__name__ in (
+                        "ConnectionError",
+                        "NewConnectionError",
+                        "MaxRetryError",
+                    ):
+                        should_suppress = True
+                        break
+                    exc = exc.__cause__ or exc.__context__
+
         if should_suppress:
             if self.warning_callback:
                 self.warning_callback()
@@ -200,6 +219,16 @@ class OTel:
 
     def configure(self, config: Config) -> None:
         """Apply OTel settings from app Config. Call once during app startup."""
+        # Mirror config values into os.environ so OTLP exporters (which read env vars
+        # directly at construction time) use the endpoint configured via pulumi_config.json
+        # rather than falling back to localhost:4318.
+        if config.otel_exporter_otlp_endpoint:
+            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+                config.otel_exporter_otlp_endpoint
+            )
+        if config.otel_exporter_otlp_headers:
+            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = config.otel_exporter_otlp_headers
+
         self.telemetry_enabled = not config.otel_sdk_disabled
 
         if self.telemetry_enabled and not config.otel_exporter_otlp_endpoint:
@@ -245,6 +274,9 @@ class OTel:
             pod_name = os.environ.get("HOSTNAME")
             if pod_name:
                 attrs["k8s.pod.name"] = pod_name
+            version = os.environ.get("APP_VERSION") or os.environ.get("SERVICE_VERSION")
+            if version:
+                attrs["service.version"] = version
             self._resource = Resource.create(attrs)
         return self._resource
 
@@ -259,6 +291,14 @@ class OTel:
         # Apply to requests logger
         requests_logger = logging.getLogger("requests")
         requests_logger.addFilter(otlp_filter)
+
+        # Apply to opentelemetry SDK export loggers
+        for sdk_logger_name in (
+            "opentelemetry.sdk._logs._internal.export",
+            "opentelemetry.sdk.trace.export",
+            "opentelemetry.sdk.metrics.export",
+        ):
+            logging.getLogger(sdk_logger_name).addFilter(otlp_filter)
 
     def _log_otlp_warning(self) -> None:
         """Log a warning about OTLP connection failure (only once)."""
@@ -600,16 +640,34 @@ class OTel:
     @overload
     def trace(self: Self, func: Callable[P, T]) -> Callable[P, T]: ...
 
+    @overload
+    def trace(self: Self, name: str) -> Callable[[Any], Any]: ...
+
     @no_type_check
     def trace(self: Self, func: Any) -> Any:
         """
-        Wrap the execution of the decorated function in an OTEL span sharing the same name as the function.
+        Wrap the execution of the decorated function in an OTEL span.
+
+        Accepts an optional custom span name::
+
+            @otel.trace
+            async def my_handler(): ...
+
+            @otel.trace("custom-operation-name")
+            async def my_handler(): ...
+
         WARNING: There are sharp edges with this decorator if applied to functions that are reflected on.
         (I've seen this with methods in utils.rest_api.)
         """
-        span_name = f"{func.__module__}.{func.__qualname__}"
+        if isinstance(func, str):
+            return functools.partial(self._trace_with_name, span_name=func)
+        return self._trace_with_name(func)
 
-        if self._is_trace_span_excluded(span_name):
+    @no_type_check
+    def _trace_with_name(self: Self, func: Any, span_name: Optional[str] = None) -> Any:
+        name = span_name or f"{func.__module__}.{func.__qualname__}"
+
+        if self._is_trace_span_excluded(name):
             return func
 
         tracer = self.get_tracer("application-tracer")
@@ -618,7 +676,7 @@ class OTel:
 
             @functools.wraps(func)
             async def async_inner(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     return await func(*args, **kwargs)
 
             return async_inner
@@ -626,7 +684,7 @@ class OTel:
 
             @functools.wraps(func)
             async def inner_asyncgen(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     async for x in func(*args, **kwargs):
                         yield x
 
@@ -635,7 +693,7 @@ class OTel:
 
             @functools.wraps(func)
             def inner_gen(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     for x in func(*args, **kwargs):
                         yield x
 
@@ -644,13 +702,13 @@ class OTel:
 
             @functools.wraps(func)
             def inner(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     return func(*args, **kwargs)
 
             return inner
         else:
             raise ValueError(
-                f"instrument can only decorate a function type, while {span_name} is a {type(func)}."
+                f"instrument can only decorate a function type, while {name} is a {type(func)}."
             )
 
     @functools.cache
@@ -659,6 +717,24 @@ class OTel:
         return meter.create_histogram(
             f"function.{name}", "s", "A histogram recording function timings."
         )
+
+    @contextmanager
+    def span(self, name: str, **attributes: Any) -> Generator[Span, None, None]:
+        """Create a named span as a context manager, with optional initial attributes.
+
+        Use this for ad-hoc spans within a function body where a decorator
+        would be too coarse-grained::
+
+            with otel.span("retrieve-documents", query=query_text) as span:
+                docs = retrieve(query_text)
+                span.set_attribute("doc_count", len(docs))
+        """
+        with self.get_tracer("application-tracer").start_as_current_span(
+            name
+        ) as active_span:
+            for key, value in attributes.items():
+                active_span.set_attribute(key, value)
+            yield active_span
 
     @contextmanager
     def time(self, name: str) -> Generator[None, None, None]:

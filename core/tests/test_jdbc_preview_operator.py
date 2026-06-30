@@ -71,6 +71,18 @@ class TestJDBCCredentials:
         creds = make_credentials("jdbc:sqlserver://localhost:1433;databaseName=db")
         assert creds.jdbc_uri.startswith("jdbc:sqlserver://")
 
+    def test_valid_snowflake_uri(self) -> None:
+        creds = make_credentials("jdbc:snowflake://account.snowflakecomputing.com/")
+        assert creds.jdbc_uri.startswith("jdbc:snowflake://")
+
+    def test_valid_sap_uri(self) -> None:
+        creds = make_credentials("jdbc:sap://host:443")
+        assert creds.jdbc_uri.startswith("jdbc:sap://")
+
+    def test_valid_bigquery_uri(self) -> None:
+        creds = make_credentials("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443")
+        assert creds.jdbc_uri.startswith("jdbc:bigquery://")
+
     def test_invalid_uri_prefix_raises(self) -> None:
         with pytest.raises(ValidationError):
             make_credentials("jdbc:oracle://localhost:1521/db")
@@ -153,6 +165,40 @@ class TestGetTables:
             assert "INFORMATION_SCHEMA" in sql
             assert "DATABASE()" not in sql
             assert tables == ["customers"]
+
+    @pytest.mark.asyncio
+    async def test_snowflake_uses_current_schema(self) -> None:
+        operator = make_operator("jdbc:snowflake://account.snowflakecomputing.com/")
+        result = make_preview_result(["TABLE_NAME"], [["employees"]])
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            tables = await operator.get_tables()
+            sql = mock_jdbc.preview.call_args.kwargs["sql"]
+            assert "CURRENT_SCHEMA()" in sql
+            assert "VIEW" in sql
+            assert tables == ["employees"]
+
+    @pytest.mark.asyncio
+    async def test_sap_uses_sys_tables(self) -> None:
+        operator = make_operator("jdbc:sap://host:443")
+        result = make_preview_result(["TABLE_NAME"], [["orders"]])
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            tables = await operator.get_tables()
+            sql = mock_jdbc.preview.call_args.kwargs["sql"]
+            assert "SYS.TABLES" in sql
+            assert tables == ["orders"]
+
+    @pytest.mark.asyncio
+    async def test_bigquery_uses_information_schema(self) -> None:
+        operator = make_operator("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443")
+        result = make_preview_result(["TABLE_NAME"], [["sales"]])
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            tables = await operator.get_tables()
+            sql = mock_jdbc.preview.call_args.kwargs["sql"]
+            assert "INFORMATION_SCHEMA.TABLES" in sql
+            assert tables == ["sales"]
 
     @pytest.mark.asyncio
     async def test_returns_empty_list_on_error(self) -> None:
@@ -280,6 +326,9 @@ class TestGetData:
             ("jdbc:postgresql://localhost:5432/db", '"users"'),
             ("jdbc:mysql://localhost:3306/db", "`users`"),
             ("jdbc:sqlserver://localhost:1433;databaseName=db", "[users]"),
+            ("jdbc:snowflake://account.snowflakecomputing.com/", '"users"'),
+            ("jdbc:sap://host:443", '"users"'),
+            ("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443", "`users`"),
         ],
     )
     async def test_get_data_quotes_table_per_dialect(

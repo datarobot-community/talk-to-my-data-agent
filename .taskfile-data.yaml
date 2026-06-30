@@ -5,7 +5,9 @@
 # Development server ports
 # Displayed when running the dev task
 ports:
-  - name: Backend
+  - name: app_backend
     port: 8080
-  - name: Frontend
+  - name: app_frontend
     port: 5173
+  - name: infra
+    port: 8090

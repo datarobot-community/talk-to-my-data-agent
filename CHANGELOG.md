@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.10.0] - 2026-06-30
+
+### Added
+
+- Added OTel chat metrics for improved observability.
+- Added local OTel tracing support.
+- Added edit icon for editable cells in the UI.
+- Show which datasets the LLM used per answer.
+
+### Changed
+
+- External database connections (PostgreSQL, MySQL, SQL Server, Snowflake, SAP Datasphere, BigQuery) now route through the JDBC Preview API (`JdbcPreviewOperator`).
+
+### Fixed
+
+- Fixed persistent storage pagination, timeout, and OTel initialization issues.
+
+### Removed
+
+- Removed native `BigQueryOperator`, `GoogleCredentialsBQ`, and `google-cloud-bigquery`/`google-auth` dependencies.
+- BigQuery-specific env vars (`GOOGLE_SERVICE_ACCOUNT_BQ`, `GOOGLE_REGION_BQ`, `GOOGLE_DB_SCHEMA_BQ`) replaced by `JDBC_URI` and `JDBC_CONNECTION_PARAMETERS`.
+
 ## [11.8.2] - 2026-06-04
 
 ### Fixed

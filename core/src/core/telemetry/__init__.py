@@ -21,6 +21,7 @@ from .logging import (
     init_logging,
     log_api_call,
 )
+from .metrics import track_chat_request
 from .otel import OTel, otel
 from .uvicorn_filter import configure_uvicorn_logging
 
@@ -35,5 +36,6 @@ __all__ = [
     "get_logger",
     "log_api_call",
     "otel",
+    "track_chat_request",
     "configure_uvicorn_logging",
 ]

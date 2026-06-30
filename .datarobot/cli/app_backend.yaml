@@ -1,0 +1,9 @@
+---
+root:
+  - env: SESSION_SECRET_KEY
+    type: secret_string
+    generate: true
+    optional: false
+    help: |
+      Enter a secret key used to sign session cookies. This should be a long, random string.
+      The default value is randomly generated if the secret key is not already configured.

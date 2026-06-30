@@ -155,6 +155,16 @@ The base component records your answers in `.datarobot/answers/base.yml`. These 
 | `copyright_year` | Year embedded in license headers. |
 | `include_core` | Whether to include the `core` shared library. |
 
+## Local Tracing (OTel)
+
+After `dr start`, OpenTelemetry is configured automatically. The `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` credentials are written to `pulumi_config.json` and read by `DataRobotAppFrameworkBaseSettings` — no `.env` editing required.
+
+**View traces:** Navigate to your Use Case in DataRobot and open the **Tracing** tab. Traces appear within a few seconds of a request completing.
+
+**Disable tracing:** Set `OTEL_SDK_DISABLED=true` in `.env`, or omit `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+> The DataRobot OTel collector uses `experiment_container` as the Use Case entity type internally (not `use_case`). The credentials written by `dr start` use the correct type automatically.
+
 ## Prerequisites
 
 - [Pulumi CLI](https://www.pulumi.com/docs/install/) installed and authenticated.

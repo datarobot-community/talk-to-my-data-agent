@@ -23,6 +23,7 @@ from core.data_connections.database.database_implementations import (
 from core.data_connections.database.database_interface import NoDatabaseOperator
 
 _JDBC_PREVIEW = "core.data_connections.database.database_implementations.JdbcPreview"
+_CREDS = "core.data_connections.database.database_implementations.JDBCCredentials"
 
 
 def make_config(
@@ -67,19 +68,36 @@ class TestGetDatabaseOperatorJdbc:
         assert isinstance(operator, JdbcPreviewOperator)
         assert operator.query_friendly_name("users") == quoted_table
 
-    def test_missing_uri_falls_back_to_no_database(
+    def test_missing_uri_raises(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.delenv("JDBC_URI", raising=False)
         monkeypatch.delenv("MLOPS_RUNTIME_PARAM_JDBC_URI", raising=False)
         config = make_config()
-        operator = get_database_operator(config)
-        assert isinstance(operator, NoDatabaseOperator)
+        with pytest.raises(ValueError, match="JDBC_URI"):
+            get_database_operator(config)
 
-    def test_invalid_uri_prefix_falls_back_to_no_database(
+    def test_invalid_uri_prefix_raises(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("JDBC_URI", "jdbc:oracle://localhost:1521/db")
         config = make_config()
-        operator = get_database_operator(config)
-        assert isinstance(operator, NoDatabaseOperator)
+        with pytest.raises(ValueError, match="JDBC_URI"):
+            get_database_operator(config)
+
+    @pytest.mark.parametrize("connection_type,jdbc_uri", [
+        ("snowflake", "jdbc:snowflake://account.snowflakecomputing.com/"),
+        ("sap", "jdbc:sap://host:443"),
+        ("bigquery", "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443"),
+    ])
+    def test_snowflake_sap_and_bigquery_route_to_jdbc_operator(
+        self, connection_type: str, jdbc_uri: str
+    ) -> None:
+        config = make_config(connection_type=connection_type)
+        with patch(_CREDS) as mock_creds_cls:
+            mock_creds = MagicMock()
+            mock_creds.jdbc_uri = jdbc_uri
+            mock_creds.jdbc_connection_parameters = None
+            mock_creds_cls.return_value = mock_creds
+            operator = get_database_operator(config)
+        assert isinstance(operator, JdbcPreviewOperator)
