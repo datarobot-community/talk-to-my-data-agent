@@ -94,6 +94,28 @@ tasks:
           echo "ℹ️  Skipping experimentation plugin check (dr CLI not available)"
         fi
 
+  check-use-case-id:
+    silent: true
+    desc: "🔎 Ensure DATAROBOT_USE_CASE_ID is configured"
+    dir: ..
+    cmds:
+      - |
+        if [ ! -f pulumi_config.json ]; then
+          echo "❌ Missing pulumi_config.json in project root. Please run 'dr start' first to setup the project."
+          exit 1
+        fi
+
+        if command -v jq >/dev/null 2>&1; then
+          DATAROBOT_USE_CASE_ID="$(jq -r '.DATAROBOT_USE_CASE_ID // empty' pulumi_config.json)"
+        else
+          DATAROBOT_USE_CASE_ID="$(grep -Eo '"DATAROBOT_USE_CASE_ID"[[:space:]]*:[[:space:]]*"[^"]*"' pulumi_config.json | sed -E 's/.*"DATAROBOT_USE_CASE_ID"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/' | head -n 1)"
+        fi
+
+        if [ -z "${DATAROBOT_USE_CASE_ID}" ]; then
+          echo "❌ DATAROBOT_USE_CASE_ID is missing in pulumi_config.json. Please run 'dr start' first to setup the project."
+          exit 1
+        fi
+
   start:
     silent: true
     desc: "💻 Deploy backing infrastructure"
@@ -127,6 +149,8 @@ tasks:
     silent: true
     dir: ../
     desc: "📡 Start the local experimentation tracing dashboard (with experiment_container as the default entity-type)"
+    deps:
+      - check-use-case-id
     cmds:
       - |
         if dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then

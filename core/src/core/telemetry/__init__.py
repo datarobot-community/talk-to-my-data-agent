@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextvars
+
 from .enums import FormatType, LogLevel
 from .logging import (
     JsonFormatter,
@@ -24,6 +26,10 @@ from .logging import (
 from .metrics import track_chat_request
 from .otel import OTel, otel
 from .uvicorn_filter import configure_uvicorn_logging
+
+dr_user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "dr_user_id", default=None
+)
 
 __all__ = [
     "LogLevel",
@@ -38,4 +44,5 @@ __all__ = [
     "otel",
     "track_chat_request",
     "configure_uvicorn_logging",
+    "dr_user_id_var",
 ]

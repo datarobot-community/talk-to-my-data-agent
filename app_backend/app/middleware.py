@@ -29,7 +29,7 @@ from typing import Any, NamedTuple
 import datarobot as dr
 from core.analyst_db import AnalystDB
 from core.datarobot_client import use_user_token
-from core.telemetry import otel
+from core.telemetry import dr_user_id_var, otel
 from fastapi import Request, Response
 
 logger = getLogger(__name__)
@@ -200,6 +200,8 @@ async def session_middleware(request: Request, call_next):  # type: ignore[no-un
     user_email: str | None = None
 
     if request.method in request_methods:
+        dr_user_id_var.set(request.headers.get("x-user-id"))
+
         # Initialize the session
         session_init = await _initialize_session(request)
         session_id = session_init.session_id

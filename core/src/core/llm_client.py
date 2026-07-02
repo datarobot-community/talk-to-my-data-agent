@@ -38,6 +38,7 @@ from openai import (
 from opentelemetry import metrics, propagate, trace
 
 from core.config import Config
+from core.telemetry import dr_user_id_var
 from core.telemetry.metrics import track_chat_request
 
 log = logging.getLogger(__name__)
@@ -234,6 +235,9 @@ class CompletionsWrapper:
                 "gen_ai.prompt", user_prompt if isinstance(user_prompt, str) else ""
             )
             span.set_attribute("gen_ai.input.messages", _otel_input_messages(messages))
+            dr_user_id = dr_user_id_var.get()
+            if dr_user_id:
+                span.set_attribute("datarobot.user_id", dr_user_id)
 
             try:
                 result = await self._completions.create(*args, **kwargs)
