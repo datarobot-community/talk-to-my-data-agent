@@ -57,7 +57,9 @@ def try_simple_numeric_conversion(
     )
     numeric_simple = simple_cleaned.cast(pl.Float64, strict=False)
     new_nulls = numeric_simple.is_null()
-    simple_success_rate = 1 - (new_nulls.sum() - original_nulls.sum()) / len(
+    new_null_count = float(new_nulls.sum() or 0)
+    original_null_count = float(original_nulls.sum() or 0)
+    simple_success_rate = 1 - (new_null_count - original_null_count) / len(
         sample_series
     )
 
@@ -181,7 +183,9 @@ def try_unit_conversion(
 
     # Calculate conversion success rate
     new_nulls = sample_result.is_null()
-    conversion_success_rate = 1 - (new_nulls.sum() - original_nulls.sum()) / len(
+    new_null_count = float(new_nulls.sum() or 0)
+    original_null_count = float(original_nulls.sum() or 0)
+    conversion_success_rate = 1 - (new_null_count - original_null_count) / len(
         sample_result
     )
 

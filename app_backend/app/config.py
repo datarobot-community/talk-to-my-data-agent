@@ -19,12 +19,18 @@ from pydantic import ValidationInfo, field_validator
 
 
 class Config(DataRobotAppFrameworkBaseSettings):
+    session_secret_key: str
+    session_max_age: int = 14 * 24 * 60 * 60  # 14 days, in seconds
+    session_https_only: bool = True
+    session_cookie_name: str = "sess"  # Can be overridden for different apps
+
     log_level: LogLevel = LogLevel.INFO
     log_format: FormatType = "readable"
     otel_entity_id: str = ""
     otel_exporter_otlp_endpoint: str = ""
     otel_exporter_otlp_headers: str = ""
     otel_sdk_disabled: bool = False
+    profiling_enabled: bool = False
 
     @field_validator("otel_exporter_otlp_headers", mode="before")
     @classmethod

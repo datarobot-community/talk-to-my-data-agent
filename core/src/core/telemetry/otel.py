@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     from app.config import Config
     from fastapi import FastAPI
 
+
 # Optional imports for auto-instrumentation
 try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -386,6 +387,9 @@ class OTel:
             app = FastAPI()
             otel.instrument_fastapi_app(app)
         """
+        if not self.telemetry_enabled:
+            return
+
         if FastAPIInstrumentor is None:
             logging.getLogger(__name__).warning(
                 "FastAPIInstrumentor not available. "
@@ -580,15 +584,15 @@ class OTel:
         """
         Gracefully shutdown all telemetry providers.
         """
+        if not (self._logger_provider or self._meter_provider or self._tracer_provider):
+            return
+
         if self._logger_provider:
-            self._logger_provider.shutdown()  # type: ignore[no-untyped-call]
+            self._logger_provider.shutdown()
         if self._meter_provider:
             self._meter_provider.shutdown()
         if self._tracer_provider:
-            self._tracer_provider.shutdown()  # type: ignore[no-untyped-call]
-
-        # Allow time for final exports (as seen in datavolt examples)
-        time.sleep(1)
+            self._tracer_provider.shutdown()
 
     def log_application_start(self, application_name: str = "Application") -> None:
         """

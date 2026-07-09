@@ -37,8 +37,11 @@ tasks:
       TEST_USER_EMAIL: "dev@example.com"
     cmds:
       - echo "🔨 Starting development server"
-      - PYTHONPATH="$CALCULATED_PYTHONPATH" uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --reload-dir
-        . --reload-dir '../core'
+      - |
+        (cd .. && DR_SKIP_PLUGIN_UPDATE_CHECK=true dr xp --plain-output) &
+        DR_XP_PID=$!
+        trap "kill $DR_XP_PID 2>/dev/null || true" EXIT
+        PYTHONPATH="$CALCULATED_PYTHONPATH" uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 
   lint:
     silent: true

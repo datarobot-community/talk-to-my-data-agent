@@ -25,9 +25,11 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import Config
 from app.deps import Deps, create_deps
+from app.profiling import PyInstrumentMiddleware
 from app.rest_api import create_app as core_create_app
 
 base_router = APIRouter()
@@ -135,6 +137,30 @@ def create_app(
     # Add our middleware for DataRobot Custom Applications
     app.add_middleware(DataRobotASGIMiddleware, health_endpoint="/health")
 
+    # Generate a unique session cookie name based on config or app's base path
+    if config.session_cookie_name != "sess":
+        # Use the configured cookie name if it's been customized
+        session_cookie_name = config.session_cookie_name
+    else:
+        # Auto-generate based on base path to avoid conflicts between apps
+        api_port = os.getenv("PORT", "8080")
+        app_base_url = get_app_base_url(api_port)
+        # Create a safe cookie name from the base path
+        cookie_suffix = (
+            app_base_url.strip("/").replace("/", "_").replace("-", "_") or "default"
+        )
+        session_cookie_name = f"sess_{cookie_suffix}"
+
+    app.add_middleware(
+        SessionMiddleware,
+        session_cookie=session_cookie_name,
+        secret_key=config.session_secret_key,
+        max_age=config.session_max_age,
+        https_only=config.session_https_only,
+    )
+
+    if config.profiling_enabled:
+        app.add_middleware(PyInstrumentMiddleware)
     app.include_router(base_router)
 
     # This is the base path for the app, used to serve static files and templates

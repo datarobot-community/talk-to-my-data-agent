@@ -1,26 +1,46 @@
 ---
 dr:
   name: DataRobot CLI
-  minimum-version: 0.2.17
+  minimum-version: 0.2.74
   command: dr self version
   url: https://github.com/datarobot-oss/cli
+  install:
+    macos: curl -fsSL https://cli.datarobot.com/install.sh | sh
+    linux: curl -fsSL https://cli.datarobot.com/install.sh | sh
+    # windows: powershell -c "irm https://cli.datarobot.com/install.ps1 | iex"
 node:
   name: Node.js
   minimum-version: 20.0.0
   command: node --version
   url: https://nodejs.org/
+  install:
+    macos: brew install node
+    linux: curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs
+    # windows: winget install OpenJS.NodeJS
 git:
   name: Git source control management tool
   minimum-version: 2.30.0
   command: git --version
   url: https://git-scm.com/
+  install:
+    macos: brew install git
+    linux: apt-get install git
+    # windows: winget install Git.Git
 task:
   name: Taskfile task runner
   minimum-version: 3.43.3
   command: task --version
   url: https://taskfile.dev/
+  install:
+    macos: brew install go-task
+    linux: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
+    # windows: winget install Task.Task
 pulumi:
   name: Pulumi Infrastructure as Code tool
   minimum-version: 3.163.0
   command: pulumi version
   url: https://www.pulumi.com/
+  install:
+    macos: brew install pulumi
+    linux: curl -fsSL https://get.pulumi.com | sh
+    # windows: winget install Pulumi.Pulumi
