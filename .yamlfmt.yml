@@ -9,3 +9,4 @@ exclude:
   - .datarobot/
   - "**/.venv/**"
   - "**/node_modules/**"
+  - .harness/e2e/pipeline.yml

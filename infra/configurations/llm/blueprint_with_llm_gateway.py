@@ -29,6 +29,7 @@ from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import use_case
 from .libllm import (
+    get_blueprint_runtime_parameters,
     validate_feature_flags,
     verify_llm,
     verify_llm_gateway_model_availability,
@@ -107,6 +108,10 @@ llm_blueprint = datarobot.LlmBlueprint(
     ),
 )
 
+# Supply the FULL runtime parameter set explicitly. Passing a partial set makes the provider
+# drop every blueprint default that isn't restated, including DRUM system parameters such as
+# DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS that the model requires to load. The gateway path uses
+# no provider credentials, so only the blueprint/DRUM defaults are needed here.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -116,6 +121,11 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
+    runtime_parameter_values=get_blueprint_runtime_parameters(
+        llm_blueprint_id=llm_blueprint.id,
+        playground_id=playground.id,
+        llm_id=default_llm_id,
+    ),
 )
 
 if prediction_environment_id := os.environ.get(

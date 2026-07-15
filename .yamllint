@@ -1,0 +1,5 @@
+---
+extends: default
+
+ignore: |
+  .harness/e2e/pipeline.yml

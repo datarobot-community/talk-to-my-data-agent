@@ -119,6 +119,9 @@ llm_blueprint = datarobot.LlmBlueprint(
     playground_id=playground.id,
 )
 
+# No runtime_parameter_values: with pulumi-datarobot >= 0.10.33 even an empty managed set can
+# cause the provider to drop the blueprint defaults (incl. DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS)
+# and break model load. Omitting the argument keeps the full blueprint-generated default set.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -128,7 +131,6 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
-    runtime_parameter_values=[],
 )
 
 # Register the custom model from the LLM Blueprint

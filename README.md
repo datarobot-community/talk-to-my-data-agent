@@ -347,9 +347,19 @@ The full list of supported model names is available in the [LLM Gateway catalog]
 
 To add Snowflake support:
 
-1. Add `DATABASE_CONNECTION_TYPE = "snowflake"` to `.env`.
-2. Provide Snowflake credentials in `.env` by either setting `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` or setting `SNOWFLAKE_KEY_PATH` to a file that contains the key. The key file must be a `*.p8` private key file (see [Snowflake key-pair authentication](https://docs.snowflake.com/en/user-guide/key-pair-auth)).
-3. Fill out the remaining Snowflake connection settings in `.env` (refer to `.env.template` for details).
+1. Add `DATABASE_CONNECTION_TYPE=datarobot_jdbc` to `.env`.
+2. Set `JDBC_URI` to your Snowflake JDBC connection string.
+   ```bash
+   JDBC_URI=jdbc:snowflake://account.snowflakecomputing.com/?warehouse=WH&db=DB&schema=PUBLIC
+   ```
+3. Provide Snowflake credentials through `JDBC_CONNECTION_PARAMETERS`, which must be valid JSON. For password authentication:
+   ```bash
+   JDBC_CONNECTION_PARAMETERS='{"user": "dbuser", "password": "secret"}'
+   ```
+   For key-pair authentication, provide the private key content inline in `JDBC_CONNECTION_PARAMETERS` using a supported [Snowflake JDBC parameter](https://docs.snowflake.com/en/developer-guide/jdbc/jdbc-parameters). JDBC queries run in DataRobot's server-side preview service.
+   ```bash
+   JDBC_CONNECTION_PARAMETERS='{"user": "dbuser", "<snowflake-key-parameter>": "<inline-private-key-content>"}'
+   ```
 4. Run `task deploy`.
 
 #### BigQuery

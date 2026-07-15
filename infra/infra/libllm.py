@@ -238,6 +238,38 @@ def get_runtime_values(
     return credential.runtime_parameter_values
 
 
+def get_blueprint_runtime_parameters(
+    llm_blueprint_id: "pulumi.Input[str]",
+    playground_id: "pulumi.Input[str]",
+    llm_id: "pulumi.Input[str]",
+) -> list[pulumi_datarobot.CustomModelRuntimeParameterValueArgs]:
+    """Return the runtime parameters an LLM-blueprint custom model needs to load and serve.
+
+    Creating a custom model from a blueprint with a *partial* ``runtime_parameter_values`` set
+    makes the provider keep only the supplied parameters and drop every other blueprint default,
+    including DRUM system parameters such as ``DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS`` that the
+    model requires to load. We therefore restate the full default set here so callers can submit
+    it explicitly (alongside their credential parameters) and never rely on a partial submission.
+    """
+    Arg = pulumi_datarobot.CustomModelRuntimeParameterValueArgs
+    return [
+        Arg(key="PROMPT_COLUMN_NAME", type="string", value="promptText"),
+        Arg(key="LLM_BLUEPRINT_ID", type="string", value=llm_blueprint_id),
+        Arg(
+            key="LLM_BLUEPRINT_ID_COLUMN_NAME", type="string", value="LLM_BLUEPRINT_ID"
+        ),
+        Arg(key="ENABLE_LLM_BLUEPRINT_ID_COLUMN", type="boolean", value="true"),
+        Arg(key="LLM_ID", type="string", value=llm_id),
+        Arg(key="PLAYGROUND_ID", type="string", value=playground_id),
+        Arg(key="DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS", type="string", value="cpu"),
+        Arg(key="CUSTOM_MODEL_WORKERS", type="numeric", value="1"),
+        Arg(key="DRUM_SERVER_TYPE", type="string", value="gunicorn"),
+        Arg(key="DRUM_GUNICORN_WORKER_CLASS", type="string", value="sync"),
+        Arg(key="DRUM_WORKER_CONNECTIONS", type="numeric", value="100"),
+        Arg(key="DRUM_CLIENT_REQUEST_TIMEOUT", type="numeric", value="300"),
+    ]
+
+
 def validate_feature_flags(flags: FeatureFlagSet) -> None:
     corrections, invalid_flags = eval_feature_flag_statuses(flags)
     for flag in invalid_flags:

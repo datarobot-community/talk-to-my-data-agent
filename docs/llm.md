@@ -80,7 +80,7 @@ Use this option when you already have an LLM from Azure, Bedrock, Anthropic, Ver
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `<LLM>_DEFAULT_MODEL` | No | `azure-openai-gpt-5-mini` | External LLM model name |
+| `<LLM>_DEFAULT_MODEL` | No | `azure/openai-gpt-5-mini` | External LLM model name (LiteLLM format) |
 | `<LLM>_DEFAULT_LLM_ID` | No | `azure-openai-gpt-5-mini` | LLM ID used in the Playground |
 | `<LLM>_DEFAULT_LLM_NAME` | No | `Azure OpenAI GPT-5 Mini` | Friendly name shown in the UI |
 

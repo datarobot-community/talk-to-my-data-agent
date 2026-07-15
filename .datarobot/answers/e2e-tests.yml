@@ -1,0 +1,7 @@
+# Changes here will be overwritten by Copier
+_commit: 7a241f5
+_src_path: git@github.com:datarobot/af-component-e2e-tests.git
+base_answers_file: .datarobot/answers/base.yml
+harness_project_identifier: dataanalyst
+recipe_answers_file: .datarobot/answers/datarobot_recipe.yml
+

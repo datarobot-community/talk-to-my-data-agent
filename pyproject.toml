@@ -1,0 +1,37 @@
+# Environment and pytest configuration for the repo-root integration suite
+# (tests/, run by the Harness `e2e` pipeline's pytest flow, e.g. the
+# weekly_pytest_e2e cron). Component apps manage their own environments in
+# app_backend/, core/ and infra/; this project only pulls in what tests/ imports.
+[project]
+name = "data-analyst"
+version = "0.1.0"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "core",
+    "datarobot>=3.16.0",
+    "datarobot-genai>=0.3.4,<0.4",
+    "openai>=1.60.0,<2",
+    "pandas>=2.2.3,<3.0",
+    "plotly>=5.24.1,<6.0",
+    "polars>=1.22.0,<2.0",
+    "pytest>=8.3.4,<9.0",
+    "pytest-asyncio>=1.0.0",
+    "python-dotenv>=1.0.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+core = { path = "core", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["core/src"]
+markers = [
+    "remote_datasource_concurrency: concurrency test for loading / interacting with remote datasources",
+    "integration: mark test as integration (not run by default)",
+]
+addopts = '-m "not integration and not remote_datasource_concurrency"'
+norecursedirs = ["tests/e2e"]
+asyncio_default_fixture_loop_scope = "module"
+filterwarnings = ["ignore::DeprecationWarning::"]

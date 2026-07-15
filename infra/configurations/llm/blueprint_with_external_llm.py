@@ -29,6 +29,7 @@ from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import use_case
 from .libllm import (
+    get_blueprint_runtime_parameters,
     get_runtime_values,
     validate_feature_flags,
     verify_llm,
@@ -96,6 +97,11 @@ llm_blueprint = datarobot.LlmBlueprint(
     ),
 )
 
+# Supply the FULL runtime parameter set explicitly. Passing a partial set (e.g. only the
+# credentials) makes the provider drop every blueprint default that isn't restated, including
+# DRUM system parameters such as DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS that the model requires
+# to load. Restating the full blueprint/DRUM default set alongside the credentials keeps the
+# model healthy and also repairs models that a previous partial submission had already wiped.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -105,7 +111,14 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
-    runtime_parameter_values=llm_credential_runtime_params,
+    runtime_parameter_values=[
+        *get_blueprint_runtime_parameters(
+            llm_blueprint_id=llm_blueprint.id,
+            playground_id=playground.id,
+            llm_id=default_llm_id,
+        ),
+        *llm_credential_runtime_params,
+    ],
 )
 
 if prediction_environment_id := os.environ.get(
@@ -201,12 +214,12 @@ rag_playground_url = pulumi.Output.format(
     use_case.id,
     playground.id,
 )
+
 deployment_url = pulumi.Output.format(
     "{0}/console-nextgen/deployments/{1}/overview",
     datarobot_url,
     llm_deployment.id,
 )
-
 pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
 pulumi.export("Deployment Console " + llm_resource_name, deployment_url)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
@@ -214,3 +227,4 @@ export("LLM_DEFAULT_MODEL", default_model)
 export("LLM_DEFAULT_MODEL_FRIENDLY_NAME", default_llm_friendly_name)
 export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
 pulumi.export("RAG Playground URL " + llm_resource_name, rag_playground_url)
+export("USE_DATAROBOT_LLM_GATEWAY", "0")

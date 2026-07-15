@@ -53,3 +53,8 @@ tasks:
     desc: "🔁 Run transfer database script"
     cmds:
       - "{{.UV_CMD}} run python src/core/scripts/transfer_database.py {{.CLI_ARGS}}"
+
+  dump-chat-history:
+    desc: "💬 Dump chat history"
+    cmds:
+      - "{{.UV_CMD}} run python src/core/scripts/dump_chat_history.py {{.CLI_ARGS}}"
