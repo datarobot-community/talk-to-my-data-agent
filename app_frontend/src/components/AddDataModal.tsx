@@ -9,10 +9,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { ExternalLink, Plus } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { DATA_SOURCES, NEW_DATA_STORE } from '@/constants/dataSources';
 import { MultiSelect } from '@/components/ui-custom/multi-select';
@@ -32,7 +30,13 @@ import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api
 import { SingleSelect } from './ui-custom/single-select';
 import { ApiError } from '@/state/types';
 
-export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
+export const AddDataModal = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
   const { data, isLoading: isLoadingDatasets, error: datasetRegistryError } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
@@ -40,9 +44,12 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedDataStoreId, setSelectedDataStoreId] = useState<string | null>(null);
   const [selectedExternalDataSources, setSelectedExternalDataSources] = useState<string[]>([]);
-  const { setDataSource, dataSource } = useAppState();
+  const { setDataSource } = useAppState();
+  // Database-only modal for now: use a local source instead of reading/writing
+  // global app state, so opening the dialog never overwrites the user's
+  // persisted DATA_SOURCE preference. TODO: refactor the non-database paths.
+  const dataSource = DATA_SOURCES.DATABASE;
   const [files, setFiles] = useState<File[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
@@ -100,7 +107,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     setSelectedDatasets([]);
     setSelectedDataStoreId(null);
     setSelectedExternalDataSources([]);
-  }, [isOpen]);
+  }, [open]);
 
   useEffect(() => {
     setSelectedExternalDataSources([]);
@@ -115,7 +122,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     onSuccess: () => {
       setIsPending(false);
       setError(null);
-      setIsOpen(false);
+      onOpenChange(false);
     },
     onError: (error: UploadError | AxiosError) => {
       setIsPending(false);
@@ -130,7 +137,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const { mutate: loadFromDatabase } = useLoadFromDatabaseMutation({
     onSuccess: () => {
       setIsPending(false);
-      setIsOpen(false);
+      onOpenChange(false);
     },
     onError: (error: Error) => {
       setIsPending(false);
@@ -142,7 +149,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     onSuccess: () => {
       setIsPending(false);
       setError(null);
-      setIsOpen(false);
+      onOpenChange(false);
     },
     onError: (error: Error) => {
       setIsPending(false);
@@ -156,39 +163,32 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
   return (
     <Dialog
-      defaultOpen={isOpen}
-      onOpenChange={open => {
+      onOpenChange={nextOpen => {
         if (isPending) return;
-        setIsOpen(open);
+        onOpenChange(nextOpen);
         setError(null);
         setFiles([]);
         setSelectedDataStoreId(null);
         setSelectedExternalDataSources([]);
       }}
-      open={isOpen}
+      open={open}
     >
-      <DialogTrigger asChild>
-        <Button
-          variant="secondary"
-          testId="add-data-button"
-          data-highlight={highlight || undefined}
-          className={cn(highlight && 'animate-(--animation-blink-border-and-shadow)', 'mr-2')}
-        >
-          <Plus /> {t('Add Data')}
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>{t('Add Data')}</DialogTitle>
+          <DialogTitle>{t('Database')}</DialogTitle>
           <Separator className="border-t" />
           <DialogDescription />
         </DialogHeader>
-        <DataSourceSelector
-          accessDenied={accessDenied}
-          onChange={setDataSource}
-          value={dataSource}
-        />
-        <Separator className="my-4 border-t" />
+        {/* Options selector hidden for now — this modal is Database-only.
+            TODO: refactor/clean up the non-database paths below. */}
+        <div className="hidden">
+          <DataSourceSelector
+            accessDenied={accessDenied}
+            onChange={setDataSource}
+            value={dataSource}
+          />
+          <Separator className="my-4 border-t" />
+        </div>
         {dataSource == DATA_SOURCES.FILE && (
           <>
             <h3 className="not-prose heading-05">{t('Local files')}</h3>
@@ -244,7 +244,6 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == DATA_SOURCES.DATABASE && (
           <>
-            <h3 className="not-prose heading-05">{t('Databases')}</h3>
             <p className="body-secondary">{t('Select one or more tables')}</p>
             <MultiSelect
               options={
@@ -359,7 +358,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
               testId="add-data-modal-cancel-button"
               disabled={isPending}
               variant={'ghost'}
-              onClick={() => setIsOpen(false)}
+              onClick={() => onOpenChange(false)}
             >
               {t('Cancel')}
             </Button>

@@ -24,7 +24,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_PLUGIN_VERSION:-}" ]; then
         echo "${PULUMI_DATAROBOT_PLUGIN_VERSION}"
       else
-        echo "v0.10.36"
+        echo "v0.10.43"
       fi
 
   PULUMI_DATAROBOT_DEFAULT_URL:
@@ -35,7 +35,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_DEFAULT_URL:-}" ]; then
         echo "${PULUMI_DATAROBOT_DEFAULT_URL}"
       else
-        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.36"
+        echo "https://github.com/datarobot-community/pulumi-datarobot/releases/download/v0.10.43"
       fi
 
 tasks:
@@ -83,10 +83,7 @@ tasks:
     cmds:
       - |
         if command -v dr &> /dev/null; then
-          if dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then
-            echo "ℹ️  DataRobot experimentation plugin 'xp' is already installed"
-            dr plugin update xp
-          else
+          if ! dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then
             echo "⬇️ Installing DataRobot experimentation plugin 'xp'"
             dr plugin install xp || true
           fi
@@ -154,7 +151,7 @@ tasks:
     cmds:
       - |
         if dr plugin list 2>/dev/null | grep -qE '(^|[[:space:]])xp([[:space:]]|$)'; then
-            DR_SKIP_PLUGIN_UPDATE_CHECK=true dr xp --plain-output
+            dr --skip-plugin-update-check xp --plain-output
           else
             echo "DataRobot experimentation plugin not found. Please install it with 'dr plugin install xp' to use the tracing dashboard."
             exit 1

@@ -1,5 +1,6 @@
 'use client';
 import { useState, createContext, useContext, useLayoutEffect } from 'react';
+import { useSyncDesignSystemTheme } from '@datarobot/design-system/scoped-theme';
 
 type Theme = 'light' | 'dark';
 
@@ -41,6 +42,8 @@ export const ThemeProvider = ({
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem(themeKey, theme);
   }, [theme]);
+
+  useSyncDesignSystemTheme(theme);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

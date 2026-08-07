@@ -30,7 +30,7 @@ root:
     options:
       - name: None
         value: no_database
-      - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery)
+      - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery / Databricks)
         value: datarobot_jdbc
         requires: jdbc_config
   - env: OTEL_SDK_DISABLED

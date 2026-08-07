@@ -22,6 +22,7 @@ tasks:
     cmds:
       - dr self update
       - dr dotenv setup --if-needed
+      - uv tool install --upgrade "datarobot[core]>=3.18.0"
       - task install
       {{- if .HasStart }}
       {{- range .StartComponents }}

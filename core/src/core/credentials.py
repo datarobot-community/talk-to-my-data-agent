@@ -34,6 +34,7 @@ _VALID_JDBC_PREFIXES = (
     "jdbc:snowflake://",
     "jdbc:sap://",
     "jdbc:bigquery://",
+    "jdbc:databricks://",
 )
 
 
@@ -59,6 +60,13 @@ class JDBCCredentials(DRCredentials):
     def validate_jdbc_uri(cls, v: str) -> str:
         if not any(v.startswith(prefix) for prefix in _VALID_JDBC_PREFIXES):
             raise ValueError(f"jdbc_uri must start with one of {_VALID_JDBC_PREFIXES}")
+        return v
+
+    @field_validator("jdbc_connection_parameters", mode="before")
+    @classmethod
+    def blank_connection_parameters_to_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
     def __repr__(self) -> str:

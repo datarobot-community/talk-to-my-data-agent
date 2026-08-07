@@ -2,6 +2,17 @@ import { AxiosProgressEvent } from 'axios';
 import apiClient from '../apiClient';
 import { DatasetResponse, Dataset } from './types';
 
+/**
+ * Fetch a Data Registry dataset's size (bytes) via the DataRobot reverse proxy.
+ * The v2 datasets API returns it as `datasetSize`. Returns null when unknown.
+ */
+export async function getRegistryDatasetSize(datasetId: string): Promise<number | null> {
+  const { data } = await apiClient.get<{ datasetSize?: number }>(
+    `/v1/proxy/datarobot/api/v2/datasets/${datasetId}/`
+  );
+  return typeof data?.datasetSize === 'number' ? data.datasetSize : null;
+}
+
 export const getDatasets = async ({
   limit,
   remote,

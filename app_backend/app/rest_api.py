@@ -33,6 +33,7 @@ from app.routers import (
     datasets_router,
     dictionaries_router,
     external_data_stores_router,
+    proxy_router,
     registry_router,
     supported_types_router,
     user_router,
@@ -131,6 +132,7 @@ def create_app(
     app.include_router(user_router, prefix=prefix)
     app.include_router(external_data_stores_router, prefix=prefix)
     app.include_router(supported_types_router, prefix=prefix)
+    app.include_router(proxy_router, prefix=prefix)
 
     # Initialize telemetry on application startup
     otel.log_application_start()

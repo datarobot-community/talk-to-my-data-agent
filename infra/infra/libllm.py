@@ -36,6 +36,28 @@ INFRA_DIR = Path(__file__).parent
 
 log = logging.getLogger(__name__)
 
+# Inert placeholder model for strategies that route by deployment ID (e.g. an opaque,
+# pre-existing deployment whose served model we don't know). Nothing keys on this value:
+# the deployment endpoint routes by its ID and ignores the model string. It is deliberately
+# named so it can never be mistaken for a real model. Users can override it with
+# LLM_DEFAULT_MODEL when they want the real name (e.g. so datarobot-genai
+# can match provider-specific reasoning parameters).
+DEPLOYED_LLM_PLACEHOLDER_MODEL = "datarobot/datarobot-deployed-llm"
+
+
+def ensure_datarobot_prefix(model_name: str) -> str:
+    """Return the model name in the unified ``datarobot/`` form the app stores and sends.
+
+    Accepts ``provider/model`` (``azure/gpt-5-mini``), a bare ``model`` (``gpt-5-mini``), or an
+    already-prefixed value, and always returns a ``datarobot/``-prefixed string. This is the one
+    canonical form for every strategy: datarobot-genai routes gateway/deployment/nim on it
+    directly and strips the prefix for the external-provider path, so a single prefixed value is
+    correct in all four modes.
+    """
+    return (
+        model_name if model_name.startswith("datarobot/") else f"datarobot/{model_name}"
+    )
+
 
 # LLM Credential Management Mapping
 RuntimeParameterValueArgs = namedtuple(
@@ -224,6 +246,9 @@ def get_runtime_values(
     model_id: str,
 ) -> list[pulumi_datarobot.CustomModelRuntimeParameterValueArgs]:
     """Get the runtime values for the active LLM module."""
+    # Provider drives credential selection. Strip the unified datarobot/ prefix first so
+    # provider parsing sees e.g. "azure/..." not "datarobot/azure/...".
+    model_id = model_id.removeprefix("datarobot/")
     # Extract provider from model_id - try slash first (new format), then dash (legacy format)
     if "/" in model_id:
         provider = model_id.split("/")[0]
@@ -308,12 +333,12 @@ def verify_llm_gateway_model_availability(model_id: str) -> None:
         Model '{model_id}' not found in catalog. Model availability may vary depending on
         region and organization settings.
         
-        To change the default_model, set the environment variable
-        'LLM_DEFAULT_MODEL' to an active model or edit the default_model directly
-        in the infra/infra/libllm.py.jinja file.
+        To change the default model, set the environment variable
+        'LLM_DEFAULT_MODEL' to an active model, or edit `default_model` in the
+        active configuration module under infra/configurations/llm/.
 
-        If you have multiple Pulumi LLM configurations, please set the appropriate environment
-        variable or update the respective infra/infra/* file for the configuration you want to modify.
+        If you have multiple Pulumi LLM configurations, set the appropriate environment variable
+        or update the respective configuration module for the one you want to modify.
 
         Available models: {active_models_display}
         """
@@ -342,16 +367,26 @@ def verify_llm(
     deployment_id: str | None = None,
     use_llm_gateway: bool = False,
 ) -> None:
-    """
-    Verify that the specified LLM is valid, available, and you can say hello
+    """Verify the configured LLM is reachable and can say hello before we deploy.
+
+    This mirrors how datarobot-genai's ``get_llm()`` routes, so a successful check here means
+    the app will route the same way at runtime:
+
+    - Deployment (``deployment_id`` set): call the deployment's chat endpoint. The deployment
+      routes by ID, so the model string is only a label; send it in the unified ``datarobot/``
+      form (falling back to the inert placeholder).
+    - LLM Gateway (``use_llm_gateway`` or ``USE_DATAROBOT_LLM_GATEWAY`` truthy): send a
+      ``datarobot/``-prefixed model so LiteLLM uses the DataRobot provider.
+    - External provider: strip the ``datarobot/`` prefix so LiteLLM calls the provider directly
+      (``azure/...``, ``bedrock/...``) using the credentials in the environment.
     """
 
-    # Pre-existing deployment
+    # Pre-existing / managed DataRobot deployment: routes by deployment ID.
     if deployment_id:
         dr_client = datarobot.Client()
         deployment_chat_base_url = f"{dr_client.endpoint.rstrip('/')}/deployments/{deployment_id}/chat/completions"
         response = completion(
-            model=model_id or "datarobot/datarobot-deployed-llm",
+            model=ensure_datarobot_prefix(model_id or DEPLOYED_LLM_PLACEHOLDER_MODEL),
             messages=[{"content": "Hi", "role": "user"}],
             api_base=deployment_chat_base_url,
         )
@@ -364,28 +399,16 @@ def verify_llm(
     use_llm_gateway_enabled = use_llm_gateway or os.environ.get(
         "USE_DATAROBOT_LLM_GATEWAY", ""
     ).lower() in {"1", "true", "yes"}
-    if use_llm_gateway_enabled and not model_id.startswith("datarobot/"):
-        err_message = f"""Default model must be prefixed with 'datarobot/' provider when using LLM gateway.
-        Edit the 'LLM_DEFAULT_MODEL' environment variable to include the prefix and run again.
-        Example value: 'LLM_DEFAULT_MODEL=datarobot/{model_id}'
-        """
-        raise ValueError(err_message)
 
-    # Map legacy to LiteLLM
-    if "-" in model_id:
-        provider_aliases = {
-            "azure": "azure",
-            "amazon": "bedrock",
-            "google": "vertex_ai",
-        }
-        provider = model_id.split("-")[0]
-        if provider in provider_aliases:
-            provider = provider_aliases[provider]
-            model_id = provider + "/" + "-".join(model_id.split("-")[1:])
-    # Map common aliases to their canonical provider names
-    provider = provider_aliases.get(provider, provider)
+    if use_llm_gateway_enabled:
+        # Gateway: LiteLLM routes to the DataRobot provider on the datarobot/ prefix.
+        model = ensure_datarobot_prefix(model_id)
+    else:
+        # External provider: LiteLLM must address the provider directly (azure/..., bedrock/...).
+        model = model_id.removeprefix("datarobot/")
+
     response = completion(
-        model=model_id,
+        model=model,
         messages=[{"content": "Hi", "role": "user"}],
     )
     assert len(response["choices"][0]["message"]["content"]) > 0

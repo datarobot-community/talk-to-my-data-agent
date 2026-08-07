@@ -1,19 +1,19 @@
 import { MessageCircle } from 'lucide-react';
 import DataRobotLogo from '@/assets/DataRobotLogo_black.svg';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useTranslation } from '@/i18n';
 import { ROUTES } from '@/pages/routes';
 
 export const DataRobotAvatar = () => {
-  const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="body text-center text-primary-foreground">
-      <img
-        src={DataRobotLogo}
-        alt=""
-        className="cursor-pointer"
-        onClick={() => navigate(ROUTES.DATA)}
-      />
+      {/* The logo carries no alt: the message header already renders "DataRobot" as
+          visible text beside it, so the link is named for where it goes instead. */}
+      <Link to={ROUTES.DATA} aria-label={t('Go to data')}>
+        <img src={DataRobotLogo} alt="" />
+      </Link>
     </div>
   );
 };

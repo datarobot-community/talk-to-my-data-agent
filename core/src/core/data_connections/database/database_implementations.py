@@ -42,6 +42,7 @@ from core.data_connections.datarobot.datarobot_dataset_handler import (
 )
 from core.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
+    SYSTEM_PROMPT_DATABRICKS,
     SYSTEM_PROMPT_MYSQL,
     SYSTEM_PROMPT_POSTGRES,
     SYSTEM_PROMPT_SAP_DATASPHERE,
@@ -90,6 +91,13 @@ _JDBC_TABLE_DISCOVERY_SQL: dict[str, str] = {
         WHERE table_type IN ('BASE TABLE', 'VIEW')
         ORDER BY table_name
     """,
+    "databricks": """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = current_schema()
+          AND table_type IN ('MANAGED', 'EXTERNAL', 'VIEW')
+        ORDER BY table_name
+    """,
 }
 
 _JDBC_DIALECT_NAMES: dict[str, str] = {
@@ -99,6 +107,7 @@ _JDBC_DIALECT_NAMES: dict[str, str] = {
     "snowflake": "Snowflake",
     "sap": "SAP Datasphere",
     "bigquery": "BigQuery",
+    "databricks": "Databricks",
 }
 
 
@@ -126,6 +135,8 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
             return "sap"
         elif uri.startswith("jdbc:bigquery://"):
             return "bigquery"
+        elif uri.startswith("jdbc:databricks://"):
+            return "databricks"
         raise ValueError(f"Unsupported JDBC URI scheme: {uri.split(':')[1]!r}")
 
     def _dialect_name(self) -> str:
@@ -142,7 +153,7 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
                 return f"[{name}]"
             case "snowflake" | "sap":
                 return f'"{name}"'
-            case "bigquery":
+            case "bigquery" | "databricks":
                 return f"`{name}`"
             case _:
                 raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
@@ -275,6 +286,7 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
             "snowflake": SYSTEM_PROMPT_SNOWFLAKE,
             "sap": SYSTEM_PROMPT_SAP_DATASPHERE,
             "bigquery": SYSTEM_PROMPT_BIGQUERY,
+            "databricks": SYSTEM_PROMPT_DATABRICKS,
         }[self._dialect_key]
         return ChatCompletionSystemMessageParam(role="system", content=prompt)
 
@@ -285,6 +297,7 @@ def get_database_operator(config: Config) -> DatabaseOperator[Any]:
         "snowflake",
         "sap",
         "bigquery",
+        "databricks",
         "datarobot_jdbc",
     ):
         try:
@@ -293,7 +306,7 @@ def get_database_operator(config: Config) -> DatabaseOperator[Any]:
             raise ValueError(
                 f"DATABASE_CONNECTION_TYPE is '{config.database_connection_type}' but JDBC_URI "
                 "is missing or invalid. Set JDBC_URI to a valid JDBC connection string "
-                "(e.g. jdbc:snowflake://..., jdbc:sap://..., or jdbc:bigquery://...)."
+                "(e.g. jdbc:snowflake://..., jdbc:sap://..., jdbc:bigquery://..., or jdbc:databricks://...)."
             ) from exc
         return cast(
             DatabaseOperator[Any],

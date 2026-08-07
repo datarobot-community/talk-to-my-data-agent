@@ -25,7 +25,10 @@ class Config(DataRobotAppFrameworkBaseSettings):
     session_cookie_name: str = "sess"  # Can be overridden for different apps
 
     log_level: LogLevel = LogLevel.INFO
-    log_format: FormatType = "readable"
+    # json avoids the DataRobot OTel collector mislabeling multi-line log
+    # continuation lines as INFO and letting them bypass level filtering
+    # (APP-6631) - readable/text remain available for local/manual use.
+    log_format: FormatType = "json"
     otel_entity_id: str = ""
     otel_exporter_otlp_endpoint: str = ""
     otel_exporter_otlp_headers: str = ""

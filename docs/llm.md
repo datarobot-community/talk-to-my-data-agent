@@ -2,12 +2,13 @@
 
 The LLM component provides the language model integration for your application. It supports multiple ways to connect an LLM.
 
-During project setup (`dr start` or `dr dotenv setup`), the CLI prompts you to choose one of five LLM integration options. Each option creates different DataRobot resources and requires different configuration.
+During project setup (`dr start` or `dr dotenv setup`), the CLI prompts you to choose one of six LLM integration options. Each option creates different DataRobot resources and requires different configuration.
 
 | Option | Best for | Deploys resources? | Requires credentials? |
 |---|---|---|---|
 | [LLM Gateway](#llm-gateway) | Getting started quickly | No | No |
 | [DataRobot Deployed LLM](#datarobot-deployed-llm) | Using an existing deployment | Yes (Playground only) | No |
+| [DataRobot NIM Deployed LLM](#datarobot-nim-deployed-llm) | Using an existing NVIDIA NIM deployment | Yes (Playground only) | No |
 | [External LLM](#external-llm) | Bringing your own provider (Azure, Bedrock, etc.) | Yes | Yes |
 | [LLM Blueprint with LLM Gateway](#llm-blueprint-with-llm-gateway) | Most production controls, multiple LLMs via one deployment | Yes | No |
 | [LLM from a Registered Model](#llm-from-a-registered-model) | Deploying a registered model (e.g. NVIDIA NIM) | Yes | No |
@@ -49,7 +50,7 @@ The component references the existing deployment and its prediction environment.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `<LLM>_DEPLOYMENT_ID` | Yes | -- | Deployment ID of the existing LLM (e.g. `6510c7b7c4f3f9407e24a849`) |
-| `<LLM>_DEFAULT_MODEL` | No | `datarobot/datarobot-deployed-llm` | Model identifier |
+| `<LLM>_DEFAULT_MODEL` | No | `datarobot/datarobot-deployed-llm` | Model label. The deployment routes by its ID, so this is inert; set it to the real model name if you want datarobot-genai to match provider-specific reasoning parameters. |
 
 **Note:** The deployment ID variable was formerly named `TEXTGEN_DEPLOYMENT_ID`. Use `<LLM>_DEPLOYMENT_ID` in current templates.
 
@@ -60,6 +61,35 @@ Surfaced by `task infra:info` or `pulumi stack output`:
 | Output | Description |
 |---|---|
 | `Deployment ID [LLM_APP_NAME]` | ID of the referenced deployment |
+
+## DataRobot NIM Deployed LLM
+
+Use this option when you already have an NVIDIA NIM model deployed on DataRobot. The component pulls the deployment into the playground and use case. You must provision and keep the NIM deployment running yourself.
+
+### Resources created
+
+| Resource | Type | Description |
+|---|---|---|
+| LLM Playground | `datarobot.Playground` | Playground linked to the use case |
+
+The component references the existing NIM deployment and its prediction environment.
+
+### Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `NIM_DEPLOYMENT_ID` (or `<LLM>_NIM_DEPLOYMENT_ID`) | Yes | -- | Deployment ID of the existing NIM LLM. Exported and read at runtime as `NIM_DEPLOYMENT_ID`. |
+| `<LLM>_DEFAULT_MODEL` | Yes | `datarobot/datarobot-deployed-llm` | Model your NIM serves (e.g. `meta-llama/Llama-3.1-8B`); stored `datarobot/`-prefixed. The placeholder is only a last-resort fallback. |
+
+### Stack outputs
+
+Surfaced by `task infra:info` or `pulumi stack output`:
+
+| Output | Description |
+|---|---|
+| `Deployment ID [LLM_APP_NAME]` | ID of the referenced NIM deployment |
+| `NIM_DEPLOYMENT_ID` | Same deployment ID (the name datarobot-genai reads to route to NIM) |
+| `USE_DATAROBOT_LLM_GATEWAY` | `0` |
 
 ## External LLM
 
@@ -80,8 +110,8 @@ Use this option when you already have an LLM from Azure, Bedrock, Anthropic, Ver
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `<LLM>_DEFAULT_MODEL` | No | `azure/openai-gpt-5-mini` | External LLM model name (LiteLLM format) |
-| `<LLM>_DEFAULT_LLM_ID` | No | `azure-openai-gpt-5-mini` | LLM ID used in the Playground |
+| `<LLM>_DEFAULT_MODEL` | No | `datarobot/azure/gpt-5-mini` | External LLM model in `provider/model` form; stored `datarobot/`-prefixed |
+| `<LLM>_DEFAULT_LLM_ID` | No | `azure-openai-gpt-5-mini` | DataRobot Playground LLM ID (a DataRobot identifier, not a LiteLLM model string) |
 | `<LLM>_DEFAULT_LLM_NAME` | No | `Azure OpenAI GPT-5 Mini` | Friendly name shown in the UI |
 
 You must also configure credentials for your chosen provider:
@@ -102,6 +132,7 @@ You must also configure credentials for your chosen provider:
 | `AWS_ACCESS_KEY_ID` | AWS access key ID |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret access key |
 | `AWS_REGION_NAME` | AWS region (e.g. `us-east-1`) |
+| `AWS_SESSION_TOKEN` | Optional. Session token for temporary AWS credentials |
 
 #### Google VertexAI
 
@@ -129,7 +160,7 @@ You must also configure credentials for your chosen provider:
 |---|---|
 | `TOGETHERAI_API_KEY` | API key |
 
-**Note:** The default `verify_llm` call in `blueprint_with_external_llm.py` assumes Azure OpenAI. For other providers, update the string passed to `verify_llm`. See [LiteLLM providers](https://docs.litellm.ai/docs/providers) for details on what string to pass.
+**Note:** `blueprint_with_external_llm.py` smoke-tests the provider directly by stripping the `datarobot/` prefix from `<LLM>_DEFAULT_MODEL` (e.g. `azure/gpt-5-mini`, `bedrock/...`). For Azure it addresses the model by its deployment name via `OPENAI_API_DEPLOYMENT_ID`. Set `<LLM>_DEFAULT_MODEL` to match your provider. See [LiteLLM providers](https://docs.litellm.ai/docs/providers) for the exact model string each provider expects.
 
 ### Stack outputs
 
@@ -200,7 +231,7 @@ This option creates two deployments:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `TEXTGEN_REGISTERED_MODEL_ID` | Yes | -- | ID of the registered model |
-| `<LLM>_DEFAULT_MODEL` | No | `datarobot/datarobot-deployed-llm` | Model identifier |
+| `<LLM>_DEFAULT_MODEL` | No | `datarobot/datarobot-deployed-llm` | Model label. The blueprint deployment routes by its ID, so this is inert; set it to the real model name for reasoning-parameter matching. |
 | `DATAROBOT_TIMEOUT_MINUTES` | No | `30` | Timeout in minutes for DataRobot operations. Increase for models that require GPU allocations |
 
 ### Stack outputs
@@ -209,7 +240,7 @@ Surfaced by `task infra:info` or `pulumi stack output`:
 
 | Output | Description |
 |---|---|
-| `Deployment ID [LLM_APP_NAME]` | ID of the proxy deployment created from the registered model |
+| `Deployment ID [LLM_APP_NAME]` | ID of the governed blueprint deployment the app calls (matches `<LLM>_DEPLOYMENT_ID`) |
 
 ## Switching between options
 
@@ -229,6 +260,7 @@ Available configuration files:
 |---|---|
 | `gateway_direct.py` | LLM Gateway |
 | `deployed_llm.py` | DataRobot Deployed LLM |
+| `nim_deployed_llm.py` | DataRobot NIM Deployed LLM |
 | `blueprint_with_external_llm.py` | External LLM |
 | `blueprint_with_llm_gateway.py` | LLM Blueprint with LLM Gateway |
 | `registered_model.py` | LLM from a Registered Model |
@@ -251,6 +283,14 @@ INFRA_ENABLE_LLM=deployed_llm.py
 ```
 
 When you select DataRobot Deployed LLM during `dr start` (or `dr dotenv setup`), the template sets `USE_DATAROBOT_LLM_GATEWAY=0` automatically so the agent calls your deployment directly instead of routing through the LLM Gateway. You do not need to set `USE_DATAROBOT_LLM_GATEWAY` manually for this option.
+
+#### DataRobot NIM Deployed LLM
+
+```sh
+NIM_DEPLOYMENT_ID=<your_nim_deployment_id>
+LLM_DEFAULT_MODEL=<your_nim_model_id>
+INFRA_ENABLE_LLM=nim_deployed_llm.py
+```
 
 #### External LLM (Azure OpenAI example)
 
@@ -306,7 +346,15 @@ LLM Gateway additionally requires:
 
 In the tables above, `<LLM>` is a placeholder for your LLM app name in uppercase (e.g. if your app name is `llm`, variables are prefixed with `LLM_`). This is set by the `llm_app_name` template variable during project setup.
 
-`USE_DATAROBOT_LLM_GATEWAY` tells downstream consumers (e.g. the agent) whether to route LLM calls through the DataRobot LLM Gateway. It's exported as `1` by the gateway-based options (LLM Gateway, LLM Blueprint with LLM Gateway) and as `0` by DataRobot Deployed LLM. External LLM and LLM from a Registered Model don't export it; consumers fall back to their own default.
+`USE_DATAROBOT_LLM_GATEWAY` tells downstream consumers (e.g. the agent) whether to route LLM calls through the DataRobot LLM Gateway. datarobot-genai defaults it to `True` (gateway) when unset, so every option now sets it explicitly: `1` for the gateway-based options (LLM Gateway, LLM Blueprint with LLM Gateway) and `0` for the deployment-based options (DataRobot Deployed LLM, DataRobot NIM Deployed LLM, External LLM, LLM from a Registered Model). Setting `0` is what makes those options route to their own deployment instead of the gateway.
+
+## Runtime configuration and datarobot-genai
+
+After `pulumi up`, uppercase stack exports (for example `<LLM>_DEPLOYMENT_ID`, `USE_DATAROBOT_LLM_GATEWAY`, `<LLM>_DEFAULT_MODEL`) are written for runtime use. In an App Framework recipe project, these values are typically present in the project `.env` after deploy.
+
+[`datarobot-genai`](https://github.com/datarobot-oss/datarobot-genai) `get_llm()` reads this environment to route calls to the LLM Gateway, a DataRobot deployment, NIM, or an external provider. Ensure the exports for your chosen option are set before starting application or agent code.
+
+The `af-component-llm` component repository runs maintainer end-to-end smoke tests against live endpoints after each configuration deploys. See that repository's README for local and CI setup.
 
 ## Further reading
 

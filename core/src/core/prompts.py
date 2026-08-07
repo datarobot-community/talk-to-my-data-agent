@@ -712,7 +712,6 @@ You will also be provided a small sample of data from the table. This will help 
 You will also be provided a list of frequently occurring values from VARCHAR / categorical columns. This will be helpful when adding WHERE clauses in your query.
 Based on this metadata, build your query so that it will run without error and return data.
 Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
-Your query will be executed with Databricks SQL.
 
 RESPONSE:
 Your response shall be a single, executable Databricks SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
@@ -732,7 +731,6 @@ Your response shall be formatted as JSON with the following fields:
 NECESSARY CONSIDERATIONS:
 Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
-This query will be executed using Databricks.
 Use standard Databricks SQL syntax and functions.
 When performing date operations on a date column, consider using appropriate Databricks date functions for error redundancy.
 The table name will be provided in fully quoted form, with catalog and schema (if present). No need to add quotes.

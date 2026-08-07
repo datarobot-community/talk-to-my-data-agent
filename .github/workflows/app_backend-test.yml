@@ -15,6 +15,9 @@ jobs:
   tests:
     name: "FastAPI: app_backend ${{ matrix.python-version }}"
     runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
+      pull-requests: write
     defaults:
       run:
         working-directory: app_backend

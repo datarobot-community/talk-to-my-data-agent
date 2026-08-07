@@ -67,6 +67,14 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['vitest-localstorage-mock', './tests/setupTests.ts'],
+    // Inline @datarobot/connectivity so vitest transforms it instead of letting
+    // node resolve its ESM — the package uses directory imports (e.g.
+    // @datarobot/design-system/form-field) that node's ESM resolver rejects.
+    server: {
+      deps: {
+        inline: ['@datarobot/connectivity'],
+      },
+    },
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },

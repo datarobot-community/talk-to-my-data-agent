@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.11.0] - 2026-08-07
+
+### Added
+
+- Added ability to browse data via connectivity and a reverse proxy.
+- Added Databricks support via the JDBC Preview API.
+- Added version control for the xp plugin.
+
+### Changed
+
+- App logging now defaults to JSON and emits `levelname` instead of `level`.
+- Detached LiteLLM's own stderr handler during logging initialization to prevent duplicate/conflicting log output.
+- Added accessibility linting to app_frontend.
+
+### Fixed
+
+- Fixed "Add Data from Data Registry" returning a 404 on submit.
+- Blank `JDBC_CONNECTION_PARAMETERS` values are now treated as `None` instead of causing errors.
+- Fixed `drdev` not being installed automatically during `task start`.
+
+
 ## [11.10.3] - 2026-07-15
 
 ### Fixed

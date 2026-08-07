@@ -32,6 +32,7 @@ tasks:
     cmds:
       - dr self update
       - dr dotenv setup --if-needed
+      - uv tool install --upgrade "datarobot[core]>=3.18.0"
       - task install
       - task infra:start
       - echo '✅ You are all set. Run `task dev` to start developing, or run `task deploy` to deploy to DataRobot.'

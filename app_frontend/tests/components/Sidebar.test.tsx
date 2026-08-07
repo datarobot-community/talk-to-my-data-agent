@@ -33,8 +33,8 @@ beforeEach(() => {
 });
 
 // Mock child components that have complex dependencies
-vi.mock('@/components/AddDataModal', () => ({
-  AddDataModal: ({ highlight }: { highlight?: boolean }) => (
+vi.mock('@/components/AddDataMenu', () => ({
+  AddDataMenu: ({ highlight }: { highlight?: boolean }) => (
     <button data-testid="add-data-button" data-highlight={highlight}>
       Add Data
     </button>

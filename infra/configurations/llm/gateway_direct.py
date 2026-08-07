@@ -21,6 +21,7 @@ import pulumi_datarobot as datarobot
 from datarobot_pulumi_utils.pulumi import export
 
 from .libllm import (
+    ensure_datarobot_prefix,
     validate_feature_flags,
     verify_llm,
     verify_llm_gateway_model_availability,
@@ -31,6 +32,7 @@ __all__ = [
     "custom_model_runtime_parameters",
     "default_model",
     "llm_application_name",
+    "llm_resource_name",
 ]
 
 REQUIRED_FEATURE_FLAGS = {
@@ -42,6 +44,7 @@ REQUIRED_FEATURE_FLAGS = {
 }
 
 llm_application_name: str = "llm"
+llm_resource_name: str = "[llm]"
 
 # This is the model_id that the DataRobot LLM Gateway expects.
 # You can get a list of these models by running:
@@ -58,11 +61,12 @@ print("\n.   - ".join(
     ]
 ))
 """
-default_model: str = os.environ.get(
-    "LLM_DEFAULT_MODEL", "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
+default_model: str = ensure_datarobot_prefix(
+    os.environ.get(
+        "LLM_DEFAULT_MODEL",
+        "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
+    )
 )
-if not default_model.startswith("datarobot/"):
-    default_model = f"datarobot/{default_model}"
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is configured properly for this configuration option.

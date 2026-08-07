@@ -3,8 +3,7 @@ import { describe, test, expect, vi, beforeEach, afterEach, type Mock } from 'vi
 import { Data } from '@/pages/Data';
 import { renderWithProviders, mockScrollIntoView } from '../test-utils';
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
-import { useParams } from 'react-router';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 vi.mock('@/api/dictionaries/hooks', () => ({
   useGeneratedDictionaries: vi.fn(),
@@ -12,11 +11,6 @@ vi.mock('@/api/dictionaries/hooks', () => ({
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
-  return { ...actual, useParams: vi.fn(), useNavigate: vi.fn() };
-});
-
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: vi.fn(() => ({ dataId: 'dataset1' })),

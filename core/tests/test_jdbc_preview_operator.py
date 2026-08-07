@@ -83,6 +83,10 @@ class TestJDBCCredentials:
         creds = make_credentials("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443")
         assert creds.jdbc_uri.startswith("jdbc:bigquery://")
 
+    def test_valid_databricks_uri(self) -> None:
+        creds = make_credentials("jdbc:databricks://adb-1234.4.azuredatabricks.net:443")
+        assert creds.jdbc_uri.startswith("jdbc:databricks://")
+
     def test_invalid_uri_prefix_raises(self) -> None:
         with pytest.raises(ValidationError):
             make_credentials("jdbc:oracle://localhost:1521/db")
@@ -98,6 +102,18 @@ class TestJDBCCredentials:
 
     def test_connection_parameters_optional(self) -> None:
         creds = make_credentials()
+        assert creds.jdbc_connection_parameters is None
+
+    @pytest.mark.parametrize("blank_value", ["", "   "])
+    def test_connection_parameters_blank_string_treated_as_none(
+        self, blank_value: str
+    ) -> None:
+        creds = JDBCCredentials.model_validate(
+            {
+                "JDBC_URI": "jdbc:postgresql://localhost:5432/db",
+                "JDBC_CONNECTION_PARAMETERS": blank_value,
+            }
+        )
         assert creds.jdbc_connection_parameters is None
 
 
@@ -199,6 +215,21 @@ class TestGetTables:
             sql = mock_jdbc.preview.call_args.kwargs["sql"]
             assert "INFORMATION_SCHEMA.TABLES" in sql
             assert tables == ["sales"]
+
+    @pytest.mark.asyncio
+    async def test_databricks_uses_information_schema(self) -> None:
+        operator = make_operator("jdbc:databricks://adb-1234.4.azuredatabricks.net:443")
+        result = make_preview_result(["table_name"], [["orders"]])
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            tables = await operator.get_tables()
+            sql = mock_jdbc.preview.call_args.kwargs["sql"]
+            assert "information_schema.tables" in sql
+            assert "current_schema()" in sql
+            assert "'MANAGED'" in sql
+            assert "'EXTERNAL'" in sql
+            assert "'BASE TABLE'" not in sql
+            assert tables == ["orders"]
 
     @pytest.mark.asyncio
     async def test_returns_empty_list_on_error(self) -> None:
@@ -329,6 +360,7 @@ class TestGetData:
             ("jdbc:snowflake://account.snowflakecomputing.com/", '"users"'),
             ("jdbc:sap://host:443", '"users"'),
             ("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443", "`users`"),
+            ("jdbc:databricks://adb-1234.4.azuredatabricks.net:443", "`users`"),
         ],
     )
     async def test_get_data_quotes_table_per_dialect(

@@ -50,6 +50,16 @@ class TestGetDatabaseOperatorJdbc:
         assert isinstance(operator, JdbcPreviewOperator)
         mock_jdbc.preview.assert_not_called()
 
+    def test_blank_connection_parameters_env_var_does_not_raise(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("JDBC_URI", "jdbc:postgresql://localhost:5432/mydb")
+        monkeypatch.setenv("JDBC_CONNECTION_PARAMETERS", "")
+        config = make_config()
+        with patch(_JDBC_PREVIEW):
+            operator = get_database_operator(config)
+        assert isinstance(operator, JdbcPreviewOperator)
+
     @pytest.mark.parametrize(
         "jdbc_uri,quoted_table",
         [
@@ -89,8 +99,9 @@ class TestGetDatabaseOperatorJdbc:
         ("snowflake", "jdbc:snowflake://account.snowflakecomputing.com/"),
         ("sap", "jdbc:sap://host:443"),
         ("bigquery", "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443"),
+        ("databricks", "jdbc:databricks://adb-1234.4.azuredatabricks.net:443"),
     ])
-    def test_snowflake_sap_and_bigquery_route_to_jdbc_operator(
+    def test_named_connection_types_route_to_jdbc_operator(
         self, connection_type: str, jdbc_uri: str
     ) -> None:
         config = make_config(connection_type=connection_type)

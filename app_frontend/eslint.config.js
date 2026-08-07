@@ -3,6 +3,7 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import tanstackQuery from '@tanstack/eslint-plugin-query';
@@ -15,6 +16,7 @@ export default tseslint.config(
       js.configs.recommended,
       ...tseslint.configs.recommended,
       ...tanstackQuery.configs['flat/recommended'],
+      jsxA11y.flatConfigs.recommended,
       prettierConfig,
     ],
     files: ['**/*.{ts,tsx}'],
@@ -32,6 +34,10 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'prettier/prettier': 'error',
+      // All 5 autofocus sites move focus into a surface the user just opened (new-chat
+      // modal, chat prompt, inline cell editor, search field) or pass the prop through.
+      // Leaving the rule on would only produce five disable comments.
+      'jsx-a11y/no-autofocus': 'off',
       'no-restricted-imports': [
         'error',
         {
@@ -86,6 +92,17 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // Test fixtures deliberately attach handlers to bare elements to assert event
+    // behaviour; they are not shipped UI. dr-ui and the design system relax the
+    // interaction rules under their own test globs.
+    files: ['tests/**/*.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'],
+    rules: {
+      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/no-static-element-interactions': 'off',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
     },
   }
 );

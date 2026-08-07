@@ -22,6 +22,7 @@ from app.routers.external_data_stores import (
     external_data_stores_router,
     supported_types_router,
 )
+from app.routers.proxy import router as proxy_router
 from app.routers.registry import router as registry_router
 from app.routers.user import router as user_router
 
@@ -31,6 +32,7 @@ __all__ = [
     "datasets_router",
     "dictionaries_router",
     "external_data_stores_router",
+    "proxy_router",
     "registry_router",
     "supported_types_router",
     "user_router",

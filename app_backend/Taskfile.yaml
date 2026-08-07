@@ -35,10 +35,13 @@ tasks:
     env:
       DISABLE_TELEMETRY: true
       TEST_USER_EMAIL: "dev@example.com"
+      # Local dev has no visitor token to forward, so let the reverse proxy fall
+      # back to the app's service token. Deployed apps leave this unset.
+      USE_BUILDER_API_TOKEN: "true"
     cmds:
       - echo "🔨 Starting development server"
       - |
-        (cd .. && DR_SKIP_PLUGIN_UPDATE_CHECK=true dr xp --plain-output) &
+        (cd .. && dr --skip-plugin-update-check xp --plain-output) &
         DR_XP_PID=$!
         trap "kill $DR_XP_PID 2>/dev/null || true" EXIT
         PYTHONPATH="$CALCULATED_PYTHONPATH" uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload

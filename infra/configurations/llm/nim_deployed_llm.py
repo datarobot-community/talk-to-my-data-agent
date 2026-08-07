@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This LLM configuration option is useful when you already have an LLM Deployed.
-It will pull it into the playground and use case. It isn't sufficient if you
-have a registered model you would like added to an LLM Blueprint and deployed.
-For that, you'll need to choose the "registered_model_llm.py" option
+Choose this option when you already have a DataRobot NIM deployment and its deployment ID.
+It attaches that existing NIM deployment to the playground and use case. For a non-NIM custom
+model deployment choose "deployed_llm.py"; for a registered model that needs to be wrapped in an
+LLM Blueprint and deployed choose "registered_model.py".
 """
 
 import os
-from datarobot_pulumi_utils.pulumi import export
-from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
+
 import pulumi
 import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.pulumi import export
+from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 
 from . import use_case
 from .libllm import (
+    DEPLOYED_LLM_PLACEHOLDER_MODEL,
+    ensure_datarobot_prefix,
     validate_feature_flags,
     verify_llm,
 )
@@ -45,14 +48,19 @@ REQUIRED_FEATURE_FLAGS = {
     "ENABLE_MLOPS_TEXT_GENERATION_TARGET_TYPE": True,
 }
 
-LLM_NIM_DEPLOYMENT_ID = os.environ.get(
-    "LLM_NIM_DEPLOYMENT_ID", os.environ["NIM_DEPLOYMENT_ID"]
+# Read the deployment ID from the app-prefixed var, falling back to the bare NIM_DEPLOYMENT_ID.
+# Use `or` (not a dict-get default) so the required bare lookup is only evaluated when the
+# prefixed var is absent.
+LLM_NIM_DEPLOYMENT_ID = (
+    os.environ.get("LLM_NIM_DEPLOYMENT_ID") or os.environ["NIM_DEPLOYMENT_ID"]
 )
 
 llm_application_name: str = "llm"
 llm_resource_name: str = "[llm]"
-default_model: str = os.environ.get(
-    "LLM_DEFAULT_MODEL", "datarobot/datarobot-deployed-llm"
+# NIM serves a specific model, so this is normally provided. It defaults to an inert placeholder
+# only as a last resort; set LLM_DEFAULT_MODEL to the real NIM model name.
+default_model: str = ensure_datarobot_prefix(
+    os.environ.get("LLM_DEFAULT_MODEL", DEPLOYED_LLM_PLACEHOLDER_MODEL)
 )
 
 # Verify everything is working
@@ -72,7 +80,7 @@ prediction_environment = datarobot.PredictionEnvironment.get(
 )
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="LLM_NIM_DEPLOYMENT_ID",
+        key="NIM_DEPLOYMENT_ID",
         type="string",
         value=proxy_llm_deployment.id,
     ),
@@ -89,7 +97,7 @@ app_runtime_parameters = [
 ]
 custom_model_runtime_parameters = [
     datarobot.CustomModelRuntimeParameterValueArgs(
-        key="LLM_NIM_DEPLOYMENT_ID",
+        key="NIM_DEPLOYMENT_ID",
         type="string",
         value=proxy_llm_deployment.id,
     ),
@@ -106,6 +114,6 @@ custom_model_runtime_parameters = [
 ]
 
 pulumi.export("Deployment ID " + llm_resource_name, proxy_llm_deployment.id)
-export("LLM_NIM_DEPLOYMENT_ID", proxy_llm_deployment.id)
+export("NIM_DEPLOYMENT_ID", proxy_llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
 export("USE_DATAROBOT_LLM_GATEWAY", "0")

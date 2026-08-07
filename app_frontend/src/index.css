@@ -1,7 +1,7 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
-@import "@/theme/preset.css";
+@import '@/theme/preset.css';
 
 @tailwind utilities;
 
@@ -56,4 +56,32 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+}
+
+/*
+ * Browse Data drawer (@datarobot/design-system full-screen-drawer) ships with
+ * z-index: 7, which sits below the app sidebar (fixed, z-10) so the sidebar
+ * paints over the open drawer. Lift it above the sidebar and its resize rail
+ * (z-20). Mirrors the override in recipe-agentic-business-planning-app.
+ */
+.full-screen-drawer-container {
+  z-index: 20 !important;
+}
+
+/*
+ * The Browse Data drawer's left nav (@datarobot/design-system .sidebar-menu)
+ * is capped by --sidebar-menu-max-width (15rem alpine-light / 12.5rem
+ * midnight-gray). Let it fill its container instead. Set on .sidebar-menu
+ * itself so the value beats the theme-scoped (layered) default.
+ */
+.sidebar-menu {
+  --sidebar-menu-max-width: 100%;
+}
+
+/*
+ * design-system offsets the drawer body by the header height (top: 3.5rem).
+ * Pin it to the top so the body fills the full drawer height.
+ */
+[data-ds] .full-screen-drawer-container .full-screen-drawer-body {
+  top: 0;
 }

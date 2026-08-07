@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Separator } from '@radix-ui/react-separator';
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { generateDataRoute } from '@/pages/routes';
 
 import { DatasetCardDescriptionPanel, DataViewTabs, ClearDatasetsButton } from '@/components/data';
@@ -9,7 +9,6 @@ import { ValueOf } from '@/state/types';
 import { useTranslation } from '@/i18n';
 import { DATA_TABS } from '@/state/constants';
 import { Loading } from '@/components/ui-custom/loading';
-import { useLocation, useParams } from 'react-router';
 import { useDebounce, cn } from '@/lib/utils';
 
 export const Data: React.FC = () => {

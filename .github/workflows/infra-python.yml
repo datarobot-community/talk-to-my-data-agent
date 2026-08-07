@@ -16,6 +16,9 @@ on:
 jobs:
   python-checks:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]

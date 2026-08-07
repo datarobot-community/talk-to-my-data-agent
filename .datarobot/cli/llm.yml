@@ -11,9 +11,12 @@ root:
 
       - If you already have a custom model deployed LLM and a deployment ID, select "DataRobot Deployed LLM".
 
-      - If you want to use your LLM provider credentials instead of the LLM gateway with an LLM Blureprint (e.g. Azure OpenAI,
+      - If you have a DataRobot NIM deployment, select "DataRobot NIM Deployed LLM".
 
-      AWS Bedrock, GCP VertexAI, Anthropic, Cohere, TogetherAI), select "LLM Blueprint with External LLM".
+      - If you want to use your own LLM provider credentials (e.g. Azure OpenAI, AWS Bedrock,
+
+      GCP VertexAI, Anthropic, Cohere, TogetherAI) wrapped in a governed deployment, select
+      "LLM Blueprint with External LLM".
 
       - If you need full DataRobot governance and monitoring with LLM Blueprint support,
 
@@ -22,12 +25,6 @@ root:
       - If you have an existing registered model (not yet deployed) that you want to use with
 
       an LLM Blueprint, select "LLM from a Registered Model".
-      
-      - If you want to use your own LLM provider credentials (e.g. Azure OpenAI, AWS Bedrock,
-
-      GCP VertexAI, Anthropic, Cohere, TogetherAI) directly, without creating an LLM Blueprint,
-
-      select "External LLM".
 
     options:
       - name: "LLM Gateway"
@@ -41,22 +38,23 @@ root:
         requires: nim_deployed_llm
       - name: "LLM Blueprint with External LLM"
         value: "blueprint_with_external_llm.py"
-        requires: blueprint_with_external_llm
+        requires: external_llm
       - name: "LLM Blueprint with LLM Gateway"
         value: "blueprint_with_llm_gateway.py"
         requires: llm_gateway
       - name: "LLM from a Registered Model"
         value: "registered_model.py"
         requires: registered_model
-      - name: "External LLM"
-        value: "external_llm.py"
-        requires: external_llm  
 
 llm_gateway:
   - env: LLM_DEFAULT_MODEL
     type: llmgw_catalog
     optional: false
     help: "Choose an LLM from the DataRobot LLM Gateway catalog to use for your LLM Blueprint."
+  - env: USE_DATAROBOT_LLM_GATEWAY
+    type: string
+    default: "1"
+    hidden: true
 
 deployed_llm:
   - env: LLM_DEPLOYMENT_ID
@@ -69,14 +67,14 @@ deployed_llm:
     hidden: true
 
 nim_deployed_llm:
-  - env: LLM_NIM_DEPLOYMENT_ID
+  - env: NIM_DEPLOYMENT_ID
     type: string
     optional: false
-    help: "Enter the deployment ID of the DataRobot custom model deployed LLM (e.g., 6510c7b7c4f3f9407e24a849)."
+    help: "Enter the deployment ID of your DataRobot NIM deployment (e.g., 6510c7b7c4f3f9407e24a849)."
   - env: LLM_DEFAULT_MODEL
     type: string
     optional: false
-    help: "Enter the default model of the DataRobot custom model deployed LLM (e.g., meta-llama/Llama-3.1-8B)."
+    help: "Enter the model your NIM deployment serves (e.g., meta-llama/Llama-3.1-8B). Stored datarobot/-prefixed automatically."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
@@ -92,34 +90,17 @@ registered_model:
     default: 30
     optional: true
     help: "Enter the timeout in minutes for DataRobot operations (default: 30 minutes)."
-
-blueprint_with_external_llm:
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
     hidden: true
-  - key: external_llm_provider
-    optional: false
-    options:
-      - name: "Azure with OpenAI"
-        requires: azure_openai
-      - name: "Google VertexAI"
-        requires: vertexai
-      - name: "Anthropic"
-        requires: anthropic
-      - name: "Bedrock"
-        requires: bedrock
-      - name: "Cohere"
-        requires: cohere
-      - name: "TogetherAI"
-        requires: togetherai
-    help: >
-      Choose which external LLM provider to use.
-
-
-      Supported providers are: Azure OpenAI, AWS Bedrock, GCP VertexAI, Anthropic, Cohere, or TogetherAI.
 
 external_llm:
+  - env: LLM_DEFAULT_MODEL
+    type: string
+    default: "datarobot/azure/gpt-5-mini"
+    optional: true
+    help: "Enter the external LLM model in provider/model form (e.g., azure/gpt-5-mini, bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0). Stored datarobot/-prefixed automatically."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "amazon-anthropic-claude-sonnet-4-5-20250929-v1"
@@ -164,12 +145,6 @@ external_llm:
       Supported providers are: Azure OpenAI, AWS Bedrock, GCP VertexAI, Anthropic, Cohere, or TogetherAI.
 
 azure_openai:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "azure/openai-gpt-5-mini"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., azure/openai-gpt-5-mini)."
   - env: OPENAI_API_KEY
     type: string
     optional: false
@@ -188,12 +163,6 @@ azure_openai:
     help: "Enter the OpenAI API version (e.g., 2024-08-01-preview)."
 
 bedrock:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0)."
   - env: AWS_ACCESS_KEY_ID
     type: string
     optional: false
@@ -206,14 +175,12 @@ bedrock:
     type: string
     optional: false
     help: "Enter the AWS region name for Bedrock (e.g., us-east-1)."
+  - env: AWS_SESSION_TOKEN
+    type: string
+    optional: true
+    help: "Optional AWS session token for temporary Bedrock credentials."
 
 vertexai:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "vertex_ai/claude-opus-4@20250514"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., vertexai/custom_llm)."
   - env: VERTEXAI_APPLICATION_CREDENTIALS
     type: string
     optional: false
@@ -222,38 +189,24 @@ vertexai:
     type: string
     optional: false
     help: "Enter the Google service account email."
+  - env: GOOGLE_REGION
+    type: string
+    optional: true
+    help: "Optional Google Cloud region for Vertex AI (default: us-west1)."
 
 anthropic:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "anthropic/claude-3-5-sonnet-20240620"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., anthropic/claude-3-5-sonnet-20240620)."
   - env: ANTHROPIC_API_KEY
     type: string
     optional: false
     help: "Enter the API key for Anthropic."
 
 cohere:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "cohere/command-r-plus"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., cohere/command-r-plus)."
   - env: COHERE_API_KEY
     type: string
     optional: false
     help: "Enter the API key for Cohere."
 
 togetherai:
-  - env: LLM_DEFAULT_MODEL
-    type: string
-    default: "together_ai/meta-llama/Llama-3.1-8B-Instruct-Turbo"
-    optional: false
-    always_prompt: true
-    help: "Enter the name of the external LLM model to use in LiteLLM format (e.g., together_ai/meta-llama/Llama-3.1-8B-Instruct-Turbo)."
   - env: TOGETHERAI_API_KEY
     type: string
     optional: false

@@ -129,7 +129,7 @@ def get_database_credentials(
         if database == "no_database":
             return NoDatabaseCredentials()
 
-        if database in ("snowflake", "bigquery", "sap", "datarobot_jdbc"):
+        if database in ("snowflake", "bigquery", "sap", "databricks", "datarobot_jdbc"):
             credentials = JDBCCredentials()  # type: ignore[call-arg]
             if test_credentials:
                 from core.data_connections.database.database_implementations import (  # type: ignore[import-not-found]

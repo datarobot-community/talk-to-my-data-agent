@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from '@/i18n';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import drLogoDark from '@/assets/DataRobot_black.svg';
 import drLogoLight from '@/assets/DataRobot_white.svg';
 import { SidebarMenu, SidebarMenuOptionType } from '@/components/ui-custom/sidebar-menu';
 import { WelcomeModal } from './WelcomeModal';
-import { AddDataModal } from './AddDataModal';
+import { AddDataMenu } from './AddDataMenu';
 import { ROUTES, generateChatRoute, generateDataRoute } from '@/pages/routes';
 import { Separator } from '@radix-ui/react-separator';
 import { NewChatModal } from './NewChatModal';
@@ -39,7 +39,7 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
         <div>
           <p className="mn-label-large">{t('Datasets')}</p>
         </div>
-        <AddDataModal highlight={highlight} />
+        <AddDataMenu highlight={highlight} />
       </div>
       <div className="flex-1 overflow-y-auto">
         <SidebarMenu
@@ -104,7 +104,6 @@ export const Sidebar = () => {
   const { data: chats, isLoading: isLoadingChats } = useFetchAllChats();
   const highlightDatasets = !isLoadingDatasets && !datasets?.length;
   const highlightChats = !highlightDatasets && !isLoadingChats && !chats?.length;
-  const navigate = useNavigate();
   const { theme } = useTheme();
   const drLogo = theme === 'dark' ? drLogoLight : drLogoDark;
   const { t } = useTranslation();
@@ -114,12 +113,9 @@ export const Sidebar = () => {
     <SidebarProvider defaultOpen={true}>
       <SidebarUI>
         <SidebarHeader>
-          <img
-            src={drLogo}
-            alt="DataRobot"
-            className="mb-4 w-[130px] cursor-pointer"
-            onClick={() => navigate(ROUTES.DATA)}
-          />
+          <Link to={ROUTES.DATA} className="mb-4 w-fit">
+            <img src={drLogo} alt="DataRobot" className="block w-[130px]" />
+          </Link>
           <h1 className="mb-1 flex items-baseline heading-04">
             <span className="shrink-0">{t('Talk to my data')}</span>
           </h1>

@@ -28,7 +28,7 @@ from datarobot_pulumi_utils.pulumi import (  # type: ignore[attr-defined]
     finalize,
 )
 
-from infra import *  # noqa: F403
+importlib.import_module("infra")
 
 CONFIGURATIONS_DIR = Path(__file__).parent / "configurations"
 DEFAULT_EXPORT_PATH: Path = Path(

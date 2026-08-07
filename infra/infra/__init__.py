@@ -23,7 +23,7 @@ import pulumi_datarobot as datarobot
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 
-__all__ = ["use_case", "project_dir"]
+__all__ = ["project_dir", "use_case"]
 
 project_dir = Path(__file__).parent.parent
 
