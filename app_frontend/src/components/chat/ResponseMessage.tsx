@@ -5,6 +5,7 @@ import {
   IBusinessComponent,
   IChartsComponent,
   IAnalysisComponent,
+  IDatabaseComponent,
   IUsageInfoComponent,
 } from '@/api/chat-messages/types';
 import { getTranslatedMessageStep } from '@/api/chat-messages/utils';
@@ -58,6 +59,15 @@ const isAnalysisComponent = (component: unknown): component is IAnalysisComponen
   );
 };
 
+const isDatabaseComponent = (component: unknown): component is IDatabaseComponent => {
+  return (
+    !!component &&
+    typeof component === 'object' &&
+    'type' in component &&
+    (component as { type?: string }).type === 'database'
+  );
+};
+
 const isUsageInfoComponent = (component: unknown): component is IUsageInfoComponent => {
   return (
     !!component &&
@@ -97,7 +107,12 @@ export const ResponseMessage: React.FC<ResponseMessageProps> = ({
     const messageComponent = message?.components?.find(isMessageComponent);
     const businessComponent = message?.components?.find(isBusinessComponent);
     const chartsComponent = message?.components?.find(isChartsComponent);
-    const analysisComponent = message?.components?.find(isAnalysisComponent);
+    // Database analyses carry the same fields as analysis results; fold them into
+    // the same render path so their SQL, dataset grid, and errors bind correctly.
+    const analysisComponent = message?.components?.find(
+      (c): c is IAnalysisComponent | IDatabaseComponent =>
+        isAnalysisComponent(c) || isDatabaseComponent(c)
+    );
     const usageInfoComponent = message?.components?.find(isUsageInfoComponent);
 
     const enhancedUserMessage = messageComponent?.enhanced_user_message || '';

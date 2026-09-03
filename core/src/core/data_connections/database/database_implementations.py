@@ -19,6 +19,7 @@ import traceback
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, cast
 
+import polars as pl
 from datarobot.models.jdbc_data_preview import JdbcPreview, JdbcResultSchemaEntry
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
@@ -26,25 +27,26 @@ from openai.types.chat.chat_completion_system_message_param import (
 from pydantic import ValidationError
 
 from core.analyst_db import AnalystDB, InternalDataSourceType
-from core.code_execution import InvalidGeneratedCode
+from core.code_execution import DatabaseFailure, InvalidGeneratedCode
 from core.config import Config
 from core.credentials import (
     JDBCCredentials,
     NoDatabaseCredentials,
 )
 from core.data_connections.database.database_interface import (
-    _DEFAULT_DB_QUERY_TIMEOUT,
     DatabaseOperator,
     NoDatabaseOperator,
 )
 from core.data_connections.datarobot.datarobot_dataset_handler import (
     BaseRecipe,
 )
+from core.data_connections.datarobot.helpers import OUTAGE_MESSAGE
 from core.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
     SYSTEM_PROMPT_DATABRICKS,
     SYSTEM_PROMPT_MYSQL,
     SYSTEM_PROMPT_POSTGRES,
+    SYSTEM_PROMPT_REDSHIFT,
     SYSTEM_PROMPT_SAP_DATASPHERE,
     SYSTEM_PROMPT_SNOWFLAKE,
     SYSTEM_PROMPT_SQLSERVER,
@@ -98,6 +100,13 @@ _JDBC_TABLE_DISCOVERY_SQL: dict[str, str] = {
           AND table_type IN ('MANAGED', 'EXTERNAL', 'VIEW')
         ORDER BY table_name
     """,
+    "redshift": """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = current_schema()
+          AND table_type IN ('BASE TABLE', 'VIEW')
+        ORDER BY table_name
+    """,
 }
 
 _JDBC_DIALECT_NAMES: dict[str, str] = {
@@ -108,17 +117,13 @@ _JDBC_DIALECT_NAMES: dict[str, str] = {
     "sap": "SAP Datasphere",
     "bigquery": "BigQuery",
     "databricks": "Databricks",
+    "redshift": "Redshift",
 }
 
 
 class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
-    def __init__(
-        self,
-        credentials: JDBCCredentials,
-        default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
-    ):
+    def __init__(self, credentials: JDBCCredentials):
         self._credentials = credentials
-        self.default_timeout = default_timeout
 
     @property
     def _dialect_key(self) -> str:
@@ -137,6 +142,10 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
             return "bigquery"
         elif uri.startswith("jdbc:databricks://"):
             return "databricks"
+        elif uri.startswith("jdbc:redshift://") or uri.startswith(
+            "jdbc:redshift:iam://"
+        ):
+            return "redshift"
         raise ValueError(f"Unsupported JDBC URI scheme: {uri.split(':')[1]!r}")
 
     def _dialect_name(self) -> str:
@@ -145,7 +154,7 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
     def _quote_identifier(self, name: str) -> str:
         """Quote a table identifier using dialect-appropriate syntax."""
         match self._dialect_key:
-            case "postgresql":
+            case "postgresql" | "redshift":
                 return f'"{name}"'
             case "mysql":
                 return f"`{name}`"
@@ -184,7 +193,9 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
 
     async def execute_query(
         self, query: str, timeout: int | None = None
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
+    ) -> pl.DataFrame:
+        # NOTE: `timeout` is part of the DatabaseOperator interface but is NOT honored
+        # on this path — JdbcPreview.preview() accepts no timeout argument (APP-6770).
         loop = asyncio.get_running_loop()
         try:
             result = await loop.run_in_executor(
@@ -196,9 +207,27 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
                     parameters=self._credentials.jdbc_connection_parameters or {},
                 ),
             )
-            result_schema = self._require_result_schema(result)
-            columns = [entry.name for entry in result_schema]
-            return [dict(zip(columns, row)) for row in result.records]
+            # `columns` is always populated by the preview; `result_schema` is
+            # optional (may be omitted for an empty result), so take names here.
+            columns = list(result.columns)
+            if not result.records:
+                # An empty result set must still carry its column schema, or a
+                # later 0x0 frame breaks table registration, chart generation,
+                # and the data dictionary (APP-6778). Preserve the source column
+                # types when the preview provides them; fall back to String
+                # otherwise. Either way the dtype is concrete (VARCHAR, BIGINT,
+                # ...), never a Null dtype that DuckDB round-trips as INTEGER.
+                if result.result_schema:
+                    empty_schema: dict[str, pl.DataType] = {
+                        entry.name: BaseRecipe.map_datarobot_type_to_polars_type(
+                            entry.data_type
+                        )
+                        for entry in result.result_schema
+                    }
+                else:
+                    empty_schema = {name: pl.String() for name in columns}
+                return pl.DataFrame(schema=empty_schema)
+            return pl.DataFrame([dict(zip(columns, row)) for row in result.records])
         except Exception as e:
             raise InvalidGeneratedCode(
                 f"JDBC query execution failed: {str(e)}",
@@ -220,16 +249,24 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
                     parameters=self._credentials.jdbc_connection_parameters or {},
                 ),
             )
-            result_schema = self._require_result_schema(result)
-            col = result_schema[0].name
-            tables = [
-                row[col] if isinstance(row, dict) else row[0] for row in result.records
-            ]
-            logger.info(f"JDBC ({self._dialect_name()}): found {len(tables)} tables")
-            return tables
-        except Exception:
+        except Exception as e:
+            # Reaching the database failed (outage, auth, unreachable host, ...).
+            # Surface it rather than reporting an empty schema — a reachable
+            # database with no tables is the separate, successful case below.
             logger.error("JDBC: failed to fetch tables", exc_info=True)
+            raise DatabaseFailure(OUTAGE_MESSAGE, exception=e) from e
+
+        # No rows means a reachable database with no tables. Return before
+        # requiring the result schema, which the preview omits for an empty result.
+        if not result.records:
+            logger.info(f"JDBC ({self._dialect_name()}): found 0 tables")
             return []
+        # The discovery query selects a single column (the table name), and
+        # records are positional rows (as execute_query also assumes), so index
+        # them directly — no result schema required.
+        tables = [row[0] for row in result.records]
+        logger.info(f"JDBC ({self._dialect_name()}): found {len(tables)} tables")
+        return tables
 
     @functools.lru_cache(maxsize=8)
     async def get_data(
@@ -287,6 +324,7 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentials]):
             "sap": SYSTEM_PROMPT_SAP_DATASPHERE,
             "bigquery": SYSTEM_PROMPT_BIGQUERY,
             "databricks": SYSTEM_PROMPT_DATABRICKS,
+            "redshift": SYSTEM_PROMPT_REDSHIFT,
         }[self._dialect_key]
         return ChatCompletionSystemMessageParam(role="system", content=prompt)
 
@@ -306,14 +344,11 @@ def get_database_operator(config: Config) -> DatabaseOperator[Any]:
             raise ValueError(
                 f"DATABASE_CONNECTION_TYPE is '{config.database_connection_type}' but JDBC_URI "
                 "is missing or invalid. Set JDBC_URI to a valid JDBC connection string "
-                "(e.g. jdbc:snowflake://..., jdbc:sap://..., jdbc:bigquery://..., or jdbc:databricks://...)."
+                "(e.g. jdbc:snowflake://..., jdbc:sap://..., jdbc:bigquery://..., jdbc:databricks://..., or jdbc:redshift://...)."
             ) from exc
         return cast(
             DatabaseOperator[Any],
-            JdbcPreviewOperator(
-                credentials=jdbc_credentials,
-                default_timeout=_DEFAULT_DB_QUERY_TIMEOUT,
-            ),
+            JdbcPreviewOperator(credentials=jdbc_credentials),
         )
     else:
         return NoDatabaseOperator(NoDatabaseCredentials())

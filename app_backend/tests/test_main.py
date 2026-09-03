@@ -13,7 +13,14 @@
 # limitations under the License.
 
 
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
+
+import app as app_module
+from app import create_app
+from app.config import Config
 
 
 def test_index(client: TestClient) -> None:
@@ -35,3 +42,11 @@ def test_health(client: TestClient) -> None:
     data = response.json()
     assert data["status"] == "healthy"
     assert "version" in data
+
+
+def test_create_app_errors_when_frontend_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, config: Config
+) -> None:
+    monkeypatch.setattr(app_module, "STATIC_DIR", tmp_path)
+    with pytest.raises(RuntimeError, match="Frontend build output missing"):
+        create_app(config=config)

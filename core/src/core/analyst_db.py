@@ -67,6 +67,49 @@ logger = get_logger("ApplicationDB")
 ANALYST_DATABASE_VERSION = 6
 
 
+# Reserved DuckDB table names used internally by the handlers. A user-supplied
+# dataset name that collides with one of these would let `CREATE OR REPLACE TABLE`
+# clobber a control table (e.g. uploading `dataset_metadata.csv`) or shadow the
+# Arrow view used during registration (`temp_view`), so reject them at the write path.
+_RESERVED_TABLE_NAMES = frozenset(
+    {
+        "dataset_metadata",
+        "cleansing_reports",
+        "dictionary_errors",
+        "db_version",
+        "temp_view",
+    }
+)
+
+
+def quote_identifier(name: str) -> str:
+    """Quote a string for safe use as a DuckDB identifier.
+
+    DuckDB (like standard SQL) delimits identifiers with double quotes and escapes an
+    embedded double quote by doubling it. Identifiers cannot be parameter-bound in these
+    positions, so this is the correct way to interpolate a user-controlled table name.
+    """
+    return '"' + name.replace('"', '""') + '"'
+
+
+def validate_table_name(name: str) -> None:
+    """Reject dataset names that must never become a DuckDB table.
+
+    `quote_identifier` is the SQL-injection control; this guard is thin hygiene applied at
+    the write path only. It rejects empty/blank names, names containing control/NUL
+    characters, and the reserved control-table names (case-insensitively, since DuckDB
+    folds identifier case). All other printable characters (spaces, dots, parentheses,
+    quotes, unicode) are allowed and preserved byte-for-byte, because the name is also a
+    user-facing label and a dict key referenced by generated code.
+    """
+    if not name.strip():
+        raise ValueError("Dataset name must not be empty or blank")
+    if any(ord(ch) < 0x20 or 0x7F <= ord(ch) <= 0x9F for ch in name):
+        raise ValueError("Dataset name must not contain control characters")
+    if name.lower() in _RESERVED_TABLE_NAMES:
+        raise ValueError(f"Dataset name '{name}' is reserved and cannot be used")
+
+
 class DatasetType(Enum):
     STANDARD = "standard"
     CLEANSED = "cleansed"
@@ -316,7 +359,8 @@ class BaseDuckDBHandler(ABC):
                     table_name = tables_to_drop.pop()
                     try:
                         await self.execute_query(
-                            conn, f'DROP TABLE IF EXISTS "{table_name}"'
+                            conn,
+                            f"DROP TABLE IF EXISTS {quote_identifier(table_name)}",
                         )
                         consecutive_skips = 0
                     except duckdb.CatalogException as e:
@@ -368,7 +412,7 @@ class BaseDuckDBHandler(ABC):
             columns = await self.execute_query(
                 conn,
                 f"""
-                    DESCRIBE {table}
+                    DESCRIBE {quote_identifier(table)}
                     """,
             )
             existing_columns = set()
@@ -386,7 +430,7 @@ class BaseDuckDBHandler(ABC):
                 for column_name, column_type in new_columns:
                     await self.execute_query(
                         conn,
-                        f"ALTER TABLE {table} ADD COLUMN {column_name} {column_type}",
+                        f"ALTER TABLE {quote_identifier(table)} ADD COLUMN {quote_identifier(column_name)} {column_type}",
                     )
 
     @asynccontextmanager
@@ -524,6 +568,8 @@ class DatasetHandler(BaseDuckDBHandler):
             data_source: The source of the data (DataSourceType.FILE, DataSourceType.DATABASE, or DataSourceType.REGISTRY)
             file_size: Size of the source file in bytes (for FILE data sources)
         """
+        validate_table_name(name)
+
         logger.info(f"Registering dataframe {name} as {dataset_type.value}")
 
         if await self.table_exists(name) and not clobber:
@@ -538,6 +584,15 @@ class DatasetHandler(BaseDuckDBHandler):
             if not await self.table_exists(original_name):
                 raise ValueError(f"Original dataset '{original_name}' not found")
 
+        # A zero-column frame cannot be stored: DuckDB rejects a 0-column
+        # CREATE TABLE, and writing metadata without a physical table produces a
+        # phantom dataset that later 404s on read (APP-6778). Refuse it outright
+        # so table and metadata always stay consistent.
+        if not df.width:
+            raise ValueError(
+                f"Cannot register dataset '{name}': dataframe has no columns"
+            )
+
         async with self._write_connection() as conn:
             # Create the table
             arrow_table = df.to_arrow()
@@ -545,12 +600,15 @@ class DatasetHandler(BaseDuckDBHandler):
             def create_table() -> None:
                 conn.register("temp_view", arrow_table)
                 conn.execute(
-                    f"CREATE OR REPLACE TABLE '{name}' AS SELECT * FROM temp_view"
+                    f"CREATE OR REPLACE TABLE {quote_identifier(name)} AS SELECT * FROM temp_view"
                 )
                 conn.unregister("temp_view")
 
-            if len(df):
-                await asyncio.get_running_loop().run_in_executor(None, create_table)
+            # Gate on columns, not rows: a 0-row frame with columns still creates
+            # a real, empty, typed table. The former `if len(df):` (row count)
+            # skipped table creation for empty results while metadata was written
+            # below, which is the phantom-table root cause (APP-6778).
+            await asyncio.get_running_loop().run_in_executor(None, create_table)
 
             # Store metadata
             metadata = DatasetMetadata(
@@ -803,8 +861,8 @@ class DatasetHandler(BaseDuckDBHandler):
             try:
                 result = await self.execute_query(
                     conn,
-                    f'SELECT * FROM "{name}"'
-                    + (f" LIMIT {max_rows}" if max_rows is not None else ""),
+                    f"SELECT * FROM {quote_identifier(name)}"
+                    + (f" LIMIT {int(max_rows)}" if max_rows is not None else ""),
                 )
                 arrow_table = await asyncio.get_running_loop().run_in_executor(
                     None, result.arrow
@@ -862,7 +920,9 @@ class DatasetHandler(BaseDuckDBHandler):
 
         async with self._write_connection() as conn:
             # Delete the actual table
-            await self.execute_query(conn, f'DROP TABLE IF EXISTS "{name}"')
+            await self.execute_query(
+                conn, f"DROP TABLE IF EXISTS {quote_identifier(name)}"
+            )
 
             # Delete metadata
             await self.execute_query(

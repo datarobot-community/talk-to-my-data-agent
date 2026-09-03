@@ -23,21 +23,21 @@ import os
 import datarobot as dr
 import pulumi
 import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.common.feature_flags import check_feature_flag_set
+from datarobot_pulumi_utils.common.llm_validation import verify_llm
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
-
-from . import use_case
-from .libllm import (
+from datarobot_pulumi_utils.schema.llms import (
     DEPLOYED_LLM_PLACEHOLDER_MODEL,
     ensure_datarobot_prefix,
-    validate_feature_flags,
-    verify_llm,
 )
 
+from . import use_case
+
 __all__ = [
-    "custom_model_runtime_parameters",
     "app_runtime_parameters",
+    "custom_model_runtime_parameters",
     "default_model",
     "llm_application_name",
     "llm_resource_name",
@@ -64,7 +64,7 @@ default_model: str = ensure_datarobot_prefix(
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify the feature flags are available
-validate_feature_flags(REQUIRED_FEATURE_FLAGS)
+check_feature_flag_set(REQUIRED_FEATURE_FLAGS)
 
 playground = datarobot.Playground(
     use_case_id=use_case.id,
@@ -125,9 +125,6 @@ llm_blueprint = datarobot.LlmBlueprint(
     playground_id=playground.id,
 )
 
-# No runtime_parameter_values: with pulumi-datarobot >= 0.10.33 even an empty managed set can
-# cause the provider to drop the blueprint defaults (incl. DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS)
-# and break model load. Omitting the argument keeps the full blueprint-generated default set.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -137,6 +134,7 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
+    runtime_parameter_values=[],
 )
 
 # Register the custom model from the LLM Blueprint

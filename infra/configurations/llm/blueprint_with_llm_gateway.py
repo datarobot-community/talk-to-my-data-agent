@@ -23,22 +23,21 @@ import os
 import datarobot as dr
 import pulumi
 import pulumi_datarobot as datarobot
-from datarobot_pulumi_utils.pulumi import export
-from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
-from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
-
-from . import use_case
-from .libllm import (
-    ensure_datarobot_prefix,
-    get_blueprint_runtime_parameters,
-    validate_feature_flags,
+from datarobot_pulumi_utils.common.feature_flags import check_feature_flag_set
+from datarobot_pulumi_utils.common.llm_validation import (
     verify_llm,
     verify_llm_gateway_model_availability,
 )
+from datarobot_pulumi_utils.pulumi import export
+from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
+from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
+from datarobot_pulumi_utils.schema.llms import ensure_datarobot_prefix
+
+from . import use_case
 
 __all__ = [
-    "custom_model_runtime_parameters",
     "app_runtime_parameters",
+    "custom_model_runtime_parameters",
     "default_model",
     "llm_application_name",
     "llm_resource_name",
@@ -77,12 +76,16 @@ default_llm_id: str = os.environ.get(
 )
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 # Verify everything is configured properly for this configuration option.
-validate_feature_flags(REQUIRED_FEATURE_FLAGS)
+check_feature_flag_set(REQUIRED_FEATURE_FLAGS)
 
 # This does a quick check that validates the selected model is available
 # by checking the LLM Gateway. If it isn't, it will raise an error
 # with the list of models that are available and active.
-verify_llm_gateway_model_availability(default_model)
+verify_llm_gateway_model_availability(
+    default_model,
+    model_env_var="LLM_DEFAULT_MODEL",
+    config_location="infra/configurations/llm/",
+)
 
 # LiteLLM support DataRobot as a provider, so this validates
 # everything is working and the default LLM you've chosen is available
@@ -104,10 +107,6 @@ llm_blueprint = datarobot.LlmBlueprint(
     ),
 )
 
-# Supply the FULL runtime parameter set explicitly. Passing a partial set makes the provider
-# drop every blueprint default that isn't restated, including DRUM system parameters such as
-# DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS that the model requires to load. The gateway path uses
-# no provider credentials, so only the blueprint/DRUM defaults are needed here.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -117,11 +116,6 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
-    runtime_parameter_values=get_blueprint_runtime_parameters(
-        llm_blueprint_id=llm_blueprint.id,
-        playground_id=playground.id,
-        llm_id=default_llm_id,
-    ),
 )
 
 if prediction_environment_id := os.environ.get(

@@ -38,6 +38,7 @@
   "Select one or more items.": "Selecione um ou mais itens.",
   "Databases": "Bancos de dados",
   "Select one or more tables": "Selecione uma ou mais tabelas",
+  "Could not load the list of tables.": "Não foi possível carregar a lista de tabelas.",
   "Add External Data Source": "Adicionar fonte de dados externa",
   "Select a data store": "Selecionar um armazenamento de dados",
   "Select one or more data sources": "Selecionar uma ou mais fontes de dados",

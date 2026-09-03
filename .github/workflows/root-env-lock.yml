@@ -1,0 +1,38 @@
+---
+# The root test env has no other PR-time CI; fail if uv.lock has drifted from
+# pyproject.toml or core (otherwise the weekly Harness cron catches it days late).
+name: Root Env Lock Check
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/*'
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - core/pyproject.toml
+      - .github/workflows/root-env-lock.yml
+  pull_request:
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - core/pyproject.toml
+      - .github/workflows/root-env-lock.yml
+  workflow_dispatch:
+
+jobs:
+  lock-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+
+      - name: Verify root uv.lock is in sync with pyproject.toml
+        run: uv lock --locked

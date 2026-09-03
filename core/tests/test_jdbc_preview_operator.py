@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import polars as pl
 import pytest
 from pydantic import ValidationError
 
+from core.code_execution import DatabaseFailure
 from core.credentials import JDBCCredentials
 from core.data_connections.database.database_implementations import JdbcPreviewOperator
+from core.data_connections.datarobot.helpers import OUTAGE_MESSAGE
 
 _JDBC_PREVIEW = "core.data_connections.database.database_implementations.JdbcPreview"
 
@@ -49,6 +53,7 @@ def make_preview_result(
         entry.data_type = "VARCHAR"
         schema_entries.append(entry)
     result.result_schema = schema_entries
+    result.columns = columns  # always populated by the SDK, even for empty results
     result.records = records
     return result
 
@@ -86,6 +91,14 @@ class TestJDBCCredentials:
     def test_valid_databricks_uri(self) -> None:
         creds = make_credentials("jdbc:databricks://adb-1234.4.azuredatabricks.net:443")
         assert creds.jdbc_uri.startswith("jdbc:databricks://")
+
+    def test_valid_redshift_uri(self) -> None:
+        creds = make_credentials("jdbc:redshift://cluster.us-east-1.redshift.amazonaws.com:5439/mydb")
+        assert creds.jdbc_uri.startswith("jdbc:redshift://")
+
+    def test_valid_redshift_iam_uri(self) -> None:
+        creds = make_credentials("jdbc:redshift:iam://cluster.us-east-1.redshift.amazonaws.com:5439/mydb")
+        assert creds.jdbc_uri.startswith("jdbc:redshift:iam://")
 
     def test_invalid_uri_prefix_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -232,12 +245,44 @@ class TestGetTables:
             assert tables == ["orders"]
 
     @pytest.mark.asyncio
-    async def test_returns_empty_list_on_error(self) -> None:
+    async def test_redshift_uses_information_schema(self) -> None:
+        operator = make_operator("jdbc:redshift://cluster.us-east-1.redshift.amazonaws.com:5439/mydb")
+        result = make_preview_result(["table_name"], [["sales"]])
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            tables = await operator.get_tables()
+            sql = mock_jdbc.preview.call_args.kwargs["sql"]
+            assert "information_schema.tables" in sql
+            assert "current_schema()" in sql
+            assert "'BASE TABLE'" in sql
+            assert "'VIEW'" in sql
+            assert tables == ["sales"]
+
+    @pytest.mark.asyncio
+    async def test_raises_database_failure_when_unreachable(self) -> None:
         operator = make_operator()
         with patch(_JDBC_PREVIEW) as mock_jdbc:
             mock_jdbc.preview.side_effect = RuntimeError("timeout")
-            tables = await operator.get_tables()
-            assert tables == []
+            with pytest.raises(DatabaseFailure) as excinfo:
+                await operator.get_tables()
+        assert str(excinfo.value) == OUTAGE_MESSAGE
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_list_when_no_tables(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # A reachable database with no tables: the preview succeeds with zero
+        # records, so get_tables returns [] via the happy path — not the failure
+        # handler, which would log and raise.
+        operator = make_operator()
+        result = MagicMock()
+        result.records = []
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            with caplog.at_level(logging.ERROR):
+                tables = await operator.get_tables()
+        assert tables == []
+        assert "failed to fetch tables" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -256,13 +301,50 @@ class TestExecuteQuery:
             assert mock_jdbc.preview.call_args.kwargs["max_rows"] == 10_000
 
     @pytest.mark.asyncio
-    async def test_returns_list_of_dicts(self) -> None:
+    async def test_returns_dataframe(self) -> None:
         operator = make_operator()
         result = make_preview_result(["id", "name"], [[1, "alice"], [2, "bob"]])
         with patch(_JDBC_PREVIEW) as mock_jdbc:
             mock_jdbc.preview.return_value = result
-            rows = await operator.execute_query("SELECT * FROM users")
-            assert rows == [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}]
+            frame = await operator.execute_query("SELECT * FROM users")
+            assert isinstance(frame, pl.DataFrame)
+            assert frame.to_dicts() == [
+                {"id": 1, "name": "alice"},
+                {"id": 2, "name": "bob"},
+            ]
+
+    @pytest.mark.asyncio
+    async def test_empty_result_preserves_column_types(self) -> None:
+        # An empty result must still carry its columns AND their source types
+        # (APP-6778): a 0x0 frame would break table registration, charts, and the
+        # data dictionary, while a String-only frame would mistype numeric columns
+        # (and a Null dtype would round-trip as INTEGER through DuckDB).
+        operator = make_operator()
+        result = make_preview_result(["id", "name"], [])
+        result.result_schema[0].data_type = "INTEGER"
+        result.result_schema[1].data_type = "VARCHAR"
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            frame = await operator.execute_query("SELECT * FROM users WHERE 1=0")
+            assert isinstance(frame, pl.DataFrame)
+            assert frame.columns == ["id", "name"]
+            assert frame.height == 0
+            assert frame.schema == {"id": pl.Int64, "name": pl.String}
+
+    @pytest.mark.asyncio
+    async def test_empty_result_without_schema_falls_back_to_string(self) -> None:
+        # `result_schema` is optional in the SDK; an empty preview may omit it.
+        # Names must still come through via `result.columns`, defaulting to String
+        # rather than raising.
+        operator = make_operator()
+        result = make_preview_result(["id", "name"], [])
+        result.result_schema = None
+        with patch(_JDBC_PREVIEW) as mock_jdbc:
+            mock_jdbc.preview.return_value = result
+            frame = await operator.execute_query("SELECT * FROM users WHERE 1=0")
+            assert frame.columns == ["id", "name"]
+            assert frame.height == 0
+            assert frame.schema == {"id": pl.String, "name": pl.String}
 
     @pytest.mark.asyncio
     async def test_sdk_error_raises_invalid_generated_code(self) -> None:
@@ -361,6 +443,7 @@ class TestGetData:
             ("jdbc:sap://host:443", '"users"'),
             ("jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443", "`users`"),
             ("jdbc:databricks://adb-1234.4.azuredatabricks.net:443", "`users`"),
+            ("jdbc:redshift://cluster.us-east-1.redshift.amazonaws.com:5439/mydb", '"users"'),
         ],
     )
     async def test_get_data_quotes_table_per_dialect(

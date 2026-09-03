@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { screen, fireEvent, act } from '@testing-library/react';
+import { screen, fireEvent, act, render } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, type Mock } from 'vitest';
 import { AddDataModal } from '@/components/AddDataModal';
-import { renderWithProviders } from '../test-utils';
+import { renderWithProviders, mockScrollIntoView } from '../test-utils';
 import {
   useFetchDatasets,
   useFileUploadMutation,
@@ -44,6 +44,8 @@ function setupMocks(overrides?: {
     remote?: Array<{ id: string; name: string; size: string }>;
   };
   dbTables?: string[];
+  dbTablesError?: boolean;
+  dbTablesFetching?: boolean;
   dataStores?: Array<{
     id: string;
     canonical_name: string;
@@ -83,6 +85,8 @@ function setupMocks(overrides?: {
 
   (useGetDatabaseTables as Mock).mockReturnValue({
     data: overrides?.dbTables ?? [],
+    isError: overrides?.dbTablesError ?? false,
+    isFetching: overrides?.dbTablesFetching ?? false,
   });
 
   (useLoadFromDatabaseMutation as Mock).mockImplementation(({ onSuccess }: any) => ({
@@ -182,6 +186,64 @@ describe('AddDataModal', () => {
     });
     renderWithProviders(<ControlledAddDataModal />);
     expect(screen.getByText('Select one or more tables')).toBeInTheDocument();
+  });
+
+  test('DATABASE source shows an error when tables fail to load', () => {
+    setupMocks({ dataSource: 'database', dbTablesError: true });
+    renderWithProviders(<ControlledAddDataModal />);
+    expect(screen.getByText('Could not load the list of tables.')).toBeInTheDocument();
+  });
+
+  test('DATABASE source shows no error when tables load successfully', () => {
+    setupMocks({ dataSource: 'database', dbTables: ['table1'] });
+    renderWithProviders(<ControlledAddDataModal />);
+    expect(screen.queryByText('Could not load the list of tables.')).not.toBeInTheDocument();
+  });
+
+  test('DATABASE source does not offer stale tables while in an error state', () => {
+    // React Query keeps the last successful data on a failed refetch; the picker
+    // must not offer those stale tables (nor keep Save enabled) during an outage.
+    setupMocks({ dataSource: 'database', dbTables: ['stale_table'], dbTablesError: true });
+    renderWithProviders(<ControlledAddDataModal />);
+    fireEvent.click(screen.getByTestId('database-table-select'));
+    expect(screen.queryByTestId('multi-select-option-stale_table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
+  });
+
+  test('DATABASE source does not offer stale tables while re-checking on reopen', () => {
+    // Reopening refetches with the previous (successful) data cached; until the
+    // check resolves those stale tables must not be selectable or submittable.
+    setupMocks({ dataSource: 'database', dbTables: ['stale_table'], dbTablesFetching: true });
+    renderWithProviders(<ControlledAddDataModal />);
+    fireEvent.click(screen.getByTestId('database-table-select'));
+    expect(screen.queryByTestId('multi-select-option-stale_table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
+  });
+
+  test('DATABASE source keeps the error visible while a failed check is refetching', () => {
+    setupMocks({ dataSource: 'database', dbTablesError: true, dbTablesFetching: true });
+    renderWithProviders(<ControlledAddDataModal />);
+    expect(screen.getByText('Could not load the list of tables.')).toBeInTheDocument();
+  });
+
+  test('DATABASE source disables Save for an already-selected table once a re-check begins', () => {
+    // A selection made while the database was reachable must stop being
+    // submittable the moment a background re-check starts, so it can't be sent
+    // to a database that may be down. (All data hooks are mocked, so the
+    // component renders without providers; re-render flips the query state while
+    // preserving the component's selection.)
+    const restoreScrollIntoView = mockScrollIntoView();
+    setupMocks({ dataSource: 'database', dbTables: ['t1'] });
+    const { rerender } = render(<ControlledAddDataModal />);
+
+    fireEvent.click(screen.getByTestId('database-table-select'));
+    fireEvent.click(screen.getByTestId('multi-select-option-t1'));
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeEnabled();
+
+    setupMocks({ dataSource: 'database', dbTables: ['t1'], dbTablesFetching: true });
+    rerender(<ControlledAddDataModal />);
+    expect(screen.getByTestId('add-data-modal-save-button')).toBeDisabled();
+    restoreScrollIntoView();
   });
 
   test.skip('REMOTE_CATALOG source shows remote data registry', () => {

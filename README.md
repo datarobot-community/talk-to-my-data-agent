@@ -378,6 +378,22 @@ Talk to My Data supports connecting to SAP Datasphere.
 2. Provide the required SAP credentials in `.env`.
 3. Run `task deploy`.
 
+#### Databricks
+
+Talk to My Data supports connecting to Databricks.
+
+1. Add `DATABASE_CONNECTION_TYPE=datarobot_jdbc` to `.env`.
+2. Provide the required Databricks credentials in `.env`. See `.env.template` for connection parameter examples.
+3. Run `task deploy`.
+
+#### Redshift
+
+Talk to My Data supports connecting to Redshift.
+
+1. Add `DATABASE_CONNECTION_TYPE=datarobot_jdbc` to `.env`.
+2. Provide the required Redshift credentials in `.env`. See `.env.template` for connection parameter examples.
+3. Run `task deploy`.
+
 ## Tools
 
 Define functions in `core/src/core/tools.py` to extend the data analyst Python agent with tools for data analysis tasks. Each function becomes available in the agent code execution environment. The name, docstring, and signature are included in the agent prompt.

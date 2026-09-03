@@ -22,7 +22,6 @@ from typing import Any
 from core.logging_helper import get_logger
 from core.telemetry import otel
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from starlette.types import Lifespan
 
@@ -102,15 +101,6 @@ def create_app(
         },
         lifespan=lifespan,
         debug=True,  # Stack traces will be exposed for 500 responses
-    )
-
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Allows all origins
-        allow_credentials=True,
-        allow_methods=["*"],  # Allows all methods
-        allow_headers=["*"],  # Allows all headers
     )
 
     # Add session middleware

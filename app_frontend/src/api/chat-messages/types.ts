@@ -32,6 +32,18 @@ export interface IAnalysisComponent extends IComponent {
   used_datasets?: string[] | null;
 }
 
+// Database analyses render through the same path as analysis results (same code /
+// dataset_id / status / metadata fields); the backend just tags them 'database'.
+// `used_datasets` is never populated for DB results but is kept optional so the
+// folded finder in ResponseMessage can treat both shapes uniformly.
+export interface IDatabaseComponent extends IComponent {
+  type: 'database';
+  metadata?: IMetadata;
+  dataset_id?: string | null;
+  code?: string | null;
+  used_datasets?: string[] | null;
+}
+
 export interface IChartsComponent extends IComponent {
   type: 'charts';
   fig1_json?: string | null;
@@ -75,6 +87,7 @@ export interface IChatMessage {
   components: (
     | IMessageComponent
     | IAnalysisComponent
+    | IDatabaseComponent
     | IChartsComponent
     | IBusinessComponent
     | IUsageInfoComponent

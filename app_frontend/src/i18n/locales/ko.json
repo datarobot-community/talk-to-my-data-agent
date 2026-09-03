@@ -38,6 +38,7 @@
   "Select one or more items.": "항목을 하나 이상 선택하세요.",
   "Databases": "데이터베이스",
   "Select one or more tables": "테이블을 하나 이상 선택하세요",
+  "Could not load the list of tables.": "테이블 목록을 불러오지 못했습니다.",
   "Add External Data Source": "외부 데이터 소스 추가",
   "Select a data store": "데이터 저장소 선택",
   "Select one or more data sources": "하나 이상의 데이터 소스 선택",

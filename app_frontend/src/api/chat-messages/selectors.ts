@@ -42,6 +42,11 @@ export const getResponseMessage = (
   if (userIndex === -1) return undefined;
 
   for (let i = userIndex + 1; i < messages.length; i++) {
+    // Stop at the next user message: this one is unpaired, so it has no response of
+    // its own and must not borrow a later exchange's answer.
+    if (messages[i].role === 'user') {
+      return undefined;
+    }
     if (messages[i].role === 'assistant') {
       return messages[i];
     }

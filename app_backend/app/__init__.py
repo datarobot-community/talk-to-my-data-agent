@@ -163,6 +163,12 @@ def create_app(
         app.add_middleware(PyInstrumentMiddleware)
     app.include_router(base_router)
 
+    if not (STATIC_DIR / "assets").is_dir():
+        raise RuntimeError(
+            "Frontend build output missing: app_backend/static/assets not found. "
+            "Build the frontend first: `cd app_frontend && npm install && npm run build`."
+        )
+
     # This is the base path for the app, used to serve static files and templates
     app.mount(
         "/assets",

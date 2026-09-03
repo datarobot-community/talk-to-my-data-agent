@@ -11,7 +11,8 @@ requires-python = ">=3.11, <3.14"
 dependencies = [
     "core",
     "datarobot>=3.8.2",
-    "datarobot-pulumi-utils>=0.1.5",
+    # no [llm] extra: it needs litellm>=1.91.1 / openai>=2, which core cannot use yet
+    "datarobot-pulumi-utils>=0.1.8",
     "pulumi-datarobot>=0.10.43",
     "litellm>=1.72.1,<2.0.0,!=1.82.7,!=1.82.8",
     "pulumi>=3.175.0",
@@ -25,9 +26,10 @@ dependencies = [
 dev = [
     "pytest-cov>=6.1.1",
     "pytest>=7.4.0",
-    "ruff>=0.3.0,<0.16.0",
+    "ruff>=0.16.0",
     "mypy>=1.8.0",
     "types-PyYAML>=6.0.12",
+    "types-requests>=2.31.0",
 ]
 
 [tool.mypy]

@@ -18,14 +18,13 @@ Choose this option for direct DataRobot LLM Gateway integration.
 import os
 
 import pulumi_datarobot as datarobot
-from datarobot_pulumi_utils.pulumi import export
-
-from .libllm import (
-    ensure_datarobot_prefix,
-    validate_feature_flags,
+from datarobot_pulumi_utils.common.feature_flags import check_feature_flag_set
+from datarobot_pulumi_utils.common.llm_validation import (
     verify_llm,
     verify_llm_gateway_model_availability,
 )
+from datarobot_pulumi_utils.pulumi import export
+from datarobot_pulumi_utils.schema.llms import ensure_datarobot_prefix
 
 __all__ = [
     "app_runtime_parameters",
@@ -70,12 +69,16 @@ default_model: str = ensure_datarobot_prefix(
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is configured properly for this configuration option.
-validate_feature_flags(REQUIRED_FEATURE_FLAGS)
+check_feature_flag_set(REQUIRED_FEATURE_FLAGS)
 
 # This does a quick check that validates the selected model is available
 # by checking the LLM Gateway. If it isn't, it will raise an error
 # with the list of models that are available and active.
-verify_llm_gateway_model_availability(default_model)
+verify_llm_gateway_model_availability(
+    default_model,
+    model_env_var="LLM_DEFAULT_MODEL",
+    config_location="infra/configurations/llm/",
+)
 
 # LiteLLM support DataRobot as a provider, so this validates
 # everything is working and the default LLM you've chosen is available

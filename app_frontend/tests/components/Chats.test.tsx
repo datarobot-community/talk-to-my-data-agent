@@ -1,4 +1,5 @@
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { test, describe, expect, vi, beforeEach } from 'vitest';
 import { Chats } from '@/pages/Chats';
 import { renderWithProviders, mockScrollIntoView } from '../test-utils';
@@ -465,6 +466,114 @@ describe('Chats Component', () => {
     // Code tab shows success indicator since analysis completed
     await waitFor(() => {
       expect(screen.getByTestId('code-loading-success')).toBeInTheDocument();
+    });
+  });
+
+  test('shows database analysis SQL in the Code tab, not the chart Python', async () => {
+    // A database analysis and a chart share the message. The backend now tags the DB
+    // result `type: 'database'`; without the fold that tag misses the analysis finder and
+    // the Code tab falls back to the chart's Python (code = analysisComponent?.code ||
+    // chartsComponent?.code). This pins that the fold selects the DB SQL instead.
+    const mockMessages = [
+      {
+        id: 'msg-user',
+        role: 'user' as const,
+        content: 'Query the sales table',
+        components: [],
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-database',
+        role: 'assistant' as const,
+        content: '',
+        created_at: '2024-01-01T00:01:00Z',
+        in_progress: false,
+        components: [
+          {
+            type: 'database',
+            status: 'success',
+            code: 'SELECT order_id FROM sales',
+          },
+          {
+            type: 'charts',
+            status: 'success',
+            fig1_json: null,
+            fig2_json: null,
+            code: 'import pandas as pd',
+          },
+        ],
+      },
+    ];
+
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    renderWithProviders(<Chats />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('response-message-msg-database')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('tab-code'));
+
+    // No dataset_id / used_datasets, so the Code panel is the only collapsible; open it.
+    await user.click(await screen.findByTestId('collapsible-panel-trigger'));
+
+    await waitFor(() => {
+      const code = screen.getByTestId('syntax-highlighter');
+      expect(code).toHaveTextContent('SELECT order_id FROM sales');
+      expect(code).not.toHaveTextContent('import pandas');
+    });
+  });
+
+  test('binds the dataset grid for a database analysis result', async () => {
+    const mockMessages = [
+      {
+        id: 'msg-user',
+        role: 'user' as const,
+        content: 'Query the sales table',
+        components: [],
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-database-ds',
+        role: 'assistant' as const,
+        content: '',
+        created_at: '2024-01-01T00:01:00Z',
+        in_progress: false,
+        components: [
+          {
+            type: 'database',
+            status: 'success',
+            code: 'SELECT 1',
+            dataset_id: 'ds-1',
+          },
+        ],
+      },
+    ];
+
+    mockUseFetchAllMessages.mockReturnValue({
+      data: mockMessages,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    renderWithProviders(<Chats />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('response-message-msg-database-ds')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('tab-code'));
+
+    // The dataset panel only renders when datasetId is bound — null before the fold.
+    await waitFor(() => {
+      expect(screen.getByText('Dataset generated for analysis')).toBeInTheDocument();
     });
   });
 

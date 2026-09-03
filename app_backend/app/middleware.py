@@ -17,10 +17,8 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import os
 import uuid
-from copy import deepcopy
 from logging import getLogger
 from pathlib import Path
 from tempfile import gettempdir
@@ -39,7 +37,6 @@ class SessionInitializationResult(NamedTuple):
     """Structured return value for session initialization."""
 
     session_state: SessionState
-    session_id: str | None
     user_id: str | None
     user_email: str | None
 
@@ -67,11 +64,17 @@ class SessionState(object):
     def __delattr__(self, key: Any) -> None:
         del self._state[key]
 
-    def update(self, state: dict[str, Any]) -> None:
-        self._state.update(state)
 
-
-# Module-level session store and lock
+# Module-level session store and lock. Keyed by `user_id`, derived in `_initialize_session`
+# from the authenticated identity header. No cookie or other client-chosen value selects an
+# entry.
+#
+# Entries are never evicted. That is deliberate: `routers/chats.py` hands `analyst_db` to
+# background tasks for minute-long analyses, so dropping a live entry would let the next
+# request open a second AnalystDB over the same DuckDB files. It holds one entry per
+# distinct authenticated user per pod, which is why `_initialize_session` refuses to derive
+# an id from any header value it cannot attribute to the proxy — an unbounded key space
+# here would be an unbounded memory and disk leak.
 session_store: dict[str, SessionState] = {}
 session_lock = asyncio.Lock()
 
@@ -97,70 +100,75 @@ async def get_database(user_id: str) -> AnalystDB:
 async def _initialize_session(
     request: Request,
 ) -> SessionInitializationResult:
-    """Initialize the session state and return the session ID and user ID."""
+    """Resolve the caller's identity and hand back their session state."""
     test_user_email = os.environ.get("TEST_USER_EMAIL", "")
 
     if test_user_email and os.environ.get("APPLICATION_ID"):
         logger.fatal("Test email set on a deployed instance.")
         raise RuntimeError("Test eail set on a deployed instance.")
 
-    # Create a new session state with default values
-    session_state = SessionState()
-    empty_session_state: dict[str, Any] = {
-        "datarobot_account_info": None,
-        "datarobot_api_scoped_token": None,
-        "analyst_db": None,
-    }
-    session_state.update(deepcopy(empty_session_state))
-
-    # Try to get user ID from cookie
-    user_id = None
-
-    session_fastapi_cookie = request.cookies.get("session_fastapi")
-    if session_fastapi_cookie:
-        try:
-            user_id = base64.b64decode(session_fastapi_cookie.encode()).decode()
-        except Exception:
-            pass  # If decoding fails, continue without user_id
-
-    # Generate a new user ID if needed
-    new_user_id = None
-    email_header = request.headers.get("x-user-email")
-    user_email: str | None = None
-    if email_header:
-        new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, email_header))[:36]
-        user_email = email_header
-    elif test_user_email:
-        new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, test_user_email))[:36]
-        user_email = test_user_email
-
-    # Determine session ID
-    session_id = None
-    if session_fastapi_cookie:
-        session_id = session_fastapi_cookie
-    elif new_user_id:
-        session_id = base64.b64encode(new_user_id.encode()).decode()
-
-    # Get or create session in store
-    if session_id:
-        async with session_lock:
-            existing_session = session_store.get(session_id)
-            if existing_session:
-                return SessionInitializationResult(
-                    session_state=existing_session,
-                    session_id=session_id,
-                    user_id=user_id or new_user_id,
-                    user_email=user_email,
-                )
-            else:
-                session_store[session_id] = session_state
-
-    return SessionInitializationResult(
-        session_state=session_state,
-        session_id=session_id,
-        user_id=user_id or new_user_id,
-        user_email=user_email,
+    session_state = SessionState(
+        {
+            "datarobot_account_info": None,
+            "datarobot_api_scoped_token": None,
+            "analyst_db": None,
+        }
     )
+
+    # LAST value, not `.get()`. The upstream proxy adds this header with `Header.Add`
+    # rather than `Del`+`Set`, so a client-supplied value survives alongside the
+    # authenticated one and lands FIRST — which is what `.get()` returns. The last value is
+    # the one written by the hop closest to this app, i.e. the proxy.
+    #
+    # That holds only while every request reaches us through that proxy, and the two ways it
+    # can fail need different fixes. An *injected* value arriving through the proxy is closed
+    # for good by an unconditional `Del` upstream, tracked separately. A request that
+    # *bypasses* the proxy never reaches that `Del`: it carries a single client-controlled
+    # value and no authentication at all, and only network isolation — or authentication in
+    # this app — would close that one.
+    #
+    # Do not change the derivation below. `user_id` is the partition key for every per-user
+    # DuckDB file and every persistent-storage key prefix, so any change to it orphans
+    # existing users from their datasets, chats and dictionaries.
+    emails = request.headers.getlist("x-user-email")
+    if len(emails) > 1:
+        logger.warning("Discarding %d injected x-user-email value(s).", len(emails) - 1)
+
+    authenticated = emails[-1] if emails else ""
+    if "," in authenticated:
+        # A hop folded repeated field-lines into one comma-joined value, so the last value
+        # is no longer just the proxy's. Rejected rather than used: deriving from the
+        # joined string would mint a partition keyed on attacker-chosen text, and since
+        # `session_store` is never evicted, varying the prefix would grow it without bound.
+        logger.error("Rejecting comma-joined x-user-email; cannot identify the caller.")
+        return SessionInitializationResult(session_state, None, None)
+
+    user_id: str | None = None
+    user_email: str | None = None
+    if authenticated:
+        user_email = authenticated
+        user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, user_email))[:36]
+    elif not emails and test_user_email:
+        # Local development only, and only when the proxy sent nothing at all. A header
+        # that arrived but resolved to nothing means the proxy did identify the caller —
+        # as someone with no address — so falling back to the developer's identity there
+        # would turn a rejected request into an authenticated one.
+        user_email = test_user_email
+        user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, test_user_email))[:36]
+
+    # No identity: no session to reuse and no database to open. `deps.py` turns this into
+    # a 400. Nothing is stored, so an unauthenticated caller cannot grow `session_store`.
+    if user_id is None:
+        return SessionInitializationResult(session_state, None, None)
+
+    async with session_lock:
+        existing_session = session_store.get(user_id)
+        if existing_session is not None:
+            session_state = existing_session
+        else:
+            session_store[user_id] = session_state
+
+    return SessionInitializationResult(session_state, user_id, user_email)
 
 
 async def _initialize_database(
@@ -178,70 +186,54 @@ async def _initialize_database(
                 await analyst_db.set_user_email(user_email)
 
 
-def _set_session_cookie(
-    response: Response,
-    user_id: str | None,
-    session_id: str,
-    session_fastapi_cookie: str | None,
-) -> None:
-    """Set the session cookie if needed."""
-    if user_id and not session_fastapi_cookie:
-        encoded_uid = base64.b64encode(user_id.encode()).decode()
-        response.set_cookie(key="session_fastapi", value=encoded_uid, httponly=True)
-    elif not session_fastapi_cookie and not user_id:
-        response.set_cookie(key="session_fastapi", value=session_id, httponly=True)
-
-
 async def session_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
     """Middleware to manage user sessions."""
     request_methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
-    session_id: str | None = None
-    user_id: str | None = None
-    user_email: str | None = None
 
     if request.method in request_methods:
         dr_user_id_var.set(request.headers.get("x-user-id"))
 
         # Initialize the session
         session_init = await _initialize_session(request)
-        session_id = session_init.session_id
-        user_id = session_init.user_id
+        user_id: str | None = session_init.user_id
         user_email = session_init.user_email
         request.state.session = session_init.session_state
 
         if not request.state.session.datarobot_account_info:
             request.state.session.datarobot_account_info = {}
+            # Gate on the identity `_initialize_session` resolved, not on a fresh
+            # `headers.get("x-user-email")`: that reads the FIRST value, so a request whose
+            # authenticated value was empty — no identity — would still fetch, for whoever
+            # the injected first value named.
+            #
+            # `getlist` is only asked whether a header arrived, never for its value — that
+            # is enough to tell a proxied request from the local TEST_USER_EMAIL fallback,
+            # and unlike comparing `user_email` to TEST_USER_EMAIL it stays right when a
+            # developer sets that variable to the same address the header carries.
             try:
-                if request.headers.get("x-user-email"):
+                if user_email and request.headers.getlist("x-user-email"):
                     # do not try to fetch user info for prob requests
                     with use_user_token(request):
                         reply = dr.client.get_client().get("account/info/")
                         account_info = reply.json()
                     request.state.session.datarobot_account_info = account_info
-                elif os.environ.get("TEST_USER_EMAIL", ""):
+                elif user_email:
+                    # Local development: there is no visitor token to borrow.
                     reply = dr.client.get_client().get("account/info/")
                     account_info = reply.json()
                     request.state.session.datarobot_account_info = account_info
             except Exception as e:
                 logger.info(f"Error fetching account info: {e}")
 
-        dr_uid = request.state.session.datarobot_account_info.get("uid")
-        if session_id is None and dr_uid is not None:
-            session_id = base64.b64encode(dr_uid.encode()).decode()
-            user_id = dr_uid
-
         # Initialize database in the session
         if user_id:
             await _initialize_database(request, user_id, user_email=user_email)
 
-    # Process the request
+    # No session cookie is issued. A `session_fastapi` cookie still held by a browser is
+    # ignored rather than cleared. Clearing it would mean emitting a Set-Cookie on every
+    # response to delete a name at path "/" that this app no longer owns and that sibling
+    # template-derived apps still use — cost with no benefit, since an unrecognised cookie
+    # is already inert here.
     response: Response = await call_next(request)
-
-    if request.method in request_methods:
-        # Set session cookie if needed
-        if session_id:
-            _set_session_cookie(
-                response, user_id, session_id, request.cookies.get("session_fastapi")
-            )
 
     return response

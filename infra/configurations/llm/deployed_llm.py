@@ -22,20 +22,20 @@ import os
 
 import pulumi
 import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.common.feature_flags import check_feature_flag_set
+from datarobot_pulumi_utils.common.llm_validation import verify_llm
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
-
-from . import use_case
-from .libllm import (
+from datarobot_pulumi_utils.schema.llms import (
     DEPLOYED_LLM_PLACEHOLDER_MODEL,
     ensure_datarobot_prefix,
-    validate_feature_flags,
-    verify_llm,
 )
 
+from . import use_case
+
 __all__ = [
-    "custom_model_runtime_parameters",
     "app_runtime_parameters",
+    "custom_model_runtime_parameters",
     "default_model",
     "llm_application_name",
     "llm_resource_name",
@@ -62,7 +62,7 @@ default_model: str = ensure_datarobot_prefix(
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
 # Verify everything is working
-validate_feature_flags(REQUIRED_FEATURE_FLAGS)
+check_feature_flag_set(REQUIRED_FEATURE_FLAGS)
 verify_llm(model_id=f"{default_model}", deployment_id=LLM_DEPLOYMENT_ID)
 
 playground = datarobot.Playground(

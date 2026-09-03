@@ -125,6 +125,15 @@ You must also configure credentials for your chosen provider:
 | `OPENAI_API_DEPLOYMENT_ID` | Deployment ID (e.g. `gpt-5-mini`) |
 | `OPENAI_API_VERSION` | API version (e.g. `2024-08-01-preview`) |
 
+#### OpenAI-compatible (Nebius, Groq, xAI, DeepSeek, self-hosted vLLM, ...)
+
+First, provide the model prefix for the preferred provider that LiteLLM can route (DataRobot supports all LiteLLM inferencing providers). Set `<LLM>_DEFAULT_MODEL` with that prefix (e.g., `nebius/moonshotai/Kimi-K2.7-Code`). **Do not** set `OPENAI_API_DEPLOYMENT_ID` — it is Azure-only and forces an Azure-style URL that non-Azure providers reject.
+
+| Variable | Description |
+|---|---|
+| `OPENAI_API_KEY` | Provider API key |
+| `OPENAI_API_BASE` | Provider base URL (e.g., `https://api.tokenfactory.us-central1.nebius.com/v1`) |
+
 #### AWS Bedrock
 
 | Variable | Description |
@@ -160,7 +169,7 @@ You must also configure credentials for your chosen provider:
 |---|---|
 | `TOGETHERAI_API_KEY` | API key |
 
-**Note:** `blueprint_with_external_llm.py` smoke-tests the provider directly by stripping the `datarobot/` prefix from `<LLM>_DEFAULT_MODEL` (e.g. `azure/gpt-5-mini`, `bedrock/...`). For Azure it addresses the model by its deployment name via `OPENAI_API_DEPLOYMENT_ID`. Set `<LLM>_DEFAULT_MODEL` to match your provider. See [LiteLLM providers](https://docs.litellm.ai/docs/providers) for the exact model string each provider expects.
+**Note**: `blueprint_with_external_llm.py` smoke-tests the provider directly by stripping the `datarobot/` prefix from `<LLM>_DEFAULT_MODEL` (e.g., `azure/gpt-5-mini`, `nebius/...`, `bedrock/...`). For Azure, it addresses the model by its deployment name via `OPENAI_API_DEPLOYMENT_ID`; every other OpenAI-compatible provider is addressed by the model string as-is (no deployment ID). Set `<LLM>_DEFAULT_MODEL` to match your provider. See [LiteLLM providers](https://docs.litellm.ai/docs/providers) for the exact model string each provider expects.
 
 ### Stack outputs
 
@@ -318,7 +327,7 @@ INFRA_ENABLE_LLM=registered_model.py
 
 ### Editing the configuration directly
 
-In addition to the `.env` file changes, you can also edit the respective configuration file to make additional changes, such as the default LLM, temperature, top_p, etc.
+In addition to the `.env` file changes, you can also edit the respective configuration file to make additional changes, such as the default LLM, temperature, top_p, etc. The feature-flag, credential, and LLM-verification helpers each configuration module imports come from the [`datarobot-pulumi-utils`](https://github.com/datarobot-oss/datarobot-pulumi-utils) package rather than a generated module in your project.
 
 ## Common configuration
 

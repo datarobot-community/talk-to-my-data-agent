@@ -100,6 +100,7 @@ class TestGetDatabaseOperatorJdbc:
         ("sap", "jdbc:sap://host:443"),
         ("bigquery", "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443"),
         ("databricks", "jdbc:databricks://adb-1234.4.azuredatabricks.net:443"),
+        ("datarobot_jdbc", "jdbc:redshift://cluster.us-east-1.redshift.amazonaws.com:5439/mydb"),
     ])
     def test_named_connection_types_route_to_jdbc_operator(
         self, connection_type: str, jdbc_uri: str

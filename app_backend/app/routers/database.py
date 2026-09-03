@@ -19,11 +19,12 @@ from __future__ import annotations
 import asyncio
 
 from core.analyst_db import AnalystDB, InternalDataSourceType
+from core.code_execution import DatabaseFailure
 from core.data_connections.database.database_implementations import (
     get_external_database,
 )
 from core.schema import AnalystDataset, LoadDatabaseRequest
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.deps import get_initialized_db
 
@@ -57,7 +58,10 @@ async def get_and_process_tables(
 @router.get("/tables")
 async def get_database_tables() -> list[str]:
     """Get list of all available database tables."""
-    return await get_external_database().get_tables()
+    try:
+        return await get_external_database().get_tables()
+    except DatabaseFailure as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/select")

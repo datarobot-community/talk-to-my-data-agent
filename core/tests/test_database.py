@@ -25,6 +25,8 @@ from core.analyst_db import (
 from core.schema import (
     AnalystChatMessage,
     AnalystDataset,
+    RunDatabaseAnalysisResult,
+    RunDatabaseAnalysisResultMetadata,
 )
 
 
@@ -235,3 +237,35 @@ async def test_update_message_feedback_overwrites_previous_feedback() -> None:
     assert final_message.content == "Initial response"
     assert final_message.user_rating == -1.0
     assert final_message.user_feedback == "Actually, this is wrong."
+
+
+@pytest.mark.asyncio
+async def test_database_analysis_component_survives_persistence_roundtrip() -> None:
+    """A RunDatabaseAnalysisResult stored in a message must reload as the same type with
+    its `type` discriminator and code/dataset_id intact (APP-6804) — i.e. the untagged
+    Component union resolves it correctly through the real DuckDB persistence layer."""
+    db = await get_analyst_db(ANALYST_DATABASE_VERSION + 6)
+    await db.delete_all_tables()
+
+    chat_id = await db.create_chat("Test Chat")
+    message = AnalystChatMessage(
+        role="assistant",
+        content="Database analysis",
+        components=[
+            RunDatabaseAnalysisResult(
+                status="success",
+                code="SELECT 1",
+                dataset_id="ds-1",
+                metadata=RunDatabaseAnalysisResultMetadata(duration=1.0, attempts=0),
+            )
+        ],
+    )
+    message_id = await db.add_chat_message(chat_id, message)
+
+    reloaded = await db.get_chat_message(message_id)
+    assert reloaded is not None
+    (component,) = reloaded.components
+    assert isinstance(component, RunDatabaseAnalysisResult)
+    assert component.type == "database"
+    assert component.code == "SELECT 1"
+    assert component.dataset_id == "ds-1"

@@ -38,6 +38,7 @@
   "Select one or more items.": "1つ以上のアイテムを選択します。",
   "Databases": "データベース",
   "Select one or more tables": "1つ以上のテーブルを選択",
+  "Could not load the list of tables.": "テーブルの一覧を読み込めませんでした。",
   "Add External Data Source": "外部データソースを追加",
   "Select a data store": "データストアを選択",
   "Select one or more data sources": "1つ以上のデータソースを選択",

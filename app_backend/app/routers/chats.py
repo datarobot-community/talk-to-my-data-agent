@@ -574,9 +574,13 @@ async def save_chat_messages(
         if idx is None or chat_messages[idx].role != "user":
             raise HTTPException(detail="User message not found", status_code=404)
 
-        # Find the following assistant message
+        # Find the following assistant message, stopping at the next user message: an
+        # unpaired user question has no answer of its own and must not borrow a later
+        # exchange's reply.
         assistant_message = None
         for i in range(idx + 1, len(chat_messages)):
+            if chat_messages[i].role == "user":
+                break
             if chat_messages[i].role == "assistant":
                 assistant_message = chat_messages[i]
                 break
@@ -792,6 +796,25 @@ async def save_chat_messages(
                     except Exception as e:
                         logger.error(f"Unexpected error processing chart: {e}")
                         continue  # Skip this chart but continue processing
+
+    # A single-message export can resolve to a user question with no answer (a failed or
+    # otherwise unpaired message). The loop above only creates sheets for assistant
+    # messages, so that would leave a zero-sheet workbook and openpyxl raises "At least
+    # one sheet must be visible" on save. Emit a question-only report sheet instead.
+    if not analysis_workbook.sheetnames:
+        question = next(
+            (msg.content for msg in chat_messages if msg.role == "user"), None
+        )
+        fallback_sheet = analysis_workbook.create_sheet("Sheet")
+        if question is not None:
+            fallback_sheet["A1"] = "Analysis Report"
+            fallback_sheet["A3"] = "Question"
+            fallback_sheet["A4"] = question
+            fallback_sheet["A6"] = "Answer"
+            fallback_sheet["A7"] = "No response was recorded for this message."
+        else:
+            fallback_sheet["A1"] = "Chat Export"
+            fallback_sheet["A3"] = "This chat contains no messages to export yet."
 
     output = io.BytesIO()
     analysis_workbook.save(output)

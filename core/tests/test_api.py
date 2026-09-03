@@ -18,8 +18,11 @@ from typing import Any, Generator, cast, no_type_check
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import plotly.graph_objects as go
+import polars as pl
 import pytest
 import pytest_asyncio
+import requests
+from datarobot.errors import ClientError
 from datarobot_genai.core.utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
@@ -37,7 +40,12 @@ from core.analyst_db import (
     DatasetType,
     InternalDataSourceType,
 )
-from core.api import RunCompleteAnalysisRequestContext, run_complete_analysis
+from core.api import (
+    RunCompleteAnalysisRequestContext,
+    run_complete_analysis,
+    run_database_analysis,
+)
+from core.code_execution import InvalidGeneratedCode
 from core.llm_client import (
     AsyncLLMClient,
     ChatWrapper,
@@ -61,6 +69,9 @@ from core.schema import (
     GetBusinessAnalysisResult,
     RunAnalysisResult,
     RunChartsResult,
+    RunDatabaseAnalysisRequest,
+    RunDatabaseAnalysisResult,
+    RunDatabaseAnalysisResultMetadata,
 )
 
 
@@ -398,6 +409,59 @@ async def test_run_complete_analysis_request(
     assert error == [None] * 8
 
 
+@no_type_check
+@pytest.mark.asyncio
+async def test_empty_result_skips_chart_and_insight_generation(
+    analysis_context: RunCompleteAnalysisRequestContext,
+    dataset_cleansed: CleansedDataset,
+    mock_llm: AsyncMock,
+    mock_execute_python: MagicMock,
+) -> None:
+    """A 0-row analysis result must skip chart + business-insight generation:
+    they would burn an LLM call on empty data and can error out (APP-6778, Part 3).
+    An empty AnalystDataset is truthy, so the guard also checks row count."""
+    analysis_context.analyst_db.get_chat_message.return_value = AnalystChatMessage(
+        role="user", content="Question", components=[]
+    )
+    analysis_context.analyst_db.get_data_dictionary.return_value = DataDictionary(
+        name="dataset", column_descriptions=[]
+    )
+    analysis_context.analyst_db.get_cleansed_dataset.return_value = dataset_cleansed
+    analysis_context.analyst_db.get_dataset.return_value = dataset_cleansed.dataset
+    analysis_context.analyst_db.add_chat_message.return_value = "added_message_id"
+
+    def execute_python(output_type: type, **kwargs) -> Any:
+        if output_type == AnalystDataset:
+            # 0-row result that still carries a column (the post-fix shape).
+            return AnalystDataset(
+                name="return", data=DataFrameWrapper(df=DataFrame({"a": []}))
+            )
+
+    mock_execute_python.side_effect = execute_python
+
+    with patch(
+        "core.api.execute_business_analysis_and_charts", new_callable=AsyncMock
+    ) as charts_and_insights:
+        messages = [
+            message
+            async for message in run_complete_analysis(
+                chat_request=analysis_context.chat_request,
+                data_source=analysis_context.data_source,
+                dataset_metadata=analysis_context.dataset_metadata,
+                analyst_db=analysis_context.analyst_db,
+                chat_id=analysis_context.chat_id,
+                message_id=analysis_context.user_message_id,
+                request=analysis_context.request,
+                enable_business_insights=analysis_context.enable_business_insights,
+                enable_chart_generation=analysis_context.enable_chart_generation,
+            )
+        ]
+
+    charts_and_insights.assert_not_called()
+    assert not any(isinstance(m, RunChartsResult) for m in messages)
+    assert not any(isinstance(m, GetBusinessAnalysisResult) for m in messages)
+
+
 @pytest.fixture
 def run_analysis_result_canned() -> RunAnalysisResult:
     with open("tests/models/run_analysis_result.json") as f:
@@ -649,3 +713,217 @@ def test_code_generation_used_datasets_coerces_malformed_llm_output() -> None:
     assert build({"k": "v"}).used_datasets == []
     assert build([1, "ok", None]).used_datasets == ["ok"]
     assert build(["a", "b"]).used_datasets == ["a", "b"]
+
+
+# ---------------------------------------------------------------------------
+# APP-6770: split retry policy in run_database_analysis
+# ---------------------------------------------------------------------------
+
+
+@no_type_check
+@pytest.mark.asyncio
+async def test_db_outage_fails_fast_once(analysis_context) -> None:
+    """A connection failure is classified as an outage: one attempt, clean error,
+    generated SQL preserved — no 7x regeneration."""
+    db = AsyncMock()
+    db.execute_query.side_effect = InvalidGeneratedCode(
+        code="SELECT 1", exception=requests.ConnectionError("refused")
+    )
+    analysis_context.database = db
+
+    with patch(
+        "core.api._generate_database_analysis_code", new_callable=AsyncMock
+    ) as gen:
+        gen.return_value = "SELECT 1"
+        result = await run_database_analysis(
+            RunDatabaseAnalysisRequest(dataset_names=["ds"], question="q"),
+            analysis_context,
+        )
+
+    assert result.status == "error"
+    assert result.type == "database"
+    assert db.execute_query.call_count == 1
+    # attempts=0 so the UI does not render the misleading "failed to generate valid
+    # code after N attempts" heading for what is an infrastructure failure.
+    assert result.metadata.attempts == 0
+    assert result.metadata.exception.exception_history[0].code == "SELECT 1"
+
+
+@no_type_check
+@pytest.mark.asyncio
+async def test_db_timeout_fails_fast_once(analysis_context) -> None:
+    """A query timeout is classified as infrastructure (regenerating SQL cannot make a
+    too-expensive query finish), so it fails fast with actionable guidance rather than
+    burning the reflection budget."""
+    db = AsyncMock()
+    db.execute_query.side_effect = InvalidGeneratedCode(
+        code="SELECT 1", exception=requests.ReadTimeout("slow")
+    )
+    analysis_context.database = db
+
+    with patch(
+        "core.api._generate_database_analysis_code", new_callable=AsyncMock
+    ) as gen:
+        gen.return_value = "SELECT 1"
+        result = await run_database_analysis(
+            RunDatabaseAnalysisRequest(dataset_names=["ds"], question="q"),
+            analysis_context,
+        )
+
+    assert result.status == "error"
+    assert result.type == "database"
+    assert db.execute_query.call_count == 1
+    assert result.metadata.attempts == 0
+    entry = result.metadata.exception.exception_history[0]
+    assert entry.code == "SELECT 1"
+    assert "expensive" in (entry.exception_str or "").lower()
+
+
+@no_type_check
+@pytest.mark.asyncio
+async def test_bad_sql_still_uses_full_reflection_budget(analysis_context) -> None:
+    """A 400 (bad SQL, indistinguishable from an outage-as-400) stays retryable and
+    exhausts the reflection loop — the accepted residual."""
+    db = AsyncMock()
+    db.execute_query.side_effect = InvalidGeneratedCode(
+        code="SELECT 1", exception=ClientError("bad sql", 400)
+    )
+    analysis_context.database = db
+
+    with patch(
+        "core.api._generate_database_analysis_code", new_callable=AsyncMock
+    ) as gen:
+        gen.return_value = "SELECT 1"
+        result = await run_database_analysis(
+            RunDatabaseAnalysisRequest(dataset_names=["ds"], question="q"),
+            analysis_context,
+        )
+
+    assert result.status == "error"
+    assert db.execute_query.call_count == 7
+
+
+@no_type_check
+@pytest.mark.asyncio
+async def test_read_only_guard_blocks_before_execute(analysis_context) -> None:
+    """A destructive statement is rejected by validate_read_only before the query runs:
+    execute_query is never called, and the read-only message surfaces to the UI."""
+    db = AsyncMock()
+    analysis_context.database = db
+
+    with patch(
+        "core.api._generate_database_analysis_code", new_callable=AsyncMock
+    ) as gen:
+        gen.return_value = "DROP TABLE users"
+        result = await run_database_analysis(
+            RunDatabaseAnalysisRequest(dataset_names=["ds"], question="q"),
+            analysis_context,
+        )
+
+    assert result.status == "error"
+    assert db.execute_query.call_count == 0  # rejected before it ever reached the DB
+    entry = result.metadata.exception.exception_history[0]
+    assert "read-only" in (entry.exception_str or "").lower()
+
+
+# ---------------------------------------------------------------------------
+# APP-6778: an empty query result keeps its column schema
+# ---------------------------------------------------------------------------
+
+
+@no_type_check
+@pytest.mark.asyncio
+async def test_empty_db_result_carries_schema(analysis_context) -> None:
+    """An empty result set stays a 0-row/N-col frame (not a 0x0 one), so the
+    dataset keeps its columns for downstream storage, charts, and the data
+    dictionary (APP-6778)."""
+    db = AsyncMock()
+    db.execute_query.return_value = pl.DataFrame(schema={"x": pl.String})
+    analysis_context.database = db
+
+    with patch(
+        "core.api._generate_database_analysis_code", new_callable=AsyncMock
+    ) as gen:
+        gen.return_value = "SELECT x FROM ds WHERE 1=0"
+        result = await run_database_analysis(
+            RunDatabaseAnalysisRequest(dataset_names=["ds"], question="q"),
+            analysis_context,
+        )
+
+    assert result.status == "success"
+    assert result.dataset.columns == ["x"]
+    assert result.dataset.to_df().height == 0
+
+
+# ---------------------------------------------------------------------------
+# APP-6804: RunDatabaseAnalysisResult carries a `type` discriminator
+# ---------------------------------------------------------------------------
+
+
+@no_type_check
+def test_database_result_serializes_type_discriminator() -> None:
+    """The wire format must include `type: "database"` (APP-6804). Asserting
+    model_dump() rather than result.type is what proves it survives serialization —
+    result.type alone would pass even if the field were excluded from the dump."""
+    result = RunDatabaseAnalysisResult(
+        status="success",
+        code="SELECT 1",
+        dataset_id="ds-1",
+        metadata=RunDatabaseAnalysisResultMetadata(duration=1.0, attempts=0),
+    )
+    assert result.model_dump()["type"] == "database"
+
+
+@no_type_check
+def test_database_result_roundtrips_through_component_union() -> None:
+    """A persisted message whose component carries type='database' must reload as
+    RunDatabaseAnalysisResult, not fall back to RunAnalysisResult. The Component union
+    is untagged, so this is the contract the discriminator buys us."""
+    message = AnalystChatMessage(
+        role="assistant",
+        content="",
+        components=[
+            RunDatabaseAnalysisResult(
+                status="success",
+                code="SELECT 1",
+                dataset_id="ds-1",
+                metadata=RunDatabaseAnalysisResultMetadata(duration=1.0, attempts=0),
+            )
+        ],
+    )
+
+    reloaded = AnalystChatMessage.model_validate(message.model_dump())
+
+    (component,) = reloaded.components
+    assert isinstance(component, RunDatabaseAnalysisResult)
+    assert component.type == "database"
+    assert component.code == "SELECT 1"
+    assert component.dataset_id == "ds-1"
+
+
+@no_type_check
+def test_legacy_database_result_without_type_still_deserializes() -> None:
+    """Back-compat: messages persisted before APP-6804 have no `type`. They must still
+    validate. In the untagged smart-union they resolve to RunAnalysisResult
+    (type="analysis") — which the frontend's folded finder renders identically — so old
+    chats are unaffected. Pinned so a future Pydantic change that flips this is caught."""
+    legacy = {
+        "role": "assistant",
+        "content": "",
+        "components": [
+            {
+                "status": "success",
+                "code": "SELECT 1",
+                "dataset_id": "ds-1",
+                "metadata": {"duration": 1.0, "attempts": 0},
+            }
+        ],
+    }
+
+    reloaded = AnalystChatMessage.model_validate(legacy)
+
+    (component,) = reloaded.components
+    assert isinstance(component, RunAnalysisResult)
+    assert component.type == "analysis"
+    assert component.code == "SELECT 1"
+    assert component.dataset_id == "ds-1"

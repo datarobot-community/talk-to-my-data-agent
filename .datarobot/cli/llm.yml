@@ -74,7 +74,7 @@ nim_deployed_llm:
   - env: LLM_DEFAULT_MODEL
     type: string
     optional: false
-    help: "Enter the model your NIM deployment serves (e.g., meta-llama/Llama-3.1-8B). Stored datarobot/-prefixed automatically."
+    help: "Enter the model your NIM deployment serves (e.g., meta-llama/Llama-3.1-8B). The template will automatically prepend /datarobot/."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
@@ -98,9 +98,8 @@ registered_model:
 external_llm:
   - env: LLM_DEFAULT_MODEL
     type: string
-    default: "datarobot/azure/gpt-5-mini"
-    optional: true
-    help: "Enter the external LLM model in provider/model form (e.g., azure/gpt-5-mini, bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0). Stored datarobot/-prefixed automatically."
+    optional: false
+    help: "Enter the external LLM model in provider/model form (e.g., azure/gpt-5-mini, nebius/moonshotai/Kimi-K2.7-Code, bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0). The template will automatically prepend /datarobot/."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "amazon-anthropic-claude-sonnet-4-5-20250929-v1"
@@ -129,24 +128,34 @@ external_llm:
     optional: false
     options:
       - name: "Azure with OpenAI"
+        value: "OpenAI"
         requires: azure_openai
+      - name: "OpenAI-compatible (Nebius, Groq, xAI, DeepSeek, vLLM, ...)"
+        value: "OpenAICompatible"
+        requires: openai_compatible
       - name: "Google VertexAI"
+        value: "VertexAI"
         requires: vertexai
       - name: "Anthropic"
+        value: "Anthropic"
         requires: anthropic
       - name: "Bedrock"
+        value: "Bedrock"
         requires: bedrock
       - name: "Cohere"
+        value: "Cohere"
         requires: cohere
       - name: "TogetherAI"
+        value: "TogetherAI"
         requires: togetherai
     help: >
       Choose which external LLM provider to use.
-      Supported providers are: Azure OpenAI, AWS Bedrock, GCP VertexAI, Anthropic, Cohere, or TogetherAI.
+      Supported providers are: Azure OpenAI, any OpenAI-compatible endpoint (Nebius, Groq, xAI,
+      DeepSeek, self-hosted vLLM, ...), AWS Bedrock, GCP VertexAI, Anthropic, Cohere, or TogetherAI.
 
 azure_openai:
   - env: OPENAI_API_KEY
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the OpenAI API key."
   - env: OPENAI_API_BASE
@@ -162,13 +171,23 @@ azure_openai:
     optional: false
     help: "Enter the OpenAI API version (e.g., 2024-08-01-preview)."
 
+openai_compatible:
+  - env: OPENAI_API_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the provider API key."
+  - env: OPENAI_API_BASE
+    type: string
+    optional: false
+    help: "Enter the provider's OpenAI-compatible base URL (e.g., https://api.tokenfactory.us-central1.nebius.com/v1). Set LLM_DEFAULT_MODEL with the LiteLLM provider prefix, e.g., nebius/moonshotai/Kimi-K2.7-Code."
+
 bedrock:
   - env: AWS_ACCESS_KEY_ID
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the AWS access key ID for Bedrock."
   - env: AWS_SECRET_ACCESS_KEY
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the AWS secret access key for Bedrock."
   - env: AWS_REGION_NAME
@@ -176,7 +195,7 @@ bedrock:
     optional: false
     help: "Enter the AWS region name for Bedrock (e.g., us-east-1)."
   - env: AWS_SESSION_TOKEN
-    type: string
+    type: secret_string
     optional: true
     help: "Optional AWS session token for temporary Bedrock credentials."
 
@@ -196,18 +215,18 @@ vertexai:
 
 anthropic:
   - env: ANTHROPIC_API_KEY
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the API key for Anthropic."
 
 cohere:
   - env: COHERE_API_KEY
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the API key for Cohere."
 
 togetherai:
   - env: TOGETHERAI_API_KEY
-    type: string
+    type: secret_string
     optional: false
     help: "Enter the API key for TogetherAI."

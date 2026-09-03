@@ -16,6 +16,7 @@ Pytests for core/datarobot_dataset_helper.
 """
 
 import datetime
+import logging
 from dataclasses import dataclass
 from typing import Any, Generator, cast
 from unittest.mock import AsyncMock, Mock, patch
@@ -24,11 +25,17 @@ import datarobot
 import datarobot as dr
 import pytest
 from datarobot.enums import DataWranglingDialect, RecipeInputType, RecipeType
+from datarobot.models.data_source import DataSource
 from datarobot.models.data_store import DataStore
 from datarobot.models.dataset import Dataset
-from datarobot.models.recipe import Recipe, RecipeDatasetInput, RecipePreview
+from datarobot.models.recipe import (
+    JDBCTableDataSourceInput,
+    Recipe,
+    RecipeDatasetInput,
+    RecipePreview,
+)
 from datarobot.models.use_cases.use_case import UseCase
-from requests import HTTPError
+from requests import HTTPError, Timeout
 
 from core.analyst_db import UserRecipe
 from core.api_exceptions import ApplicationUsageException
@@ -446,12 +453,15 @@ async def test_preview_dataset(mocks: Mocks) -> None:
         stored_count=2,
         byte_size=10,
         estimated_size_exceeds_limit=False,
-        result_schema=cast(Any, [
-            {"name": "id", "dataType": "INT_TYPE"},
-            {"name": "double", "dataType": "DOUBLE_TYPE"},
-            {"name": "string", "dataType": "STRING_TYPE"},
-            {"name": "other", "dataType": "STRING_TYPE"},
-        ]),
+        result_schema=cast(
+            Any,
+            [
+                {"name": "id", "dataType": "INT_TYPE"},
+                {"name": "double", "dataType": "DOUBLE_TYPE"},
+                {"name": "string", "dataType": "STRING_TYPE"},
+                {"name": "other", "dataType": "STRING_TYPE"},
+            ],
+        ),
         data=[[1, 1.0, "1", "A"], [2, 2.0, "2", "B"]],
         next=None,
     )
@@ -485,12 +495,15 @@ async def test_preview_dataset__snake_case_data_type(mocks: Mocks) -> None:
         stored_count=2,
         byte_size=10,
         estimated_size_exceeds_limit=False,
-        result_schema=cast(Any, [
-            {"name": "id", "data_type": "INT_TYPE"},
-            {"name": "double", "dataType": "DOUBLE_TYPE"},
-            {"name": "string", "data_type": "STRING_TYPE"},
-            {"name": "other", "data_type": "STRING_TYPE"},
-        ]),
+        result_schema=cast(
+            Any,
+            [
+                {"name": "id", "data_type": "INT_TYPE"},
+                {"name": "double", "dataType": "DOUBLE_TYPE"},
+                {"name": "string", "data_type": "STRING_TYPE"},
+                {"name": "other", "data_type": "STRING_TYPE"},
+            ],
+        ),
         data=[[1, 1.0, "1", "A"], [2, 2.0, "2", "B"]],
         next=None,
     )
@@ -535,12 +548,15 @@ async def test_preview_dataset_retryable_error(mocks: Mocks) -> None:
                 stored_count=2,
                 byte_size=10,
                 estimated_size_exceeds_limit=False,
-                result_schema=cast(Any, [
-                    {"name": "id", "dataType": "INT_TYPE"},
-                    {"name": "double", "dataType": "DOUBLE_TYPE"},
-                    {"name": "string", "dataType": "STRING_TYPE"},
-                    {"name": "other", "dataType": "STRING_TYPE"},
-                ]),
+                result_schema=cast(
+                    Any,
+                    [
+                        {"name": "id", "dataType": "INT_TYPE"},
+                        {"name": "double", "dataType": "DOUBLE_TYPE"},
+                        {"name": "string", "dataType": "STRING_TYPE"},
+                        {"name": "other", "dataType": "STRING_TYPE"},
+                    ],
+                ),
                 data=[[1, "INVALID", "1", "A"], [2, "2.0", "2", "B"]],
                 next=None,
             )
@@ -618,6 +634,30 @@ def test_convert_preview_to_dataframe(
 ) -> None:
     data = DatasetSparkRecipe.convert_preview_to_dataframe(schema, rows)
     assert data.to_dict() == expected
+
+
+@pytest.mark.asyncio
+async def test_datarobot_operator_execute_query_preserves_empty_schema() -> None:
+    """execute_query returns the polars frame with columns intact even at 0 rows.
+    The former `df.to_dict()` dropped the schema for an empty result, producing a
+    0x0 frame downstream (APP-6778)."""
+    import polars as pl
+
+    from core.data_connections.datarobot.datarobot_dataset_handler import (
+        DataRobotOperator,
+    )
+    from core.schema import DataFrameWrapper
+
+    operator = DataRobotOperator(credentials=Mock(), recipe=Mock())
+    empty = pl.DataFrame(schema={"id": pl.Int64, "name": pl.String})
+    with patch.object(
+        operator, "_run_sql", AsyncMock(return_value=DataFrameWrapper(empty))
+    ):
+        frame = await operator.execute_query("SELECT * FROM t WHERE 1=0")
+
+    assert isinstance(frame, pl.DataFrame)
+    assert frame.columns == ["id", "name"]
+    assert frame.height == 0
 
 
 def test_find_underlying_client_message_from_client_error_direct() -> None:
@@ -1096,3 +1136,153 @@ async def test_verify_sql_recipe_retrieve_preview_builds_response(
     assert connection.dataset_name == dataset_identifier
     assert run_preview_mock.call_args.args[1] == dataset_identifier
     assert run_preview_mock.call_args.args[2] == recipe.MAX_ROWS
+
+
+# --- APP-6806: best-effort cleanup loop in select_data_sources -------------
+
+CLEANUP_WARNING = "Failed to delete orphaned data source during cleanup."
+
+
+def _build_recipe_with_jdbc_inputs(
+    mocks: Mocks,
+    data_store_id: str = "ds1",
+    data_source_ids: tuple[str, ...] = ("dsrc1",),
+) -> DataSourceRecipe:
+    """Build a DataSourceRecipe whose recipe carries real JDBC inputs.
+
+    Each input's ``data_store_id`` matches the store id so the ``data_store_id``
+    guard at the top of ``select_data_sources`` passes and execution reaches the
+    best-effort cleanup loop.
+    """
+    data_store = ExternalDataStore(
+        id=data_store_id,
+        canonical_name="TestStore",
+        driver_class_type="postgres",
+        defined_data_sources=[],
+    )
+    mocks.recipe.id = "recipe1"
+    mocks.recipe.inputs = [
+        JDBCTableDataSourceInput(
+            input_type=RecipeInputType.DATASOURCE,
+            data_source_id=data_source_id,
+            data_store_id=data_store_id,
+        )
+        for data_source_id in data_source_ids
+    ]
+    return DataSourceRecipe(
+        analyst_db=mocks.analyst_db,
+        recipe=mocks.recipe,
+        data_store=data_store,
+    )
+
+
+def _path_aware_delete(error: Exception | None) -> Mock:
+    """A ``dr_client.delete`` mock that fails only on data-source deletes.
+
+    The recipe delete (``recipes/…``) and the cleanup loop
+    (``externalDataSources/…``) share ``dr_client.delete``. To exercise the
+    cleanup loop alone we succeed on the recipe path and raise ``error`` only on
+    the data-source path.
+    """
+
+    def _side_effect(path: str, *args: Any, **kwargs: Any) -> Mock:
+        if error is not None and DataSource._path in path:
+            raise error
+        return Mock()
+
+    return Mock(side_effect=_side_effect)
+
+
+@pytest.mark.asyncio
+async def test_select_data_sources_cleanup_success(mocks: Mocks) -> None:
+    """A successful cleanup delete must not raise and must reach ``refresh()``.
+
+    Regression for APP-6806: the old ``else: raise`` hung off the ``try`` and
+    fired on every successful delete (``RuntimeError: No active exception``).
+    """
+    recipe = _build_recipe_with_jdbc_inputs(mocks, data_source_ids=("dsrc1",))
+    mocks.dr_client.delete = _path_aware_delete(None)
+    data_sources = [
+        ExternalDataSource.from_path(path="db.schema.t1", data_store_id="ds1")
+    ]
+
+    with patch.object(
+        DataSourceRecipe, "refresh", new_callable=AsyncMock
+    ) as refresh_mock:
+        await recipe.select_data_sources(data_sources)
+
+    mocks.dr_client.delete.assert_any_call("recipes/recipe1/")
+    mocks.dr_client.delete.assert_any_call("externalDataSources/dsrc1/")
+    refresh_mock.assert_awaited_once()
+    # No raise -> @default_retry does not replay the method. (The old bug raised
+    # RuntimeError on success and only "passed" because retry re-ran with an
+    # already-cleared recipe, awaiting register_data_store a second time.)
+    mocks.analyst_db.register_data_store.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        dr.errors.ClientError("gone", status_code=404, json={}),
+        dr.errors.ServerError("boom", status_code=500, json={}),
+        Timeout("network timeout"),
+    ],
+    ids=["4xx", "5xx", "transport"],
+)
+@pytest.mark.asyncio
+async def test_select_data_sources_cleanup_delete_failure_is_logged(
+    mocks: Mocks, error: Exception, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A cleanup-delete failure is logged and never propagates.
+
+    Covers both halves of the ``(AppPlatformError, RequestException)`` catch:
+    the datarobot client raises ``ClientError``/``ServerError`` (both
+    ``AppPlatformError``) on 4xx/5xx — which the old ``except HTTPError`` never
+    caught — and transport faults surface as ``requests`` errors (``Timeout``).
+    """
+    recipe = _build_recipe_with_jdbc_inputs(mocks, data_source_ids=("dsrc1",))
+    mocks.dr_client.delete = _path_aware_delete(error)
+    data_sources = [
+        ExternalDataSource.from_path(path="db.schema.t1", data_store_id="ds1")
+    ]
+
+    with (
+        patch.object(
+            DataSourceRecipe, "refresh", new_callable=AsyncMock
+        ) as refresh_mock,
+        caplog.at_level(logging.WARNING),
+    ):
+        await recipe.select_data_sources(data_sources)
+
+    refresh_mock.assert_awaited_once()
+    warnings = [r for r in caplog.records if r.msg == CLEANUP_WARNING]
+    assert len(warnings) == 1
+    assert getattr(warnings[0], "data_source_id") == "dsrc1"
+
+
+@pytest.mark.asyncio
+async def test_select_data_sources_cleanup_continues_past_failure(
+    mocks: Mocks, caplog: pytest.LogCaptureFixture
+) -> None:
+    """One failing cleanup delete must not abort the rest, and ``refresh()``
+    still runs — proving the loop is genuinely best-effort."""
+    recipe = _build_recipe_with_jdbc_inputs(mocks, data_source_ids=("dsrc1", "dsrc2"))
+    error = dr.errors.ServerError("boom", status_code=500, json={})
+    mocks.dr_client.delete = _path_aware_delete(error)
+    data_sources = [
+        ExternalDataSource.from_path(path="db.schema.t1", data_store_id="ds1")
+    ]
+
+    with (
+        patch.object(
+            DataSourceRecipe, "refresh", new_callable=AsyncMock
+        ) as refresh_mock,
+        caplog.at_level(logging.WARNING),
+    ):
+        await recipe.select_data_sources(data_sources)
+
+    mocks.dr_client.delete.assert_any_call("externalDataSources/dsrc1/")
+    mocks.dr_client.delete.assert_any_call("externalDataSources/dsrc2/")
+    refresh_mock.assert_awaited_once()
+    warnings = [r for r in caplog.records if r.msg == CLEANUP_WARNING]
+    assert {getattr(r, "data_source_id") for r in warnings} == {"dsrc1", "dsrc2"}

@@ -4,10 +4,16 @@ import { getDatabaseTables, loadFromDatabase } from './api-requests';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
 
-export const useGetDatabaseTables = () => {
+export const useGetDatabaseTables = (enabled = true) => {
   const queryResult = useQuery({
     queryKey: databaseKeys.all,
     queryFn: ({ signal }) => getDatabaseTables({ signal }),
+    enabled,
+    // Surface an outage on the first attempt rather than retrying a down database.
+    retry: false,
+    // An errored query is stale, so window refocus would otherwise re-ping a
+    // down database on every focus while the modal is open.
+    refetchOnWindowFocus: false,
   });
 
   return queryResult;

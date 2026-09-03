@@ -118,4 +118,36 @@ describe('getResponseMessage', () => {
 
     expect(result).toEqual(messages[1]);
   });
+
+  test('returns undefined for an unpaired user message followed by a later exchange', () => {
+    // A failed question can be persisted with no assistant reply of its own (APP-6805);
+    // its response must not be the NEXT question's answer.
+    const messages: IChatMessage[] = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Failed question',
+        components: [],
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'user-2',
+        role: 'user',
+        content: 'Next question',
+        components: [],
+        created_at: '2024-01-01T00:01:00Z',
+      },
+      {
+        id: 'assistant-2',
+        role: 'assistant',
+        content: 'Answer to next question',
+        components: [],
+        created_at: '2024-01-01T00:02:00Z',
+      },
+    ];
+
+    // user-1 is unpaired; user-2 still pairs with its own answer.
+    expect(getResponseMessage(messages, 'user-1')).toBeUndefined();
+    expect(getResponseMessage(messages, 'user-2')).toEqual(messages[2]);
+  });
 });

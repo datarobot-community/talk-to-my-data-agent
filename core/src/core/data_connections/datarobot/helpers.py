@@ -17,7 +17,9 @@ import logging
 from contextlib import contextmanager
 from typing import Callable, Generator, ParamSpec, TypeVar, cast
 
+import requests
 from datarobot.errors import (
+    AppPlatformError,
     AsyncProcessUnsuccessfulError,
     AsyncTimeoutError,
     ClientError,
@@ -106,6 +108,74 @@ def retryable_recipe_preview_exception(exc: BaseException) -> bool:
     )
 
 
+def _http_status(exc: BaseException) -> int | None:
+    """Best-effort HTTP status from a DataRobot ClientError/ServerError or a requests
+    HTTPError. ClientError (4xx) and ServerError (5xx) share the AppPlatformError base
+    and both carry ``status_code``, so one check covers both."""
+    if isinstance(exc, AppPlatformError):
+        return getattr(exc, "status_code", None)
+    if isinstance(exc, HTTPError) and exc.response is not None:
+        return exc.response.status_code
+    return None
+
+
+def _walk_causes(exc: BaseException) -> Generator[BaseException, None, None]:
+    """Yield the exception and its explicit ``__cause__`` chain.
+
+    Only ``__cause__`` (set by ``raise ... from e``, which the DataRobot handlers use)
+    is followed — not the implicit ``__context__`` — so an unrelated exception that
+    merely happened to be in flight when the real error was raised cannot flip the
+    classification (e.g. a bad-SQL 400 carrying a stale ConnectionError in its context).
+    """
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        yield current
+        current = current.__cause__
+
+
+TIMEOUT_MESSAGE = (
+    "The query exceeded the time limit — it is too expensive. Rewrite it to do less "
+    "work: add filters to the WHERE clause, add a LIMIT, pre-aggregate, or avoid cross joins."
+)
+OUTAGE_MESSAGE = "The database is unavailable or refused the request."
+
+
+def classify_db_failure(exc: BaseException | None) -> str | None:
+    """Return a user-facing reason when a database failure is one that regenerating
+    SQL cannot fix (a timeout, an outage, a rate limit, or an auth error), else None
+    to keep it as ordinary retryable bad SQL.
+
+    Walks the explicit __cause__ chain (the DataRobot handlers raise `... from e`, and
+    the recipe path wraps in RecipeError) and unwraps requests.HTTPError, so a wrapped
+    transport error is still classified. Only __cause__ is followed — not the implicit
+    __context__ — so an unrelated error merely in flight cannot flip the result.
+
+    The monolith flattens *connector-level* gRPC failures into HTTP status
+    (DEADLINE_EXCEEDED->408, RESOURCE_EXHAUSTED->429, PERMISSION_DENIED->403, everything
+    else including INTERNAL/UNAVAILABLE->400), so a mid-query connector outage arriving as
+    400 is indistinguishable from bad SQL and stays retryable. A gateway/platform 5xx
+    (502/503/504, raised as a datarobot ServerError) is a genuine outage and IS classified.
+    """
+    if exc is None:
+        return None
+    for e in _walk_causes(exc):
+        status = _http_status(e)
+        if isinstance(e, (requests.ReadTimeout, AsyncTimeoutError)) or status == 408:
+            return TIMEOUT_MESSAGE
+        if (
+            isinstance(e, requests.ConnectionError)
+            or status in (401, 403, 429)
+            or (status is not None and status >= 500)
+        ):
+            return OUTAGE_MESSAGE
+        # Generic timeout that isn't a connection failure.
+        if isinstance(e, requests.Timeout):
+            return TIMEOUT_MESSAGE
+    return None
+
+
 def _handle_403_client_error(client_error: ClientError) -> None:
     """
     Handle 403 ClientError, raising ApplicationUsageException for seat license restrictions.
@@ -123,10 +193,12 @@ def _handle_403_client_error(client_error: ClientError) -> None:
         else str(client_error)
     )
     if "seat license" in error_message.lower():
+        # Chain the 403 so classify_db_failure's __cause__ walk sees it and fails fast
+        # (outage) instead of regenerating SQL 7x against an entitlement error (APP-6770).
         raise ApplicationUsageException(
             UsageExceptionType.USER_ACCESS_DENIED,
             "Feature unavailable due to seat license restrictions. Please contact your DataRobot administrator.",
-        )
+        ) from client_error
     else:
         raise client_error
 

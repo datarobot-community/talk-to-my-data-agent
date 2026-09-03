@@ -63,6 +63,27 @@ class InvalidGeneratedCode(Exception):
         return "\n".join(parts)
 
 
+class DatabaseFailure(Exception):
+    """Raised when a database query fails for a reason regenerating SQL cannot fix:
+    a timeout (the query is too expensive), an outage, a rate limit, or an auth error.
+
+    Deliberately NOT an InvalidGeneratedCode subclass: the reflection loop only
+    retries InvalidGeneratedCode, so this propagates straight out instead of
+    re-running the query up to 7x against a database that cannot serve it. Its
+    message is the user-facing reason (see classify_db_failure).
+    """
+
+    def __init__(
+        self,
+        *args: Any,
+        code: str | None = None,
+        exception: Exception | None = None,
+    ):
+        super().__init__(*args)
+        self.code = code
+        self.exception = exception
+
+
 class MaxReflectionAttempts(Exception):
     """Raised after final attempt to self-correct LLM code generation"""
 

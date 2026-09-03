@@ -30,7 +30,7 @@ root:
     options:
       - name: None
         value: no_database
-      - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery / Databricks)
+      - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery / Databricks / Redshift)
         value: datarobot_jdbc
         requires: jdbc_config
   - env: OTEL_SDK_DISABLED
@@ -38,6 +38,11 @@ root:
     default: ""
     optional: true
     help: "Set to 'true' to disable all OpenTelemetry tracing. Leave empty to keep tracing enabled."
+  - env: PYTHONUTF8
+    type: string
+    default: "1"
+    optional: true
+    help: "Set to '1' to enable Python's UTF-8 mode. Needed on Windows, where the system locale encoding is not UTF-8."
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"

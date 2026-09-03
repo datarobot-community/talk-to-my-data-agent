@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- The `session_fastapi` cookie is no longer issued or read. It held
+  `base64(uuid5(NAMESPACE_OID, <email>))` — unsigned, and computable from a victim's email
+  address alone — and the decoded value was taken as the user's identity ahead of the
+  `x-user-email` header, so a forged cookie reached another user's chats, datasets and
+  dictionaries. Sessions are now keyed by the identity derived from the request itself. A
+  stale cookie left in a browser is ignored; no user data moves.
+- User identity is now derived from the *last* `x-user-email` header value rather than the
+  first. The upstream proxy appends the authenticated address instead of replacing the
+  header, so a client-supplied value arrived first and was the one read. Two requests that
+  previously resolved to an identity no longer do: one whose authenticated value is empty
+  (an account with no address, where the injected value used to win outright), and one
+  carrying a comma-joined value, which means some hop folded the field-lines together and
+  the last value can no longer be attributed to the proxy. Both are answered with a 400.
+  Note this holds while requests reach the application through that proxy; one that bypasses
+  it carries a single client-supplied value and no authentication of any kind.
+- An uploaded file's name was interpolated into DuckDB statements as a raw table identifier,
+  so a crafted filename (or Excel sheet name) could break out of the identifier and run
+  arbitrary DuckDB SQL in the app's process — including reading another user's database file
+  in the shared temp directory. Table identifiers are now quoted and escaped at every sink,
+  and dataset names that contain control characters or collide with an internal control
+  table are rejected before a table is created.
+
+### Changed
+
+- `TEST_USER_EMAIL` now applies only when no `x-user-email` header arrived at all, so a
+  rejected header no longer falls back to the local developer's identity. Affects local
+  development only — the variable cannot be set on a deployed instance.
+- `SessionState.update()` was removed; it had no callers left. Forks that call it should use
+  the constructor, which takes the same dict.
+
+## [11.12.0] - 2026-09-03
+
+### Added
+
+- Added Redshift support via the JDBC Preview API.
+
+### Fixed
+
+- Fixed empty query result producing three user-visible failures.
+- Fixed data source clearing failing on every successful delete.
+- Fixed SQL injection via uploaded filename.
+- Fixed database outage surfaced as "no tables found".
+- Fixed deploy shipping an image with no frontend build.
+
+### Changed
+
+- Bounded LLM query amplification; removed decorative timeout parameters; added read-only guard on database connections.
+
+### Security
+
+- Fixed forged session cookie allowing access to another user's chats and data.
+- Fixed user identity being derived from a client-supplied header value instead of the proxy-appended one.
+- Fixed SQL injection via uploaded filename interpolated into DuckDB statements.
+- Removed wildcard CORS that reflected any origin with credentials.
+
 ## [11.11.0] - 2026-08-07
 
 ### Added

@@ -40,15 +40,15 @@ from core.schema import (
     RunChartsResult,
 )
 from core.telemetry import otel
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from starlette.datastructures import Headers
 
 import app.deps as app_deps
 from app.middleware import (
     SessionState,
     _initialize_session,
-    _set_session_cookie,
 )
 from app.rest_api import create_app
 from app.routers.chats import delete_chat_message
@@ -83,7 +83,9 @@ def mock_request() -> MagicMockType:
     request = MagicMock(spec=Request)
     request.state = MagicMock()
     request.cookies = {}
-    request.headers = {}
+    # Headers, not {}: `_initialize_session` reads the LAST `x-user-email` via
+    # `getlist`, which a plain dict does not implement.
+    request.headers = Headers()
     request.method = "GET"
     return request
 
@@ -95,15 +97,34 @@ def clean_environ(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None
 
 
 @pytest.mark.usefixtures("clean_environ")
+def test_cors_headers_not_returned_for_foreign_origin(
+    test_client: TestClient,
+) -> None:
+    """A cross-site request must not come back CORS-approved (APP-6842).
+
+    The app is same-origin in every deployment, so it registers no CORS
+    middleware. Assert the response carries no `access-control-allow-origin` at
+    all -- not merely that it isn't paired with credentials: the weaker check
+    would stay green if `CORSMiddleware(allow_origins=["*"], ...)` were ever
+    re-added with `allow_credentials=False`, which still echoes a permissive
+    origin. Any path works (this one 404s); only the CORS headers are asserted.
+    """
+    response = test_client.get(
+        "/api/v1/does-not-exist",
+        headers={"Origin": "https://evil.example.com", "Cookie": "sess=stolen"},
+    )
+
+    assert "access-control-allow-origin" not in response.headers
+    assert "access-control-allow-credentials" not in response.headers
+
+
+@pytest.mark.usefixtures("clean_environ")
 def test_initialize_session_default_values(mock_request: MagicMockType) -> None:
     """Test that _initialize_session creates a new session with default values"""
 
     async def run_test() -> None:
-        session_state, session_id, user_id, user_email = await _initialize_session(
-            mock_request
-        )
+        session_state, user_id, user_email = await _initialize_session(mock_request)
         assert session_state is not None
-        assert session_id is None
         assert user_id is None
         assert user_email is None
         assert session_state._state["datarobot_account_info"] is None
@@ -113,45 +134,6 @@ def test_initialize_session_default_values(mock_request: MagicMockType) -> None:
     import asyncio
 
     asyncio.run(run_test())
-
-
-@pytest.mark.usefixtures("clean_environ")
-def test_set_session_cookie() -> None:
-    """Test that _set_session_cookie sets cookies correctly"""
-    response = Response()
-    user_id = "test_user_id"
-    session_id = "test_session_id"
-
-    # Test when user_id exists but no cookie
-    _set_session_cookie(response, user_id, session_id, None)
-
-    # The cookie should be set with base64 encoded user_id
-    cookies = [
-        header for header in response.raw_headers if header[0].decode() == "set-cookie"
-    ]
-    assert cookies, "No set-cookie header found"
-    assert "session_fastapi" in cookies[0][1].decode()
-
-    # Test when neither user_id nor cookie exists
-    response = Response()
-    _set_session_cookie(response, None, session_id, None)
-
-    # The cookie should be set with session_id
-    cookies = [
-        header for header in response.raw_headers if header[0].decode() == "set-cookie"
-    ]
-    assert cookies, "No set-cookie header found"
-    assert "session_fastapi" in cookies[0][1].decode()
-
-    # Test when cookie already exists
-    response = Response()
-    _set_session_cookie(response, user_id, session_id, "existing_cookie")
-
-    # No cookie should be set
-    cookies = [
-        header for header in response.raw_headers if header[0].decode() == "set-cookie"
-    ]
-    assert not cookies, "Cookie was set when it shouldn't have been"
 
 
 def test_trace_excludes_initialize_session_span(
@@ -680,6 +662,70 @@ async def test_save_single_message_to_xlsx(mock_analyst_db_creation: None) -> No
     assert report_sheet["A1"].value == "Analysis Report"
     assert report_sheet["A4"].value == "Second question"  # User question
     assert report_sheet["A7"].value == "Second answer"  # Assistant answer
+
+
+@pytest.mark.usefixtures("clean_environ")
+@pytest.mark.asyncio
+async def test_save_unpaired_user_message_to_xlsx(
+    mock_analyst_db_creation: None,
+) -> None:
+    """APP-6805: exporting an unpaired user question must not borrow the NEXT
+    exchange's answer, and must not 500 on the resulting user-only workbook."""
+    user_name = "data_analyst_app_user@datarobot.com"
+
+    # msg1 has no answer of its own; msg2/msg3 are a later, complete exchange.
+    chat_history = [
+        AnalystChatMessage(
+            id="msg1",
+            role="user",
+            content="Failed question",
+            components=[],
+            in_progress=False,
+        ),
+        AnalystChatMessage(
+            id="msg2",
+            role="user",
+            content="Next question",
+            components=[],
+            in_progress=False,
+        ),
+        AnalystChatMessage(
+            id="msg3",
+            role="assistant",
+            content="Answer to next question",
+            components=[],
+            in_progress=False,
+        ),
+    ]
+
+    mock_analyst_db = AsyncMock()
+    mock_analyst_db.get_chat_messages = AsyncMock(return_value=chat_history)
+    app = create_app()
+    app.dependency_overrides[app_deps.get_initialized_db] = lambda: mock_analyst_db
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/v1/chats/chat_123/messages/download/?message_id=msg1",
+        headers={
+            "Authorization": "Bearer test_token_123",
+            "x-user-email": user_name,
+        },
+    )
+
+    # Must succeed with a question-only report, not 500 on a zero-sheet workbook.
+    assert response.status_code == 200
+
+    wb = load_workbook(filename=io.BytesIO(response.content), read_only=True)
+    report_sheet = wb["Sheet"]
+    assert report_sheet["A4"].value == "Failed question"  # its own question
+    # The later exchange's answer must NOT appear anywhere in the export.
+    exported_values = {
+        cell.value
+        for sheet in wb.worksheets
+        for row in sheet.iter_rows()
+        for cell in row
+    }
+    assert "Answer to next question" not in exported_values
 
 
 @pytest.mark.usefixtures("clean_environ")

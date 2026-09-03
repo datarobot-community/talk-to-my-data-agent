@@ -23,7 +23,7 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
   if (!errors || errors.length === 0) return null;
   return (
     <>
-      {attempts && (
+      {!!attempts && (
         <h2 className="mb-2">
           {t('Failed to generate valid code after {{attempts}} attempts', { attempts })}
         </h2>

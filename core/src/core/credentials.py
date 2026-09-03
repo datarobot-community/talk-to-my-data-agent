@@ -35,6 +35,8 @@ _VALID_JDBC_PREFIXES = (
     "jdbc:sap://",
     "jdbc:bigquery://",
     "jdbc:databricks://",
+    "jdbc:redshift://",
+    "jdbc:redshift:iam://",
 )
 
 

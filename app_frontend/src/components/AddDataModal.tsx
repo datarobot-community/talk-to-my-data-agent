@@ -40,7 +40,11 @@ export const AddDataModal = ({
   const { data, isLoading: isLoadingDatasets, error: datasetRegistryError } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
-  const { data: dbTables } = useGetDatabaseTables();
+  const {
+    data: dbTables,
+    isError: isDbTablesError,
+    isFetching: isDbTablesFetching,
+  } = useGetDatabaseTables(open);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedDataStoreId, setSelectedDataStoreId] = useState<string | null>(null);
   const [selectedExternalDataSources, setSelectedExternalDataSources] = useState<string[]>([]);
@@ -89,13 +93,16 @@ export const AddDataModal = ({
   }, [selectedDataStoreId, availableDataStores]);
 
   const hasSelections = useMemo(() => {
-    if (dataSource === DATA_SOURCES.DATABASE) return selectedTables.length > 0;
+    if (dataSource === DATA_SOURCES.DATABASE)
+      return selectedTables.length > 0 && !isDbTablesError && !isDbTablesFetching;
     if (dataSource === NEW_DATA_STORE)
       return selectedAvailableDataStore != null && selectedExternalDataSources.length > 0;
     return files.length > 0 || selectedDatasets.length > 0;
   }, [
     dataSource,
     selectedTables,
+    isDbTablesError,
+    isDbTablesFetching,
     selectedAvailableDataStore,
     selectedExternalDataSources,
     files,
@@ -105,6 +112,7 @@ export const AddDataModal = ({
   // Reset selections when modal is opened/closed.
   useEffect(() => {
     setSelectedDatasets([]);
+    setSelectedTables([]);
     setSelectedDataStoreId(null);
     setSelectedExternalDataSources([]);
   }, [open]);
@@ -246,8 +254,9 @@ export const AddDataModal = ({
           <>
             <p className="body-secondary">{t('Select one or more tables')}</p>
             <MultiSelect
+              isLoading={isDbTablesFetching}
               options={
-                dbTables
+                dbTables && !isDbTablesError && !isDbTablesFetching
                   ? dbTables.map(i => ({
                       label: i,
                       value: i,
@@ -263,6 +272,11 @@ export const AddDataModal = ({
               animation={2}
               maxCount={3}
             />
+            {isDbTablesError && (
+              <Alert variant="destructive">
+                <AlertDescription>{t('Could not load the list of tables.')}</AlertDescription>
+              </Alert>
+            )}
           </>
         )}
 

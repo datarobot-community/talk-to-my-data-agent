@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Generic, TypeVar
 
+import polars as pl
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
 )
@@ -47,7 +48,7 @@ WARMUP_RECHECK_INTERVAL_SECONDS = 30 * 60
 
 class DatabaseOperator(ABC, Generic[T]):
     @abstractmethod
-    def __init__(self, credentials: T, default_timeout: int): ...
+    def __init__(self, credentials: T): ...
 
     @abstractmethod
     @asynccontextmanager
@@ -73,7 +74,7 @@ class DatabaseOperator(ABC, Generic[T]):
     @abstractmethod
     async def execute_query(
         self, query: str, timeout: int | None = None
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]: ...
+    ) -> pl.DataFrame: ...
 
     @abstractmethod
     async def get_tables(self, timeout: int | None = None) -> list[str]:
@@ -115,8 +116,8 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
         self,
         query: str,
         timeout: int | None = 300,
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
-        return []
+    ) -> pl.DataFrame:
+        return pl.DataFrame()
 
     async def get_tables(self, timeout: int | None = 300) -> list[str]:
         return []

@@ -46,7 +46,10 @@ async def extract_and_store_datasets(
 
     for component in modified_message.components:
         if isinstance(component, (RunAnalysisResult, RunDatabaseAnalysisResult)):
-            if component.dataset is not None:
+            # Skip an empty (0-column) result: register_dataframe would raise on
+            # it, and minting a dataset_id for a table that is never created
+            # yields a phantom 404 on read (APP-6778).
+            if component.dataset is not None and component.dataset.to_df().width:
                 # Generate unique dataset_id
                 dataset_id = str(uuid.uuid4())
 

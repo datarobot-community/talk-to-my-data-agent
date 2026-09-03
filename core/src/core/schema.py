@@ -48,7 +48,7 @@ from pydantic import (
 )
 from typing_extensions import Self, TypedDict
 
-from .code_execution import MaxReflectionAttempts
+from .code_execution import DatabaseFailure, MaxReflectionAttempts
 
 
 class SanitizedJsonModel(BaseModel):
@@ -521,6 +521,27 @@ class AnalysisError(BaseModel):
         )
 
     @classmethod
+    def from_database_failure(
+        cls,
+        exception: DatabaseFailure,
+    ) -> "AnalysisError":
+        # Fail-fast path: no reflection history, so carry the generated SQL and the
+        # user-facing reason (classify_db_failure always sets a non-empty message) to
+        # the UI, else it would show nothing.
+        message = str(exception)
+        return AnalysisError(
+            exception_history=[
+                CodeExecutionError(
+                    exception_str=message,
+                    traceback_str=None,
+                    code=exception.code,
+                    stdout=None,
+                    stderr=message,
+                )
+            ],
+        )
+
+    @classmethod
     def from_value_error(
         cls,
         exception: ValueError,
@@ -547,6 +568,7 @@ class CodeExecutionError(BaseModel):
 
 
 class RunDatabaseAnalysisResult(BaseModel):
+    type: Literal["database"] = "database"
     status: Literal["success", "error"]
     metadata: RunDatabaseAnalysisResultMetadata
     dataset: AnalystDataset | None = Field(

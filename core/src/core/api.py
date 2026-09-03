@@ -86,7 +86,11 @@ from core.data_connections.datarobot.datarobot_dataset_handler import (
     DataSourceRecipe,
     load_or_create_spark_recipe,
 )
-from core.data_connections.datarobot.helpers import handle_datarobot_error
+from core.data_connections.datarobot.helpers import (
+    classify_db_failure,
+    handle_datarobot_error,
+)
+from core.data_connections.read_only import validate_read_only
 from core.datarobot_client import use_user_token
 from core.llm_client import AsyncLLMClient
 
@@ -101,6 +105,7 @@ from core.analyst_db import (
     get_data_source_type,
 )
 from core.code_execution import (
+    DatabaseFailure,
     InvalidGeneratedCode,
     MaxReflectionAttempts,
     execute_python,
@@ -1752,21 +1757,39 @@ async def _run_database_analysis(
         next(iter(exception_history[::-1]), None),
         analysis_context.token_tracker,
     )
-    try:
-        if analysis_context.assistant_message and analysis_context.assistant_message_id:
-            analysis_context.assistant_message.step_value = "RUNNING_QUERY"
-            analysis_context.assistant_message.step_reattempt = (
-                len(exception_history) if exception_history else 0
-            )
-            analysis_context.stage_message_update()
+    # Best-effort read-only gate (APP-6770): reject obvious writes/DDL before the query
+    # reaches the database. Raised as retryable InvalidGeneratedCode so the loop can
+    # re-prompt the LLM; placed before the try so it does not hit classify_db_failure.
+    validate_read_only(sql_code)
 
+    if analysis_context.assistant_message and analysis_context.assistant_message_id:
+        analysis_context.assistant_message.step_value = "RUNNING_QUERY"
+        analysis_context.assistant_message.step_reattempt = (
+            len(exception_history) if exception_history else 0
+        )
+        analysis_context.stage_message_update()
+
+    # Only the query itself is classified — the status-update above is a platform call,
+    # not a DB query, so keeping it outside the try avoids misreporting it as a DB failure.
+    try:
         results = await database.execute_query(query=sql_code)
-        results = cast(list[dict[str, Any]], results)
         duration = datetime.now() - start_time
 
-    except InvalidGeneratedCode:
+    except InvalidGeneratedCode as exc:
+        # Both operators wrap the original error on `.exception`; classify it once
+        # here (walks the cause chain) rather than inside each operator. A failure
+        # regenerating SQL cannot fix (timeout/outage/rate-limit/auth) becomes a
+        # DatabaseFailure, which escapes the reflection loop instead of re-running.
+        reason = classify_db_failure(exc.exception)
+        if reason is not None:
+            raise DatabaseFailure(
+                reason, code=sql_code, exception=exc.exception
+            ) from exc
         raise
     except Exception as e:
+        reason = classify_db_failure(e)
+        if reason is not None:
+            raise DatabaseFailure(reason, code=sql_code, exception=e) from e
         raise InvalidGeneratedCode(code=sql_code, exception=e)
     return RunDatabaseAnalysisResult(
         status="success",
@@ -1793,6 +1816,20 @@ async def run_database_analysis(
     try:
         return await _run_database_analysis(
             request, analysis_context=analysis_context, exception_history=[]
+        )
+    except DatabaseFailure as e:
+        # Fail fast: the query timed out or the database is down / rate-limited /
+        # auth-denied. Regenerating SQL cannot help, so surface a clean error carrying
+        # the generated SQL and the user-facing reason. attempts=0 (not 1): this was not
+        # a code-generation failure, so the UI must not render the "failed to generate
+        # valid code after N attempts" heading (ErrorPanel hides it when attempts is 0).
+        return RunDatabaseAnalysisResult(
+            status="error",
+            metadata=RunDatabaseAnalysisResultMetadata(
+                duration=0,
+                attempts=0,
+                exception=AnalysisError.from_database_failure(e),
+            ),
         )
     except MaxReflectionAttempts as e:
         return RunDatabaseAnalysisResult(
@@ -2214,10 +2251,13 @@ async def run_complete_analysis(
 
         return
 
-    # Only proceed with additional analysis if we have valid initial results
+    # Only proceed with additional analysis if we have valid initial results.
+    # An empty AnalystDataset is truthy, so also require rows: charts/insights on
+    # a 0-row result waste an LLM call and can error out (APP-6778).
     if not (
         analysis_result
         and analysis_result.dataset
+        and analysis_result.dataset.to_df().height > 0
         and (enable_chart_generation or enable_business_insights)
     ):
         analysis_context.assistant_message.in_progress = False

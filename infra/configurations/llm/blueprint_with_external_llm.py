@@ -23,22 +23,19 @@ import os
 import datarobot as dr
 import pulumi
 import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.common.feature_flags import check_feature_flag_set
+from datarobot_pulumi_utils.common.llm_validation import verify_llm
 from datarobot_pulumi_utils.pulumi import export
+from datarobot_pulumi_utils.pulumi.llm_credentials import get_runtime_values
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
+from datarobot_pulumi_utils.schema.llms import ensure_datarobot_prefix
 
 from . import use_case
-from .libllm import (
-    ensure_datarobot_prefix,
-    get_blueprint_runtime_parameters,
-    get_runtime_values,
-    validate_feature_flags,
-    verify_llm,
-)
 
 __all__ = [
-    "custom_model_runtime_parameters",
     "app_runtime_parameters",
+    "custom_model_runtime_parameters",
     "default_model",
     "llm_application_name",
     "llm_resource_name",
@@ -66,8 +63,13 @@ default_llm_friendly_name: str = os.environ.get(
 )
 default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 
-validate_feature_flags(REQUIRED_FEATURE_FLAGS)
-llm_credential_runtime_params = get_runtime_values(default_llm_id)
+check_feature_flag_set(REQUIRED_FEATURE_FLAGS)
+# get_runtime_values() must run before verify_llm() below: it hydrates this provider's
+# credential env vars (e.g. cross-populating AZURE_API_KEY from OPENAI_API_KEY) as a side
+# effect, and verify_llm() relies on that hydration having already happened.
+llm_credential_runtime_params = get_runtime_values(
+    default_llm_id, resource_suffix=llm_resource_name
+)
 # Smoke-test the external provider directly (before the DataRobot deployment exists) using the
 # credentials in the environment. verify_llm() strips the datarobot/ prefix so LiteLLM addresses
 # the provider directly. See https://docs.litellm.ai/docs/providers for the model string each
@@ -95,11 +97,6 @@ llm_blueprint = datarobot.LlmBlueprint(
     ),
 )
 
-# Supply the FULL runtime parameter set explicitly. Passing a partial set (e.g. only the
-# credentials) makes the provider drop every blueprint default that isn't restated, including
-# DRUM system parameters such as DEVICE_FOR_NEURAL_NETWORK_COMPUTATIONS that the model requires
-# to load. Restating the full blueprint/DRUM default set alongside the credentials keeps the
-# model healthy and also repairs models that a previous partial submission had already wiped.
 llm_custom_model = datarobot.CustomModel(
     resource_name="LLM Custom Model " + llm_resource_name,
     name="LLM Custom Model " + llm_resource_name,
@@ -109,14 +106,7 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
-    runtime_parameter_values=[
-        *get_blueprint_runtime_parameters(
-            llm_blueprint_id=llm_blueprint.id,
-            playground_id=playground.id,
-            llm_id=default_llm_id,
-        ),
-        *llm_credential_runtime_params,
-    ],
+    runtime_parameter_values=llm_credential_runtime_params,
 )
 
 if prediction_environment_id := os.environ.get(

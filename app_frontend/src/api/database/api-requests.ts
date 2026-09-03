@@ -9,6 +9,9 @@ export const getDatabaseTables = async ({
 }): Promise<DatabaseTables> => {
   const { data } = await apiClient.get<DatabaseTables>(`/v1/database/tables`, {
     signal,
+    // A failed table discovery is surfaced to the user as an outage, so don't
+    // let the client hammer a down database — no axios-level retries here.
+    'axios-retry': { retries: 0 },
   });
   return data;
 };

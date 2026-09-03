@@ -46,7 +46,7 @@ from datarobot.enums import (
     RecipeInputType,
     RecipeType,
 )
-from datarobot.errors import ClientError
+from datarobot.errors import AppPlatformError, ClientError
 from datarobot.models.credential import Credential
 from datarobot.models.data_source import DataSource
 from datarobot.models.data_store import DataStore
@@ -62,7 +62,7 @@ from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
 )
 from packaging.version import Version
-from requests import HTTPError
+from requests import RequestException
 from tenacity import (
     after_log,
     retry,
@@ -292,14 +292,16 @@ class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
         timeout: int | None = None,
         table_names: list[str] = [],
         **kwargs: Any,
-    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
+    ) -> pl.DataFrame:
         """Execute a SQL query using DataRobot's Data Wrangling platform"""
 
         timeout = timeout if timeout is not None else self.default_timeout
 
         try:
+            # Return the frame directly: it carries the column schema even at
+            # 0 rows, which `.to_dict()` would discard for an empty result (APP-6778).
             df = await self._run_sql(query, timeout)
-            return df.to_dict()  # TODO: this is silly as cast gets undone.
+            return df.df
 
         except Exception as e:
             message = find_underlying_client_message(e)
@@ -1455,26 +1457,20 @@ class DataSourceRecipe(BaseRecipe):
 
         for ds in data_sources_to_clear:
             try:
-                dr.client.get_client().delete(
-                    f"{DataSource._path}{ds}/"
-                ).raise_for_status()
-            except HTTPError as e:
-                if (
-                    e.response
-                    and hasattr(e.response, "status_code")
-                    and e.response.status_code // 100 == 4
-                ):
-                    logger.warning(
-                        "Failed to delete recipe.",
-                        exc_info=True,
-                        extra={
-                            "data_store_id": self._data_store.id,
-                            "recipe_id": self._recipe.id if self._recipe else "NA",
-                            "user_id": self._analyst_db.user_id,
-                        },
-                    )
-            else:
-                raise
+                dr.client.get_client().delete(f"{DataSource._path}{ds}/")
+            except (AppPlatformError, RequestException):
+                # Best-effort cleanup of orphaned data sources; the new selection is
+                # already persisted. Log and continue — never fail the (background)
+                # selection over GC. A racing replica may already have deleted it.
+                logger.warning(
+                    "Failed to delete orphaned data source during cleanup.",
+                    exc_info=True,
+                    extra={
+                        "data_store_id": self._data_store.id,
+                        "data_source_id": ds,
+                        "user_id": self._analyst_db.user_id,
+                    },
+                )
 
         await self.refresh()
 

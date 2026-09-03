@@ -14,6 +14,8 @@
 
 
 import hashlib
+import os
+import time
 from pathlib import Path
 
 import pulumi
@@ -56,17 +58,39 @@ def _hash_frontend_sources(frontend_dir: Path) -> str:
 
 
 def build_frontend() -> command.local.Command:
-    """
-    Build the frontend application before deploying infrastructure.
-    Split into two stages: install dependencies and build application.
-    """
+    """Build the frontend application before deploying infrastructure."""
     frontend_dir = project_dir.parent / "app_frontend"
+    static_assets_dir = project_dir.parent / "app_backend" / "static" / "assets"
     source_hash = _hash_frontend_sources(frontend_dir)
+
+    # Build via the shell pulumi_command uses (cmd on Windows, POSIX sh elsewhere).
+    # Windows: `cd /d` also switches drive; `if exist "dir\."` is the directory test
+    # that avoids cmd mis-parsing a trailing backslash before the closing quote. The
+    # trailing check fails "Build Frontend" loudly when the build produced no assets.
+    if os.name == "nt":
+        create_cmd = (
+            f'cd /d "{frontend_dir}" && npm install && npm run build '
+            f'&& if not exist "{static_assets_dir}\\." exit /b 1'
+        )
+    else:
+        create_cmd = (
+            f'cd "{frontend_dir}" && npm install && npm run build '
+            f'&& test -d "{static_assets_dir}"'
+        )
 
     build_react_app = command.local.Command(
         f"Talk to My Data [{PROJECT_NAME}] Build Frontend",
-        create=f"cd {frontend_dir} && npm install && npm run build",
-        triggers=[source_hash],
+        create=create_cmd,
+        # The build output (static_assets_dir) is gitignored, so a fresh checkout or
+        # cleaned workspace has none. Pulumi records the trigger computed before the
+        # build runs, so a plain presence flag would store "absent" and let the next
+        # clean deploy match it and skip the build — shipping an app with no frontend.
+        # A unique token for the absent case always differs, forcing a rebuild whenever
+        # the output is missing; a present, unchanged build stays "present" and skips.
+        triggers=[
+            source_hash,
+            "present" if static_assets_dir.is_dir() else f"missing-{time.time()}",
+        ],
         opts=pulumi.ResourceOptions(
             # This resource should be created first
             depends_on=[]

@@ -117,7 +117,63 @@ describe('MessageHeader Component', () => {
     const confirmButton = screen.getByTestId('confirm-dialog-confirm');
     await user.click(confirmButton);
 
+    // Deletes the response first, then the user message — locking the pairing so the
+    // APP-6805 bound cannot regress into "never delete the assistant".
+    expect(deleteMutate).toHaveBeenCalledTimes(2);
+    expect(deleteMutate).toHaveBeenNthCalledWith(1, { messageId: 'resp-1', chatId: 'chat-1' });
+    expect(deleteMutate).toHaveBeenNthCalledWith(2, { messageId: 'msg-1', chatId: 'chat-1' });
+  });
+
+  test('deleting a failed unpaired question removes only that message, not a later answer', async () => {
+    // APP-6805: msg-1 failed with no answer of its own; deleting it must not remove
+    // resp-2, which belongs to the following question.
+    const failedUserMessage = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'Failed question',
+      created_at: '2024-01-15T12:00:00Z',
+      components: [],
+      error: 'Failed to process your question',
+    } as IChatMessage;
+    const nextUserMessage = {
+      id: 'msg-2',
+      role: 'user' as const,
+      content: 'Next question',
+      created_at: '2024-01-15T12:02:00Z',
+      components: [],
+    } as IChatMessage;
+    const nextResponse = {
+      id: 'resp-2',
+      role: 'assistant' as const,
+      content: 'Answer to next question',
+      created_at: '2024-01-15T12:03:00Z',
+      components: [],
+    } as IChatMessage;
+
+    const user = userEvent.setup();
+    const deleteMutate = vi.fn();
+    vi.mocked(useDeleteMessage).mockReturnValue({
+      mutate: deleteMutate,
+      isPending: false,
+    } as any);
+
+    renderWithProviders(
+      <MessageHeader
+        messageId="msg-1"
+        chatId="chat-1"
+        messages={[failedUserMessage, nextUserMessage, nextResponse]}
+      />
+    );
+
+    const deleteButton = screen.getByRole('button', { name: /delete message/i });
+    await user.click(deleteButton);
+
+    const confirmButton = screen.getByTestId('confirm-dialog-confirm');
+    await user.click(confirmButton);
+
+    expect(deleteMutate).toHaveBeenCalledTimes(1);
     expect(deleteMutate).toHaveBeenCalledWith({ messageId: 'msg-1', chatId: 'chat-1' });
+    expect(deleteMutate).not.toHaveBeenCalledWith({ messageId: 'resp-2', chatId: 'chat-1' });
   });
 
   test('closes confirm dialog when cancel is clicked', async () => {
