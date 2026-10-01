@@ -13,17 +13,20 @@ export async function getRegistryDatasetSize(datasetId: string): Promise<number 
   return typeof data?.datasetSize === 'number' ? data.datasetSize : null;
 }
 
+/**
+ * Fetch both Data Registry listings in a single request. The backend returns
+ * them together because the platform permits only one AI Catalog search per
+ * user at a time — two concurrent requests raced and one lost with a 409.
+ */
 export const getDatasets = async ({
   limit,
-  remote,
   signal,
 }: {
   limit: number;
-  remote: boolean;
   signal?: AbortSignal;
-}): Promise<Dataset[]> => {
-  const { data } = await apiClient.get<Dataset[]>(
-    `/v1/registry/datasets?limit=${limit}&remote=${remote}`,
+}): Promise<{ local: Dataset[]; remote: Dataset[] }> => {
+  const { data } = await apiClient.get<{ local: Dataset[]; remote: Dataset[] }>(
+    `/v1/registry/datasets?limit=${limit}`,
     {
       signal,
     }

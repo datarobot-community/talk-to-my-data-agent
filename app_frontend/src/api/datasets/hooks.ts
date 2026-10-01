@@ -38,13 +38,7 @@ export interface UploadError extends Error {
 export const useFetchDatasets = ({ limit = 100 } = {}) => {
   const queryResult = useQuery<DatasetsResponse, AxiosError<ApiError>>({
     queryKey: datasetKeys.list(limit),
-    queryFn: async ({ signal }) => {
-      const [local, remote] = await Promise.all([
-        getDatasets({ signal, limit, remote: false }),
-        getDatasets({ signal, limit, remote: true }),
-      ]);
-      return { local: local, remote: remote };
-    },
+    queryFn: ({ signal }) => getDatasets({ signal, limit }),
     refetchInterval: 5 * 60 * 1000,
     retry: (failureCount, error) => {
       const errorCode = error?.response?.data?.detail?.code;

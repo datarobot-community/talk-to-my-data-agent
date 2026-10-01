@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { test, describe, expect } from 'vitest';
 import { HighlightText } from '@/components/ui-custom/highlight-text';

@@ -10,7 +10,7 @@ dr:
     # windows: powershell -c "irm https://cli.datarobot.com/install.ps1 | iex"
 xp:
   name: DataRobot XP plugin
-  minimum-version: 1.3.2
+  minimum-version: 2.0.0
   command: dr plugin version xp
   url: https://github.com/datarobot-oss/cli
   install:

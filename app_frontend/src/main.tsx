@@ -26,6 +26,7 @@ import { getBaseUrl } from '@/lib/utils.ts';
 import './index.css';
 import App from './App.tsx';
 import { AppStateProvider } from './state';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18n from './i18n';
 
@@ -39,7 +40,9 @@ createRoot(document.getElementById('root')!).render(
       <I18nextProvider i18n={i18n}>
         <Router basename={basename}>
           <AppStateProvider>
-            <App />
+            <ErrorBoundary label="app">
+              <App />
+            </ErrorBoundary>
           </AppStateProvider>
         </Router>
       </I18nextProvider>

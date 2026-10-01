@@ -26,7 +26,7 @@ const defaultDataRobotInfo = {
     email: 'anton@datarobot.com',
   },
   datarobot_api_token: '****AbC1',
-  datarobot_api_scoped_token: null,
+  datarobot_api_scoped_token: null as string | null,
 };
 
 function setupMocks(overrides?: {

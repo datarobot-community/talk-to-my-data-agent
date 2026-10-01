@@ -84,6 +84,14 @@ app_runtime_parameters = [
         type="string",
         value=proxy_llm_deployment.id,
     ),
+    # datarobot-genai resolves LLM settings through the app-prefixed name
+    # (e.g. Config.llm_nim_deployment_id -> LLM_NIM_DEPLOYMENT_ID);
+    # set both so the deployed app resolves regardless of which one a consumer reads.
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="LLM_NIM_DEPLOYMENT_ID",
+        type="string",
+        value=proxy_llm_deployment.id,
+    ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key="LLM_DEFAULT_MODEL",
         type="string",
@@ -102,6 +110,11 @@ custom_model_runtime_parameters = [
         value=proxy_llm_deployment.id,
     ),
     datarobot.CustomModelRuntimeParameterValueArgs(
+        key="LLM_NIM_DEPLOYMENT_ID",
+        type="string",
+        value=proxy_llm_deployment.id,
+    ),
+    datarobot.CustomModelRuntimeParameterValueArgs(
         key="LLM_DEFAULT_MODEL",
         type="string",
         value=default_model,
@@ -115,5 +128,6 @@ custom_model_runtime_parameters = [
 
 pulumi.export("Deployment ID " + llm_resource_name, proxy_llm_deployment.id)
 export("NIM_DEPLOYMENT_ID", proxy_llm_deployment.id)
+export("LLM_NIM_DEPLOYMENT_ID", proxy_llm_deployment.id)
 export("LLM_DEFAULT_MODEL", default_model)
 export("USE_DATAROBOT_LLM_GATEWAY", "0")

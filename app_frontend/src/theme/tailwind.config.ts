@@ -47,7 +47,7 @@ const config = {
           foreground: 'var(--card-foreground)',
         },
         sidebar: {
-          DEFAULT: 'var(--sidebar-background)',
+          DEFAULT: 'var(--sidebar)',
           foreground: 'var(--sidebar-foreground)',
           primary: 'var(--sidebar-primary)',
           'primary-foreground': 'var(--sidebar-primary-foreground)',
@@ -72,8 +72,8 @@ const config = {
         '4xl': ['2.5rem', { lineHeight: '3rem' }],
       },
       fontFamily: {
-        serif: ['var(--font-inter-serif)', ...defaultTheme.fontFamily.serif],
-        mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
+        sans: ['var(--font-sans)', ...defaultTheme.fontFamily.sans],
+        mono: ['var(--font-mono)', ...defaultTheme.fontFamily.mono],
       },
     },
   },

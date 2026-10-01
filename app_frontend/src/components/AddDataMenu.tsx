@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Database, Plus, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +14,7 @@ import { useTranslation } from '@/i18n';
 
 import { AddDataModal } from './AddDataModal';
 import { BrowseDataDrawer } from './BrowseDataDrawer';
+import { ErrorBoundary } from './ErrorBoundary';
 
 import './browse-data-styles.css';
 
@@ -58,7 +60,21 @@ export const AddDataMenu = ({ highlight }: { highlight?: boolean }) => {
         </DropdownMenuContent>
       </DropdownMenu>
       <AddDataModal open={addDataOpen} onOpenChange={setAddDataOpen} />
-      {browseOpen && <BrowseDataDrawer open={browseOpen} onOpenChange={setBrowseOpen} />}
+      {browseOpen && (
+        // The drawer renders third-party connectivity/design-system components.
+        // If one throws, close the drawer and tell the user rather than letting
+        // the throw unmount the whole app (AECO-44).
+        <ErrorBoundary
+          label="browse-data-drawer"
+          fallback={() => null}
+          onError={() => {
+            setBrowseOpen(false);
+            toast.error(t('Browse Data could not be opened'));
+          }}
+        >
+          <BrowseDataDrawer open={browseOpen} onOpenChange={setBrowseOpen} />
+        </ErrorBoundary>
+      )}
     </>
   );
 };

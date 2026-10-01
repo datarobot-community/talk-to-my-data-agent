@@ -209,5 +209,8 @@
   "Delete chat": "チャットを削除",
   "Are you sure you want to delete this chat?": "このチャットを削除してもよろしいですか？",
   "Data": "データ",
-  "View": "表示"
+  "View": "表示",
+  "Something went wrong": "問題が発生しました",
+  "Try again": "再試行",
+  "Browse Data could not be opened": "データの参照を開けませんでした"
 }

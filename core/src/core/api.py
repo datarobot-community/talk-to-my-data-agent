@@ -31,6 +31,7 @@ from typing import (
     Any,
     AsyncGenerator,
     Callable,
+    Final,
     Literal,
     TypeVar,
     cast,
@@ -139,6 +140,7 @@ from core.schema import (
     GetBusinessAnalysisMetadata,
     GetBusinessAnalysisRequest,
     GetBusinessAnalysisResult,
+    RegistryDatasets,
     RunAnalysisRequest,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
@@ -205,38 +207,63 @@ def cache(f: T) -> T:
         return cast(T, wrapper)
 
 
+# Page size for the catalog walk in `list_registry_datasets`. One page is one
+# AI Catalog search, and the platform serialises those per user, so prefer a
+# large page over many small ones.
+_REGISTRY_PAGE_SIZE: Final[int] = 100
+
+
 # This can be large as we are not storing the actual datasets in memory, just metadata
 @otel.meter_and_trace
-def list_registry_datasets(
-    remote: bool = False, limit: int = 100
-) -> list[DataRegistryDataset]:
-    """Fetch datasets from Data Registry with specified limit
+def list_registry_datasets(limit: int = 100) -> RegistryDatasets:
+    """Fetch the local and remote Data Registry listings in one catalog walk.
+
+    `Dataset.iterate`'s own `limit` is the *page size*, not a cap — passing the
+    caller's limit there walks the entire catalog, one AI Catalog search per
+    page. The platform allows a user only one catalog search at a time, so that
+    (doubled by fetching local and remote separately) is what produced 409s and
+    multi-second load times. Here the generator is consumed lazily and abandoned
+    as soon as both lists are full, so a large catalog costs a page or two.
 
     Args:
-        filter_downloadable (bool, optional): Include only downloadable datasets. Defaults to False.
-        limit (int, optional): _description_. Defaults to 100.
+        limit (int, optional): Maximum datasets to return per list. Defaults to 100.
 
     Returns:
-        list[DataRegistryDataset]: _description_
+        RegistryDatasets: up to `limit` local and up to `limit` remote datasets.
     """
+    local: list[DataRegistryDataset] = []
+    remote: list[DataRegistryDataset] = []
+
     with handle_datarobot_error("Dataset.iterate()"):
-        datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
-    return [
-        DataRegistryDataset(
-            id=ds.id,
-            name=ds.name,
-            created=(_year_month_day(ds.created_at) if ds.created_at else "N/A"),
-            size=(f"{ds.size / (1024 * 1024):.1f} MB" if ds.size else "N/A"),
-        )
-        for ds in datasets
-        if (remote and ds.is_data_engine_eligible and ds.is_snapshot)
-        or (
-            not remote
-            and ds.size
-            and ds.size <= REGISTRY_DATASET_SIZE_CUTOFF
-            and ds.is_snapshot
-        )
-    ]
+        for ds in Dataset.iterate(limit=_REGISTRY_PAGE_SIZE, filter_failed=True):
+            if len(local) >= limit and len(remote) >= limit:
+                break
+            # A dataset that is not a snapshot can be neither downloaded nor
+            # wrangled, so it belongs to neither list.
+            if not ds.is_snapshot:
+                continue
+            # The lists are not mutually exclusive: a small, engine-eligible
+            # dataset can be both downloaded and wrangled, and appeared in both
+            # listings before these were split apart. Keep that.
+            if (
+                len(local) < limit
+                and ds.size
+                and ds.size <= REGISTRY_DATASET_SIZE_CUTOFF
+            ):
+                local.append(_to_registry_dataset(ds))
+            if len(remote) < limit and ds.is_data_engine_eligible:
+                remote.append(_to_registry_dataset(ds))
+
+    return RegistryDatasets(local=local, remote=remote)
+
+
+def _to_registry_dataset(ds: Dataset) -> DataRegistryDataset:
+    return DataRegistryDataset(
+        id=ds.id,
+        name=ds.name,
+        created=(_year_month_day(ds.created_at) if ds.created_at else "N/A"),
+        size=(f"{ds.size / (1024 * 1024):.1f} MB" if ds.size else "N/A"),
+    )
 
 
 def _year_month_day(date: datetime | str) -> str:

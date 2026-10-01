@@ -113,6 +113,18 @@ class DataRegistryDataset(BaseModel):
     size: str
 
 
+class RegistryDatasets(BaseModel):
+    """Both halves of the Data Registry listing, from a single catalog walk.
+
+    `local` datasets are small enough to download directly; `remote` ones must
+    be wrangled through Spark. Splitting them server-side means one AI Catalog
+    search instead of two concurrent ones.
+    """
+
+    local: list[DataRegistryDataset]
+    remote: list[DataRegistryDataset]
+
+
 class EmptyResponse(BaseModel):
     success: bool = True
 

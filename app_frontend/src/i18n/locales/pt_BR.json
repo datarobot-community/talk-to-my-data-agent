@@ -209,5 +209,8 @@
   "Delete chat": "Excluir bate-papo",
   "Are you sure you want to delete this chat?": "Tem certeza de que deseja excluir este bate-papo?",
   "Data": "Dados",
-  "View": "Exibir"
+  "View": "Exibir",
+  "Something went wrong": "Algo deu errado",
+  "Try again": "Tentar novamente",
+  "Browse Data could not be opened": "Não foi possível abrir Navegar pelos dados"
 }

@@ -1,5 +1,6 @@
 @import '@datarobot/design-system/styles/scoped/index.min.css' layer(dr-design-system);
-@import '@datarobot/design-system/styles/scoped/themes/midnight-gray.min.css' layer(dr-design-system);
+@import '@datarobot/design-system/styles/scoped/themes/midnight-gray.min.css'
+  layer(dr-design-system);
 @import '@datarobot/design-system/styles/scoped/themes/alpine-light.min.css' layer(dr-design-system);
 @import '@datarobot/connectivity/styles.css' layer(dr-design-system);
 

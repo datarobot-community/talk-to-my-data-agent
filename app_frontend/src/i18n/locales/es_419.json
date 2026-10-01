@@ -209,5 +209,8 @@
   "Delete chat": "Eliminar chat",
   "Are you sure you want to delete this chat?": "¿Estás seguro de que quieres eliminar este chat?",
   "Data": "Datos",
-  "View": "Ver"
+  "View": "Ver",
+  "Something went wrong": "Se produjo un error",
+  "Try again": "Intentar de nuevo",
+  "Browse Data could not be opened": "No se pudo abrir Explorar datos"
 }

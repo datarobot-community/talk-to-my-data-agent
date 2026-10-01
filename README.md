@@ -46,9 +46,10 @@ The template scales with your data. Whether you're working with a few thousand r
      - [Snowflake](#snowflake)
      - [BigQuery](#bigquery)
 8. [Tools](#tools)
-9. [Share results](#share-results)
-10. [Delete all provisioned resources](#delete-all-provisioned-resources)
-11. [Maintaining this template](#maintaining-this-template)
+9. [Testing](#testing)
+10. [Share results](#share-results)
+11. [Delete all provisioned resources](#delete-all-provisioned-resources)
+12. [Maintaining this template](#maintaining-this-template)
 
 ## 🚀 Quick start
 
@@ -397,6 +398,48 @@ Talk to My Data supports connecting to Redshift.
 ## Tools
 
 Define functions in `core/src/core/tools.py` to extend the data analyst Python agent with tools for data analysis tasks. Each function becomes available in the agent code execution environment. The name, docstring, and signature are included in the agent prompt.
+
+## Testing
+
+This repository has three separate test suites. The root `task test` runs only the first of them.
+
+### Component unit tests
+
+```bash
+task test  # Runs app_backend, app_frontend, and core suites
+```
+
+They can also be run individually:
+
+```bash
+task app_backend:test   # pytest with coverage
+task app_frontend:test  # Vitest
+task core:test          # pytest with coverage
+```
+
+### Root integration suite
+
+`tests/` holds integration tests that deploy against a real DataRobot environment. They need a populated `.env` and are **not** part of `task test`.
+
+```bash
+uv sync
+uv run pytest tests                # Against an existing Pulumi stack
+uv run pytest tests --pulumi_up    # Run `pulumi up` first, then test
+```
+
+Two custom flags are defined in `tests/conftest.py`: `--pulumi_up` provisions the stack before the run, and `--always_delete_stack` tears it down even when a test fails. Tests marked `integration` or `remote_datasource_concurrency` are excluded by default (see `addopts` in `pyproject.toml`); select them explicitly with `-m`.
+
+### End-to-end browser tests
+
+`tests/e2e/` holds the Cypress suite, which drives a *deployed* instance of the app through a browser. It has its own `package.json` and its own Taskfile, neither of which is wired into the root Taskfile.
+
+```bash
+cd tests/e2e
+npm install
+npm run cy:open  # Or cy:run for headless
+```
+
+It needs `DATAROBOT_HOST`, `APP_USERNAME`, `APP_PASSWORD`, and `APP_ID` in the environment. See [tests/e2e/README.md](tests/e2e/README.md) for the full configuration reference, the page-object layout, and how to add a spec.
 
 ## Share results
 

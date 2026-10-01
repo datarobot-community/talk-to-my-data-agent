@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.13.0] - 2026-10-01
+
 ### Security
 
 - The `session_fastapi` cookie is no longer issued or read. It held
@@ -31,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and dataset names that contain control characters or collide with an internal control
   table are rejected before a table is created.
 
+### Fixed
+
+- Browse Data no longer crashes the app, and Data Registry listings no longer fail with 409
+  from concurrent catalog searches.
+
 ### Changed
 
 - `TEST_USER_EMAIL` now applies only when no `x-user-email` header arrived at all, so a
@@ -38,6 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   development only — the variable cannot be set on a deployed instance.
 - `SessionState.update()` was removed; it had no callers left. Forks that call it should use
   the constructor, which takes the same dict.
+- Updated `fastapi-app_backend` component from 568d86c to 7724b95663efa54d2438c9859c0ee1222e28ba09:
+  - Fixed resource type mismatch in mypy casting.
+  - Added support for custom execution environments via environment variables.
+  - Fixed development server start command in Taskfile.
+  - Changed default app logging to JSON format, emitting levelname instead of level.
+  - Removed metadata.yaml in favor of direct runtime parameters.
+  - Skipped OTel shutdown flush when no providers were configured.
+- Updated `base` component from b2774bb to dcc1ce08c924fa00b4b0b3ad9022e190b4242fec:
+  - Updated Pulumi version and pulumi-datarobot plugin version to support workload c2w.
+  - Synced pulumi-datarobot plugin version with SDK floor.
+  - Bumped pulumi-datarobot library version.
+- Updated `llm` component from 11.11.16 to 11.11.18:
+  - Updated dependencies to address CVEs in pydantic-settings and soupsieve.
+  - Updated dependencies to address CVE in anyio.
 
 ## [11.12.0] - 2026-09-03
 

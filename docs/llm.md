@@ -78,7 +78,7 @@ The component references the existing NIM deployment and its prediction environm
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `NIM_DEPLOYMENT_ID` (or `<LLM>_NIM_DEPLOYMENT_ID`) | Yes | -- | Deployment ID of the existing NIM LLM. Exported and read at runtime as `NIM_DEPLOYMENT_ID`. |
+| `NIM_DEPLOYMENT_ID` (or `<LLM>_NIM_DEPLOYMENT_ID`) | Yes | -- | Deployment ID of the existing NIM LLM. Exported as both `NIM_DEPLOYMENT_ID` and `<LLM>_NIM_DEPLOYMENT_ID` so it resolves for datarobot-genai and for `Config` alike. |
 | `<LLM>_DEFAULT_MODEL` | Yes | `datarobot/datarobot-deployed-llm` | Model your NIM serves (e.g. `meta-llama/Llama-3.1-8B`); stored `datarobot/`-prefixed. The placeholder is only a last-resort fallback. |
 
 ### Stack outputs
@@ -89,6 +89,7 @@ Surfaced by `task infra:info` or `pulumi stack output`:
 |---|---|
 | `Deployment ID [LLM_APP_NAME]` | ID of the referenced NIM deployment |
 | `NIM_DEPLOYMENT_ID` | Same deployment ID (the name datarobot-genai reads to route to NIM) |
+| `<LLM>_NIM_DEPLOYMENT_ID` | Same deployment ID, app-prefixed (the name `Config` reads) |
 | `USE_DATAROBOT_LLM_GATEWAY` | `0` |
 
 ## External LLM

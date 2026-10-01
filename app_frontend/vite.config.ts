@@ -76,7 +76,7 @@ export default defineConfig({
       },
     },
     typecheck: {
-      tsconfig: './tsconfig.test.json',
+      tsconfig: './tsconfig.json',
     },
     coverage: {
       provider: 'v8',
