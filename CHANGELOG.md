@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.13.1] - 2026-10-06
+
+### Changed
+
+- The notebook execution environment is now built with the `dr-environment` plugin for the
+  DataRobot CLI instead of the bespoke `execution_environments` build scripts. Users build the
+  image themselves (see `execution_environments/README.md`, which builds with Python 3.12), and
+  `execution_environments/` is no longer excluded from the datarobot-community release.
+  `start-app.sh` is adapted to the offline image.
+
+### Removed
+
+- The execution environment image build workflow and the `build_docker_context_*` scripts.
+
+### Fixed
+
+- Refreshed the stale `infra/uv.lock` that the `dr-environment` lockfile check rejected.
+
 ## [11.13.0] - 2026-10-01
 
 ### Security

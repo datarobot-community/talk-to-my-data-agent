@@ -45,11 +45,11 @@ The dev server proxies `/api` calls to the backend on port 8080.
 
 ### Known issue with Apple Silicon (arm64)
 
-If you're on an Apple Silicon (arm64) machine, you might encounter issues with optional dependencies or platform-specific packages. If you encounter errors after a teammate updates `package-lock.json` on a different architecture, delete `node_modules` and `package-lock.json`, then run `npm install` again.
+If you're on an Apple Silicon (arm64) machine, you might encounter issues with optional dependencies or platform-specific packages. If you encounter errors after a teammate updates `package-lock.json` on a different architecture, delete `node_modules` and run `npm ci` again. Keep `package-lock.json`: `task install` and the deploy build use `npm ci`, which installs strictly from the lockfile and also works offline from a warm npm cache. After changing `package.json`, run `npm install` once to update the lockfile and commit it.
 
 ```bash
-rm -rf node_modules package-lock.json
-npm i
+rm -rf node_modules
+npm ci
 ```
 
 ## Testing

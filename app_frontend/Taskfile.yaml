@@ -4,7 +4,7 @@ tasks:
   install:
     desc: 🧱 Install React dependencies
     cmds:
-      - npm install
+      - npm ci
   lint:
     desc: 🧹 Lint React code
     cmds:

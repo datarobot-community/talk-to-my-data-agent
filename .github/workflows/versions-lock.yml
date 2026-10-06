@@ -1,0 +1,37 @@
+---
+# dr-environment bakes the Pulumi providers and base-image Python from
+# .datarobot/cli/versions.yaml; fail if they drift from the uv.lock files (a provider
+# mismatch makes `task deploy` download it from GitHub, which fails in an air gap).
+name: Versions Lock Check
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/*'
+    paths:
+      - .datarobot/cli/versions.yaml
+      - '**/uv.lock'
+      - .github/scripts/check_versions_lock.py
+      - .github/workflows/versions-lock.yml
+  pull_request:
+    paths:
+      - .datarobot/cli/versions.yaml
+      - '**/uv.lock'
+      - .github/scripts/check_versions_lock.py
+      - .github/workflows/versions-lock.yml
+  workflow_dispatch:
+
+jobs:
+  versions-lock-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Verify versions.yaml is in sync with the uv.lock files
+        run: uv run .github/scripts/check_versions_lock.py

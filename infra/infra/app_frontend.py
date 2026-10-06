@@ -69,12 +69,12 @@ def build_frontend() -> command.local.Command:
     # trailing check fails "Build Frontend" loudly when the build produced no assets.
     if os.name == "nt":
         create_cmd = (
-            f'cd /d "{frontend_dir}" && npm install && npm run build '
+            f'cd /d "{frontend_dir}" && npm ci && npm run build '
             f'&& if not exist "{static_assets_dir}\\." exit /b 1'
         )
     else:
         create_cmd = (
-            f'cd "{frontend_dir}" && npm install && npm run build '
+            f'cd "{frontend_dir}" && npm ci && npm run build '
             f'&& test -d "{static_assets_dir}"'
         )
 

@@ -207,7 +207,6 @@ dist-ssr
 *.sln
 *.sw?
 
-package-lock.json
 bun.lockb
 .vite/
 app_backend/metadata.yaml
@@ -221,12 +220,8 @@ pulumi_config.json
 
 Taskfile.gen.yaml
 
-execution_environments/artifacts/*
-execution_environments/notebook_docker_context.zip
-execution_environments/notebook_docker_context/kernels/task-sources.tgz
-execution_environments/notebook_docker_context/kernels/agent.zip
-execution_environments/notebook_docker_context/kernels/node.zip
-execution_environments/notebook_docker_context/kernels/python.zip
+docker_context/
+docker_context.tar.gz
 
 # DataRobot CLI stuff:
 # .datarobot/cli/state.yaml contains user-specific history and audit-trail while working with the CLI

@@ -53,3 +53,37 @@ pulumi:
     macos: brew install pulumi
     linux: curl -fsSL https://get.pulumi.com | sh
     # windows: winget install Pulumi.Pulumi
+# Must stay below `pulumi`: entries install in file order and this one needs pulumi.
+# dr-environment bakes this provider into the execution environment, so minimum-version
+# must match the pulumi-datarobot version locked in infra/uv.lock (checked in CI).
+pulumi-datarobot:
+  name: DataRobot Pulumi provider
+  minimum-version: 0.12.4
+  command: uv pip show --python infra/.venv pulumi-datarobot
+  url: https://github.com/datarobot-community/pulumi-datarobot
+  install:
+    macos: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
+    linux: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
+    # windows: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
+# Same as pulumi-datarobot: must match infra/uv.lock (checked in CI).
+pulumi-command:
+  name: Pulumi Command provider
+  minimum-version: 1.2.1
+  command: uv pip show --python infra/.venv pulumi-command
+  url: https://github.com/pulumi/pulumi-command
+  install:
+    macos: pulumi plugin install resource command v1.2.1
+    linux: pulumi plugin install resource command v1.2.1
+    # windows: pulumi plugin install resource command v1.2.1
+# `version` is the execution environment's base-image Python for dr-environment; it must
+# satisfy requires-python in every uv.lock (checked in CI).
+python:
+  name: Python
+  version: "3.12"
+  minimum-version: 3.12.0
+  command: python3 --version
+  url: https://www.python.org/downloads/
+  install:
+    macos: brew install python@3.12
+    linux: sudo apt-get install python3.12
+    # windows: winget install -e --id Python.Python.3.12
