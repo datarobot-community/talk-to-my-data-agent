@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.14.0] - 2026-11-04
+
+### Changed
+
+- Updated `llm` component from 11.11.18 to 11.11.25:
+  - Aligned LLM config field names for consistency
+- Updated `base` component from dcc1ce0 to 96fd8232b19a2d94b5c797b9eb6184957fea6d40:
+  - Bumped Pulumi to latest version
+- Updated `react-app` component from 95792e1 to dc8727028fffff46bb7876d45a7fa0ed1fb80915:
+  - Declared the supported Node.js range and pinned `.nvmrc` to 22
+
+### Fixed
+
+- LLM token usage is now reported correctly in the metrics API.
+
 ## [11.13.1] - 2026-10-06
 
 ### Changed
@@ -35,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `x-user-email` header, so a forged cookie reached another user's chats, datasets and
   dictionaries. Sessions are now keyed by the identity derived from the request itself. A
   stale cookie left in a browser is ignored; no user data moves.
-- User identity is now derived from the *last* `x-user-email` header value rather than the
+- User identity is now derived from the _last_ `x-user-email` header value rather than the
   first. The upstream proxy appends the authenticated address instead of replacing the
   header, so a client-supplied value arrived first and was the one read. Two requests that
   previously resolved to an identity no longer do: one whose authenticated value is empty
@@ -122,7 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed "Add Data from Data Registry" returning a 404 on submit.
 - Blank `JDBC_CONNECTION_PARAMETERS` values are now treated as `None` instead of causing errors.
 - Fixed `drdev` not being installed automatically during `task start`.
-
 
 ## [11.10.3] - 2026-07-15
 

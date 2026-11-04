@@ -1,4 +1,5 @@
 import React, { Suspense, lazy } from 'react';
+import type { Layout } from 'plotly.js';
 import { CollapsiblePanel } from './CollapsiblePanel';
 import { PlotlyData } from './utils';
 import './PlotPanel.css';
@@ -47,7 +48,7 @@ export const PlotPanel: React.FC<PlotPanelProps> = ({
       <Suspense fallback={<PlotLoading />}>
         <Plot
           data={plotData.data}
-          layout={plotData.layout}
+          layout={plotData.layout as Partial<Layout>}
           className={className}
           style={{ position: 'relative', width, height }}
           config={{ responsive: true }}

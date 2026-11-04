@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || ^24.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "i18n:extract": "i18next 'src/**/!(*.test).{js,jsx,ts,tsx}'",
@@ -48,7 +51,7 @@
     "cmdk": "1.0.4",
     "i18next": "^26.3.1",
     "lucide-react": "^0.475.0",
-    "plotly.js": "^3.0.1",
+    "plotly.js": "^4.1.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-dropzone": "^14.3.5",
@@ -76,7 +79,7 @@
     "@types/react-dom": "^19.0.4",
     "@types/react-plotly.js": "^2.6.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
     "eslint": "^9.21.0",
@@ -98,7 +101,7 @@
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0",
     "vite-plugin-node-polyfills": "^0.23.0",
-    "vitest": "^3.1.1",
+    "vitest": "^5.0.5",
     "vitest-localstorage-mock": "^0.1.2"
   },
   "overrides": {

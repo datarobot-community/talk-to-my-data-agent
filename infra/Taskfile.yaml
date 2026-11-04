@@ -24,7 +24,7 @@ vars:
       if [ -n "${PULUMI_DATAROBOT_PLUGIN_VERSION:-}" ]; then
         echo "${PULUMI_DATAROBOT_PLUGIN_VERSION}"
       else
-        echo "v0.12.3"
+        echo "v0.13.0"
       fi
 
   PULUMI_DATAROBOT_DEFAULT_URL:

@@ -58,13 +58,13 @@ pulumi:
 # must match the pulumi-datarobot version locked in infra/uv.lock (checked in CI).
 pulumi-datarobot:
   name: DataRobot Pulumi provider
-  minimum-version: 0.12.4
+  minimum-version: 0.13.0
   command: uv pip show --python infra/.venv pulumi-datarobot
   url: https://github.com/datarobot-community/pulumi-datarobot
   install:
-    macos: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
-    linux: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
-    # windows: pulumi plugin install resource datarobot v0.12.4 --server github://api.github.com/datarobot-community/pulumi-datarobot
+    macos: pulumi plugin install resource datarobot v0.13.0 --server github://api.github.com/datarobot-community/pulumi-datarobot
+    linux: pulumi plugin install resource datarobot v0.13.0 --server github://api.github.com/datarobot-community/pulumi-datarobot
+    # windows: pulumi plugin install resource datarobot v0.13.0 --server github://api.github.com/datarobot-community/pulumi-datarobot
 # Same as pulumi-datarobot: must match infra/uv.lock (checked in CI).
 pulumi-command:
   name: Pulumi Command provider

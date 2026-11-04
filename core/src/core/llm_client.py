@@ -46,8 +46,10 @@ _tracer = trace.get_tracer(__name__)
 
 
 @functools.cache
-def _token_counter() -> metrics.Counter:
-    return metrics.get_meter("gen_ai").create_counter(
+def _token_usage_histogram() -> metrics.Histogram:
+    # A histogram, as the OTel GenAI conventions define it. The metrics store keeps one type per
+    # metric name, and drops a counter's points where the name was first sent as a histogram.
+    return metrics.get_meter("gen_ai").create_histogram(
         "gen_ai.client.token.usage",
         unit="{token}",
         description="Number of tokens used in GenAI API calls",
@@ -274,7 +276,7 @@ class CompletionsWrapper:
                     prompt_tokens = getattr(usage, "prompt_tokens", None)
                     if prompt_tokens is not None:
                         span.set_attribute("gen_ai.usage.input_tokens", prompt_tokens)
-                        _token_counter().add(
+                        _token_usage_histogram().record(
                             prompt_tokens,
                             {**token_attrs, "gen_ai.token.type": "input"},
                         )
@@ -283,7 +285,7 @@ class CompletionsWrapper:
                         span.set_attribute(
                             "gen_ai.usage.output_tokens", completion_tokens
                         )
-                        _token_counter().add(
+                        _token_usage_histogram().record(
                             completion_tokens,
                             {**token_attrs, "gen_ai.token.type": "output"},
                         )

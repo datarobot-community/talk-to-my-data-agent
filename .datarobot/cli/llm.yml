@@ -51,7 +51,7 @@ llm_gateway:
     type: llmgw_catalog
     optional: false
     help: "Choose an LLM from the DataRobot LLM Gateway catalog to use for your LLM Blueprint."
-  - env: USE_DATAROBOT_LLM_GATEWAY
+  - env: LLM_USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "1"
     hidden: true
@@ -61,13 +61,13 @@ deployed_llm:
     type: string
     optional: false
     help: "Enter the deployment ID of the DataRobot custom model deployed LLM (e.g., 6510c7b7c4f3f9407e24a849)."
-  - env: USE_DATAROBOT_LLM_GATEWAY
+  - env: LLM_USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
     hidden: true
 
 nim_deployed_llm:
-  - env: NIM_DEPLOYMENT_ID
+  - env: LLM_NIM_DEPLOYMENT_ID
     type: string
     optional: false
     help: "Enter the deployment ID of your DataRobot NIM deployment (e.g., 6510c7b7c4f3f9407e24a849)."
@@ -75,7 +75,7 @@ nim_deployed_llm:
     type: string
     optional: false
     help: "Enter the model your NIM deployment serves (e.g., meta-llama/Llama-3.1-8B). The template will automatically prepend /datarobot/."
-  - env: USE_DATAROBOT_LLM_GATEWAY
+  - env: LLM_USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
     hidden: true
@@ -90,7 +90,7 @@ registered_model:
     default: 30
     optional: true
     help: "Enter the timeout in minutes for DataRobot operations (default: 30 minutes)."
-  - env: USE_DATAROBOT_LLM_GATEWAY
+  - env: LLM_USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "0"
     hidden: true
@@ -100,7 +100,7 @@ external_llm:
     type: string
     optional: false
     help: "Enter the external LLM model in provider/model form (e.g., azure/gpt-5-mini, nebius/moonshotai/Kimi-K2.7-Code, bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0). The template will automatically prepend /datarobot/."
-  - env: USE_DATAROBOT_LLM_GATEWAY
+  - env: LLM_USE_DATAROBOT_LLM_GATEWAY
     type: string
     default: "amazon-anthropic-claude-sonnet-4-5-20250929-v1"
     optional: true

@@ -1,5 +1,5 @@
 /// <reference types="vitest/globals" />
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/react';
 import { server } from './__mocks__/node.js';
 

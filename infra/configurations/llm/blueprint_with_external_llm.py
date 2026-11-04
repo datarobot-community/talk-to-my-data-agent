@@ -28,7 +28,7 @@ from datarobot_pulumi_utils.common.llm_validation import verify_llm
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.llm_credentials import get_runtime_values
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
-from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
+from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironment
 from datarobot_pulumi_utils.schema.llms import ensure_datarobot_prefix
 
 from . import use_case
@@ -103,7 +103,9 @@ llm_custom_model = datarobot.CustomModel(
     target_name="resultText",
     target_type=dr.enums.TARGET_TYPE.TEXT_GENERATION,
     replicas=1,
-    base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
+    base_environment_id=RuntimeEnvironment(
+        name="[GenAI] Python 3.14 with Moderations"
+    ).id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
     runtime_parameter_values=llm_credential_runtime_params,
@@ -162,7 +164,7 @@ app_runtime_parameters = [
         value=llm_deployment.id,
     ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
-        key="USE_DATAROBOT_LLM_GATEWAY",
+        key="LLM_USE_DATAROBOT_LLM_GATEWAY",
         type="string",
         value="0",
     ),
@@ -189,7 +191,7 @@ custom_model_runtime_parameters = [
         value=llm_deployment.id,
     ),
     datarobot.CustomModelRuntimeParameterValueArgs(
-        key="USE_DATAROBOT_LLM_GATEWAY",
+        key="LLM_USE_DATAROBOT_LLM_GATEWAY",
         type="string",
         value="0",
     ),
@@ -221,7 +223,7 @@ deployment_url = pulumi.Output.format(
 pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
 pulumi.export("Deployment Console " + llm_resource_name, deployment_url)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
-export("USE_DATAROBOT_LLM_GATEWAY", "0")
+export("LLM_USE_DATAROBOT_LLM_GATEWAY", "0")
 export("LLM_DEFAULT_MODEL", default_model)
 export("LLM_DEFAULT_MODEL_FRIENDLY_NAME", default_llm_friendly_name)
 export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
