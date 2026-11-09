@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The notebook execution environment's Docker context is now generated with
+  `dr environment template --template-path .` (`dr-environment` renamed its `recipe` command);
+  install or update the plugin with `uv tool install 'dr-environment>=0.1.12'`.
+
 ## [11.14.0] - 2026-11-04
 
 ### Changed
